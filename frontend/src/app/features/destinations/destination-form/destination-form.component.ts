@@ -1,0 +1,294 @@
+import {
+  Component, OnInit, ChangeDetectionStrategy, inject, signal,
+} from '@angular/core';
+import { ReactiveFormsModule, FormBuilder, Validators, AbstractControl } from '@angular/forms';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { MatCardModule } from '@angular/material/card';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
+import { MatChipsModule, MatChipInputEvent } from '@angular/material/chips';
+import { MatAutocompleteModule, MatAutocompleteSelectedEvent } from '@angular/material/autocomplete';
+import { MatIconModule } from '@angular/material/icon';
+import { MatButtonModule } from '@angular/material/button';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatDatepickerModule } from '@angular/material/datepicker';
+import { COMMA, ENTER } from '@angular/cdk/keycodes';
+import { DestinationService } from '../../../core/services/destination.service';
+
+const MONTHS = [
+  'January','February','March','April','May','June',
+  'July','August','September','October','November','December',
+];
+
+@Component({
+  selector: 'app-destination-form',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [
+    RouterLink, ReactiveFormsModule,
+    MatCardModule, MatFormFieldModule, MatInputModule, MatSelectModule,
+    MatChipsModule, MatAutocompleteModule, MatIconModule, MatButtonModule,
+    MatProgressSpinnerModule, MatDatepickerModule,
+  ],
+  styles: [`
+    .form-card { max-width: 720px; margin: 0 auto; }
+    .form-title { font-size:22px; font-weight:700; margin-bottom:20px; }
+    .row { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    @media(max-width:600px){ .row { grid-template-columns:1fr; } }
+    mat-form-field { width:100%; margin-bottom:4px; }
+    .section { margin:16px 0 8px; font-size:13px; font-weight:600;
+                text-transform:uppercase; letter-spacing:.7px; color:var(--wp-text-secondary); }
+    .star-row { display:flex; gap:4px; margin:8px 0 16px; }
+    .star-btn  { cursor:pointer; font-size:28px; color:var(--wp-border); transition:color .15s; }
+    .star-btn.active { color:#FFB300; }
+    .actions { display:flex; gap:12px; justify-content:flex-end; margin-top:8px; }
+    .err { font-size:12px; color:#c62828; margin-bottom:4px; }
+  `],
+  template: `
+    <div class="page-container">
+      <button mat-stroked-button routerLink="/destinations" style="margin-bottom:16px">
+        <mat-icon>arrow_back</mat-icon> Destinations
+      </button>
+
+      <mat-card class="form-card">
+        <mat-card-content>
+          <h2 class="form-title">{{ isEdit() ? 'Edit' : 'Add' }} Destination</h2>
+
+          <form [formGroup]="form" (ngSubmit)="save()">
+
+            <!-- Basic info -->
+            <mat-form-field appearance="outline">
+              <mat-label>Destination name *</mat-label>
+              <input matInput formControlName="name" />
+            </mat-form-field>
+
+            <div class="row">
+              <mat-form-field appearance="outline">
+                <mat-label>City *</mat-label>
+                <input matInput formControlName="city" />
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>State / Province *</mat-label>
+                <input matInput formControlName="state_province" />
+              </mat-form-field>
+            </div>
+
+            <div class="row">
+              <mat-form-field appearance="outline">
+                <mat-label>Country *</mat-label>
+                <mat-select formControlName="country">
+                  <mat-option value="USA">USA</mat-option>
+                  <mat-option value="Canada">Canada</mat-option>
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Region</mat-label>
+                <input matInput formControlName="region" placeholder="e.g. Pacific Northwest" />
+              </mat-form-field>
+            </div>
+
+            <!-- Status & rating -->
+            <p class="section">Status &amp; Rating</p>
+            <div class="row">
+              <mat-form-field appearance="outline">
+                <mat-label>Status</mat-label>
+                <mat-select formControlName="status">
+                  <mat-option value="want_to_visit">Want to Visit</mat-option>
+                  <mat-option value="planned">Planned</mat-option>
+                  <mat-option value="visited">Visited</mat-option>
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Date Visited</mat-label>
+                <input matInput [matDatepicker]="picker" formControlName="visited_at" />
+                <mat-datepicker-toggle matSuffix [for]="picker" />
+                <mat-datepicker #picker />
+              </mat-form-field>
+            </div>
+
+            <div>
+              <label style="font-size:13px;color:var(--wp-text-secondary)">Rating</label>
+              <div class="star-row">
+                @for (i of [1,2,3,4,5]; track i) {
+                  <span class="star-btn" [class.active]="(form.value.rating ?? 0) >= i"
+                        (click)="setRating(i)">★</span>
+                }
+              </div>
+            </div>
+
+            <!-- Location -->
+            <p class="section">Location</p>
+            <div class="row">
+              <mat-form-field appearance="outline">
+                <mat-label>Latitude</mat-label>
+                <input matInput type="number" step="0.0001" formControlName="latitude" />
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Longitude</mat-label>
+                <input matInput type="number" step="0.0001" formControlName="longitude" />
+              </mat-form-field>
+            </div>
+
+            <!-- Best months -->
+            <p class="section">Best Months to Visit</p>
+            <mat-form-field appearance="outline" style="width:100%">
+              <mat-label>Best months</mat-label>
+              <mat-chip-grid #chipGrid>
+                @for (m of selectedMonths(); track m) {
+                  <mat-chip (removed)="removeMonth(m)">
+                    {{ m }}
+                    <button matChipRemove><mat-icon>cancel</mat-icon></button>
+                  </mat-chip>
+                }
+              </mat-chip-grid>
+              <input placeholder="Add month…"
+                     [matChipInputFor]="chipGrid"
+                     [matChipInputSeparatorKeyCodes]="separatorKeys"
+                     [matAutocomplete]="monthAuto"
+                     (matChipInputTokenEnd)="addMonth($event)"
+                     #monthInput />
+              <mat-autocomplete #monthAuto (optionSelected)="selectMonth($event); monthInput.value = ''">
+                @for (m of filteredMonths(); track m) {
+                  <mat-option [value]="m">{{ m }}</mat-option>
+                }
+              </mat-autocomplete>
+            </mat-form-field>
+
+            <!-- Notes & image -->
+            <p class="section">Content</p>
+            <mat-form-field appearance="outline">
+              <mat-label>Description</mat-label>
+              <textarea matInput formControlName="description" rows="3"></textarea>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Notes</mat-label>
+              <textarea matInput formControlName="notes" rows="2"></textarea>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Image URL</mat-label>
+              <input matInput formControlName="image_url" placeholder="https://…" />
+            </mat-form-field>
+
+            @if (error()) {
+              <p class="err">{{ error() }}</p>
+            }
+
+            <div class="actions">
+              <button mat-stroked-button type="button" routerLink="/destinations">Cancel</button>
+              <button mat-raised-button color="primary" type="submit" [disabled]="saving()">
+                @if (saving()) { <mat-spinner diameter="18" style="margin:auto" /> }
+                @else { {{ isEdit() ? 'Save changes' : 'Add destination' }} }
+              </button>
+            </div>
+          </form>
+        </mat-card-content>
+      </mat-card>
+    </div>
+  `,
+})
+export class DestinationFormComponent implements OnInit {
+  private route = inject(ActivatedRoute);
+  private router = inject(Router);
+  private svc = inject(DestinationService);
+  private fb = inject(FormBuilder);
+
+  isEdit = signal(false);
+  saving = signal(false);
+  error = signal('');
+  selectedMonths = signal<string[]>([]);
+
+  readonly separatorKeys = [ENTER, COMMA];
+  readonly allMonths = MONTHS;
+
+  filteredMonths = signal<string[]>(MONTHS);
+
+  form = this.fb.group({
+    name:           ['', Validators.required],
+    city:           ['', Validators.required],
+    state_province: ['', Validators.required],
+    country:        ['USA', Validators.required],
+    region:         [''],
+    status:         ['want_to_visit'],
+    visited_at:     [null as Date | null],
+    rating:         [null as number | null],
+    latitude:       [null as number | null],
+    longitude:      [null as number | null],
+    description:    [''],
+    notes:          [''],
+    image_url:      [''],
+  });
+
+  private destId?: number;
+
+  ngOnInit(): void {
+    const id = this.route.snapshot.paramMap.get('id');
+    if (id && id !== 'new') {
+      this.isEdit.set(true);
+      this.destId = +id;
+      this.svc.get(+id).subscribe((d) => {
+        this.form.patchValue({
+          ...d,
+          visited_at: d.visited_at ? new Date(d.visited_at) : null,
+        });
+        this.selectedMonths.set(d.best_months ?? []);
+        this.updateFilteredMonths();
+      });
+    }
+  }
+
+  setRating(n: number): void { this.form.patchValue({ rating: n }); }
+
+  addMonth(event: MatChipInputEvent): void {
+    const val = (event.value ?? '').trim();
+    if (val && !this.selectedMonths().includes(val)) {
+      this.selectedMonths.update((m) => [...m, val]);
+      this.updateFilteredMonths();
+    }
+    event.chipInput?.clear();
+  }
+
+  selectMonth(event: MatAutocompleteSelectedEvent): void {
+    const val = event.option.value as string;
+    if (!this.selectedMonths().includes(val)) {
+      this.selectedMonths.update((m) => [...m, val]);
+      this.updateFilteredMonths();
+    }
+  }
+
+  removeMonth(month: string): void {
+    this.selectedMonths.update((m) => m.filter((x) => x !== month));
+    this.updateFilteredMonths();
+  }
+
+  private updateFilteredMonths(): void {
+    this.filteredMonths.set(this.allMonths.filter((m) => !this.selectedMonths().includes(m)));
+  }
+
+  save(): void {
+    if (this.form.invalid) { this.form.markAllAsTouched(); return; }
+    this.saving.set(true);
+    this.error.set('');
+
+    const raw = this.form.value;
+    // Convert nulls to undefined so Partial<Destination> is satisfied
+    const dto: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(raw)) dto[k] = v ?? undefined;
+    dto['best_months'] = this.selectedMonths();
+    dto['visited_at'] = raw.visited_at
+      ? (raw.visited_at as Date).toISOString().slice(0, 10)
+      : undefined;
+
+    const req$ = this.isEdit()
+      ? this.svc.update(this.destId!, dto)
+      : this.svc.create(dto);
+
+    req$.subscribe({
+      next: (d) => this.router.navigate(['/destinations', d.id]),
+      error: (e) => {
+        this.error.set(e.error?.error ?? 'An error occurred');
+        this.saving.set(false);
+      },
+    });
+  }
+}

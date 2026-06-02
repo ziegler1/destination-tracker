@@ -1,0 +1,106 @@
+@use '@angular/material' as mat;
+
+// ─── Palettes ─────────────────────────────────────────────────────────────────
+// Teal 800 = #00695c (primary)   Amber 600 = #ffb300 (accent)
+$wp-primary: mat.define-palette(mat.$teal-palette, 800, 600, 900);
+$wp-accent:  mat.define-palette(mat.$amber-palette, 600, A200, A400);
+$wp-warn:    mat.define-palette(mat.$red-palette);
+
+$wp-light: mat.define-light-theme((
+  color: (primary: $wp-primary, accent: $wp-accent, warn: $wp-warn),
+));
+$wp-dark: mat.define-dark-theme((
+  color: (primary: $wp-primary, accent: $wp-accent, warn: $wp-warn),
+));
+
+@include mat.core();
+
+html              { @include mat.all-component-themes($wp-light); }
+.dark-theme       { @include mat.all-component-colors($wp-dark); }
+
+// ─── 19 CSS custom properties ─────────────────────────────────────────────────
+:root {
+  --wp-primary:          #00695C;
+  --wp-primary-light:    #439889;
+  --wp-primary-dark:     #003D33;
+  --wp-on-primary:       #ffffff;
+  --wp-accent:           #FFB300;
+  --wp-on-accent:        #000000;
+  --wp-bg:               #f5f5f5;
+  --wp-surface:          #ffffff;
+  --wp-surface-variant:  #f0f0f0;
+  --wp-text-primary:     rgba(0,0,0,.87);
+  --wp-text-secondary:   rgba(0,0,0,.60);
+  --wp-text-hint:        rgba(0,0,0,.38);
+  --wp-border:           rgba(0,0,0,.12);
+  --wp-divider:          rgba(0,0,0,.08);
+  --wp-sidebar-bg:       #00695C;
+  --wp-sidebar-text:     rgba(255,255,255,.92);
+  --wp-sidebar-active:   rgba(255,255,255,.18);
+  --wp-shadow:           rgba(0,0,0,.16);
+  --wp-status-visited:   #43a047;
+}
+
+.dark-theme {
+  --wp-bg:               #121212;
+  --wp-surface:          #1e1e1e;
+  --wp-surface-variant:  #2a2a2a;
+  --wp-text-primary:     rgba(255,255,255,.87);
+  --wp-text-secondary:   rgba(255,255,255,.60);
+  --wp-text-hint:        rgba(255,255,255,.38);
+  --wp-border:           rgba(255,255,255,.12);
+  --wp-divider:          rgba(255,255,255,.08);
+  --wp-sidebar-bg:       #1a2e2a;
+  --wp-sidebar-text:     rgba(255,255,255,.90);
+  --wp-sidebar-active:   rgba(255,255,255,.12);
+  --wp-shadow:           rgba(0,0,0,.50);
+  --wp-status-visited:   #66bb6a;
+}
+
+// ─── Angular Material MDC overrides ───────────────────────────────────────────
+.mat-mdc-card {
+  border-radius: 12px !important;
+  box-shadow: 0 2px 8px var(--wp-shadow) !important;
+}
+.mat-mdc-raised-button.mat-primary { letter-spacing: .5px; }
+.mat-mdc-chip { border-radius: 8px !important; }
+.mat-drawer { border-right: none !important; }
+
+// ─── Global ───────────────────────────────────────────────────────────────────
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: Roboto, 'Helvetica Neue', sans-serif;
+  background: var(--wp-bg);
+  color: var(--wp-text-primary);
+  transition: background-color .3s, color .3s;
+}
+
+::-webkit-scrollbar        { width: 6px; height: 6px; }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  { background: var(--wp-border); border-radius: 3px; }
+
+// ─── Utility ──────────────────────────────────────────────────────────────────
+.spacer         { flex: 1 1 auto; }
+.page-container { padding: 24px; max-width: 1200px; margin: 0 auto; }
+.loading-wrap   { display:flex; justify-content:center; align-items:center; height:240px; }
+.status-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: capitalize;
+  &.want_to_visit { background: #e3f2fd; color: #1565c0; }
+  &.planned       { background: #fff8e1; color: #f57f17; }
+  &.visited       { background: #e8f5e9; color: #2e7d32; }
+}
+.dark-theme .status-badge {
+  &.want_to_visit { background: #1a3a5c; color: #90caf9; }
+  &.planned       { background: #4a3800; color: #ffe082; }
+  &.visited       { background: #1b3a1f; color: #a5d6a7; }
+}
+
+.star { color: #FFB300; font-size: 16px; vertical-align: middle; }
+.star-empty { color: var(--wp-border); font-size: 16px; vertical-align: middle; }
