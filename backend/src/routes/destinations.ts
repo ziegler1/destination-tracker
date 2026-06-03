@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import pool from '../db';
 import { asyncHandler } from '../lib/asyncHandler';
+import { deleteFile } from '../lib/r2';
 
 const router = Router();
 
@@ -101,6 +102,44 @@ router.delete('/:id', asyncHandler(async (req, res) => {
   const { rowCount } = await pool.query('DELETE FROM destinations WHERE id=$1', [req.params.id]);
   if (!rowCount) return void res.status(404).json({ error: 'Destination not found' });
   res.status(204).send();
+}));
+
+// ── Photo management ──────────────────────────────────────────────────────────
+
+// POST /api/destinations/:id/photos
+router.post('/:id/photos', asyncHandler(async (req, res) => {
+  const { r2_key, url, caption, is_primary } = req.body;
+  if (is_primary) {
+    await pool.query('UPDATE destination_photos SET is_primary=false WHERE destination_id=$1', [req.params.id]);
+  }
+  const { rows } = await pool.query(
+    `INSERT INTO destination_photos (destination_id, r2_key, url, caption, is_primary)
+     VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+    [req.params.id, r2_key, url, caption ?? null, is_primary ?? false],
+  );
+  res.status(201).json(rows[0]);
+}));
+
+// DELETE /api/destinations/:id/photos/:photoId
+router.delete('/:id/photos/:photoId', asyncHandler(async (req, res) => {
+  const { rows } = await pool.query(
+    'DELETE FROM destination_photos WHERE id=$1 AND destination_id=$2 RETURNING r2_key',
+    [req.params.photoId, req.params.id],
+  );
+  if (!rows[0]) return void res.status(404).json({ error: 'Photo not found' });
+  try { await deleteFile(rows[0].r2_key); } catch { /* R2 key may not exist */ }
+  res.status(204).send();
+}));
+
+// PATCH /api/destinations/:id/photos/:photoId/primary
+router.patch('/:id/photos/:photoId/primary', asyncHandler(async (req, res) => {
+  await pool.query('UPDATE destination_photos SET is_primary=false WHERE destination_id=$1', [req.params.id]);
+  const { rows } = await pool.query(
+    'UPDATE destination_photos SET is_primary=true WHERE id=$1 AND destination_id=$2 RETURNING *',
+    [req.params.photoId, req.params.id],
+  );
+  if (!rows[0]) return void res.status(404).json({ error: 'Photo not found' });
+  res.json(rows[0]);
 }));
 
 export default router;

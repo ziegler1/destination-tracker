@@ -27,6 +27,16 @@
   ],
   "dataGroups": [
     {
+      "name": "api-entity-lists",
+      "urls": ["/api/destinations", "/api/restaurants", "/api/lodging"],
+      "cacheConfig": {
+        "strategy": "freshness",
+        "maxSize": 10,
+        "maxAge": "1d",
+        "timeout": "5s"
+      }
+    },
+    {
       "name": "api-freshness",
       "urls": ["/api/**"],
       "cacheConfig": {

@@ -1,0 +1,36 @@
+import { Injectable, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Restaurant, Trip } from '../../types/schema.types';
+
+interface ClaudeResult { result: string; }
+
+@Injectable({ providedIn: 'root' })
+export class ClaudeService {
+  private http = inject(HttpClient);
+
+  suggestDestination(preferences: string, visitedDestinations: string[] = []) {
+    return this.http.post<ClaudeResult>('/api/claude/suggest-destination', {
+      preferences, visitedDestinations,
+    });
+  }
+
+  bestTimeToVisit(destination: string, location: string) {
+    return this.http.post<ClaudeResult>('/api/claude/best-time-to-visit', {
+      destination, location,
+    });
+  }
+
+  packingSuggestions(tripName: string, destinations: string[], duration: number, activities: string[]) {
+    return this.http.post<ClaudeResult>('/api/claude/packing-suggestions', {
+      tripName, destinations, duration, activities,
+    });
+  }
+
+  tripSummary(trip: Trip) {
+    return this.http.post<ClaudeResult>('/api/claude/trip-summary', { trip });
+  }
+
+  restaurantDescription(restaurant: Restaurant) {
+    return this.http.post<ClaudeResult>('/api/claude/restaurant-description', { restaurant });
+  }
+}

@@ -10,6 +10,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { SkeletonGridComponent } from '../../../shared/skeleton-grid/skeleton-grid.component';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { DestinationService } from '../../../core/services/destination.service';
 import { Destination, DestinationStatus } from '../../../types/schema.types';
@@ -24,7 +25,7 @@ type StatusFilter = DestinationStatus | 'all';
     RouterLink,
     MatCardModule, MatChipsModule, MatFormFieldModule, MatInputModule,
     MatSelectModule, MatIconModule, MatButtonModule,
-    MatProgressSpinnerModule, MatTooltipModule,
+    MatProgressSpinnerModule, MatTooltipModule, SkeletonGridComponent,
   ],
   styles: [`
     .toolbar { display:flex; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:20px; }
@@ -101,7 +102,7 @@ type StatusFilter = DestinationStatus | 'all';
       </div>
 
       @if (loading()) {
-        <div class="loading-wrap"><mat-spinner diameter="48" /></div>
+        <app-skeleton-grid [count]="6" />
       } @else {
         @if (filtered().length === 0) {
           <div class="empty">
@@ -140,6 +141,10 @@ type StatusFilter = DestinationStatus | 'all';
       }
     </div>
 
+    <button mat-mini-fab style="position:fixed;bottom:100px;right:28px;z-index:100;background:var(--wp-surface);color:var(--wp-primary)"
+            [routerLink]="['/destinations/suggest']" matTooltip="AI suggest">
+      <mat-icon>auto_awesome</mat-icon>
+    </button>
     <button mat-fab class="fab" [routerLink]="['/destinations/new']" matTooltip="Add destination">
       <mat-icon>add</mat-icon>
     </button>

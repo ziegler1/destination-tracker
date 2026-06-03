@@ -39,145 +39,157 @@
 
 ---
 
-## Phase 1 — Restaurants, Lodging & Trips CRUD ⬜
+## Phase 1 — Restaurants, Lodging & Trips CRUD ✅
 
 **Restaurants**
-- [ ] List page — cuisine filter chips, price-range filter, search bar, card grid
-- [ ] Detail page — full info, photo gallery, Google Maps link, AI description button
-- [ ] Add/edit form — all fields, pet-friendly toggle, price range selector
+- [x] `RestaurantService` — full CRUD via `/api/restaurants`
+- [x] List page — cuisine filter dropdown, price-range chips, search bar, card grid
+- [x] Detail page — full info, photo gallery, Google Maps link, AI description button (Claude)
+- [x] Add/edit form — all fields, pet-friendly toggle, price range selector, star rating
 
 **Lodging**
-- [ ] List page — type filter chips, search bar, card grid (price/night, quality stars)
-- [ ] Detail page — amenity chips, photo gallery, would-return badge
-- [ ] Add/edit form — all fields, amenities chip input, price-per-night field
+- [x] `LodgingService` — full CRUD via `/api/lodging`
+- [x] List page — type filter chips (hotel/motel/airbnb/resort/campground), search, card grid
+- [x] Detail page — amenity chips, photo gallery, would-return badge, Maps link
+- [x] Add/edit form — all fields, amenities chip input, price-per-night, room quality / cleanliness stars
 
 **Trips**
-- [ ] List page — status filter chips (planning/active/completed/cancelled), trip cards
-- [ ] Detail page — stop timeline, trip metadata, tabbed layout placeholder
-- [ ] Add/edit form — name, dates, budget, status, notes
-- [ ] Status quick-patch buttons ("Start Trip" / "Complete Trip")
+- [x] `TripService` — full CRUD + status patch via `/api/trips`
+- [x] `ClaudeService` — all 5 AI endpoints wired
+- [x] List page — status filter chips, sorted active-first, colour-coded status bar
+- [x] Detail page — stop timeline, trip metadata, tabbed layout (Expenses/Packing/Journal/Fuel placeholders)
+- [x] Add/edit form — name, dates (date picker), budget, status, notes
+- [x] Status quick-patch buttons ("Start Trip" / "Complete Trip")
 
 ---
 
-## Phase 2 — Trip Planning Tools ⬜
+## Phase 2 — Trip Planning Tools ✅
 
-**Trip Stops**
-- [ ] Add stop inline on trip detail (destination autocomplete from existing destinations)
-- [ ] Stop cards — linked destination + lodging, arrival/departure dates, status badge
-- [ ] Reorder stops (up/down arrows or drag handle)
-- [ ] Stop status update (upcoming → current → completed)
+**Services added**
+- [x] `StopService`, `ExpenseService`, `PackingService`, `JournalService`, `FuelService`
 
-**Expense Tracker**
-- [ ] Expenses tab on trip detail — total header, rows by category with color coding
-- [ ] Add expense modal — category, description, amount, date, stop selector
-- [ ] Summary donut chart (ng2-charts) — spending by category
-- [ ] Edit / delete expense
+**Trip Stops tab** (`TripStopsTabComponent`)
+- [x] Add stop inline — destination + lodging selects, arrival/departure date pickers
+- [x] Stop cards — destination, city/state, dates, lodging, status badge
+- [x] Reorder stops — up/down arrows swap `stop_order` values
+- [x] Cycle status on click (upcoming → current → completed)
+- [x] Edit stop inline, delete with confirm
 
-**Packing Lists**
-- [ ] Packing tab on trip detail
-- [ ] Create named list, rename, delete list
-- [ ] Item checklist — grouped by category, progress bar (% packed)
-- [ ] Add / edit / delete items
-- [ ] Toggle `is_packed` per item
-- [ ] Bulk check/uncheck all items in a category
-- [ ] AI suggest button → calls `/api/claude/packing-suggestions` → bulk-import items
+**Expenses tab** (`TripExpensesTabComponent`)
+- [x] Summary cards — total spent, per-category breakdown
+- [x] Donut chart (ng2-charts v10 + Chart.js) — spending by category, colour-coded
+- [x] Category filter chips
+- [x] Add / edit / delete expense inline
 
-**Trip Journal**
-- [ ] Journal tab on trip detail — entries sorted by date (newest first)
-- [ ] Add / edit / delete journal entry (title + body + date + optional stop link)
+**Packing Lists tab** (`TripPackingTabComponent`)
+- [x] Create / rename / delete packing lists
+- [x] Item checklist grouped by category with `mat-progress-bar` (% packed)
+- [x] Toggle `is_packed` per item, bulk check/uncheck by category
+- [x] AI Suggest → `/api/claude/packing-suggestions` → selection overlay → bulk import
 
-**Fuel Log**
-- [ ] Fuel tab on trip detail — running total cost and gallons
-- [ ] Add / edit / delete fuel stop (station, city/state, price/gal, gallons, odometer)
-- [ ] Cost-per-mile calculation when odometer readings are present
+**Journal tab** (`TripJournalTabComponent`)
+- [x] Entries sorted newest-first, expandable preview cards
+- [x] Add / edit / delete journal entry (title, body, date)
+
+**Fuel Log tab** (`TripFuelTabComponent`)
+- [x] Summary — total cost, gallons, avg price/gal, cost-per-mile (when odometer present)
+- [x] Add / edit / delete fuel stop
 
 ---
 
-## Phase 3 — Interactive Map ⬜
+## Phase 3 — Interactive Map ✅
 
-**Map Page**
-- [ ] Leaflet map centered on contiguous US + Canada
-- [ ] Destination pins — color-coded by status (blue/amber/green)
-- [ ] Click pin → popup (name, city, status, rating, "View" button)
-- [ ] Marker clustering for dense areas (Leaflet.markercluster)
+**Map Page** (`MapComponent` — full-screen Leaflet + OSM)
+- [x] Leaflet map centered on contiguous US + Canada (zoom 4)
+- [x] Destination pins — DivIcons colour-coded by status (blue/amber/green), no image assets required
+- [x] Click pin → popup (name, city/state, status, star rating, "View →" button using `window._wpNav`)
+- [x] Layers toggle panel — show/hide destinations, show/hide POIs
+- [x] Legend (bottom-left) — colour key for all marker types
 
 **Trip Route View**
-- [ ] Filter dropdown — "All destinations" or select a specific trip
-- [ ] Draw polyline connecting trip stops in order when a trip is selected
-- [ ] Animated route draw on selection change
+- [x] Trip selector dropdown — loads all trips into select
+- [x] On selection: fetches full trip, draws numbered stop markers + dashed polyline in order
+- [x] `map.fitBounds()` zooms to the selected route with padding
+- [x] Clearing trip selection removes the route layer
 
 **POI Markers**
-- [ ] Toggle layer for Points of Interest
-- [ ] Distinct secondary marker style
+- [x] Rotated-square orange DivIcon — visually distinct from destination pins
+- [x] Toggle layer, extracted from destinations' `pois[]` array
+- [x] Popup shows POI name and parent destination name
 
-**Mini-Map on Detail Pages**
-- [ ] Small non-interactive Leaflet map on destination detail
-- [ ] Small non-interactive Leaflet map on restaurant detail
-- [ ] Small non-interactive Leaflet map on lodging detail
+**Mini-Map on Detail Pages** (`MiniMapComponent` — shared, non-interactive)
+- [x] Destination detail — shows when `latitude` + `longitude` present
+- [x] Restaurant detail — shows when `latitude` + `longitude` present
+- [x] Lodging detail — shows when `latitude` + `longitude` present
+- [x] Signal-based inputs (`input.required<number>()`), runs outside Angular zone
+- [x] `@types/leaflet` installed, `leaflet.css` added to `angular.json`
 
 ---
 
-## Phase 4 — Photos & AI Features ⬜
+## Phase 4 — Photos & AI Features ✅
 
 **Photo Uploads**
-- [ ] Reusable `PhotoUploaderComponent` (file-drop, preview, progress)
-- [ ] Calls `POST /api/uploads` → saves key+url to entity photos table
-- [ ] Primary photo selection (pin icon on photo grid)
-- [ ] Delete photo (calls `DELETE /api/uploads?key=` + removes DB record)
-- [ ] Photo upload on: destination form, restaurant form, lodging form, journal entries
+- [x] Backend photo endpoints on destinations, restaurants, lodging (POST /:id/photos, DELETE /:id/photos/:photoId, PATCH /:id/photos/:photoId/primary)
+- [x] `PhotoService` — uploads file to R2 then saves DB record in one pipeline
+- [x] `PhotoUploaderComponent` — drag-and-drop or click to browse, 5 MB guard, live previews
+- [x] Primary photo selection — "PRIMARY" badge + star button promotes any photo
+- [x] Delete photo — removes DB record + R2 object
+- [x] Photo uploader wired into destination detail, restaurant detail, lodging detail
 
 **AI Features**
-- [ ] Suggest Destination page (`/destinations/suggest`) — preferences form → 3 Claude cards → "Save this" pre-fills add form
-- [ ] Best Time to Visit — button on destination detail → modal with season breakdown → option to auto-populate `best_months`
-- [ ] Packing Suggestions — button on packing tab → Claude list → bulk-import into active list
-- [ ] Trip Summary — button on completed trip → narrative modal → save as journal entry
-- [ ] Restaurant Description — button on restaurant detail → saves to `highlights` field
+- [x] Suggest Destination page (`/destinations/suggest`) — travel-style chips + free-text → 3 Claude cards with activities & best months → "Save to Wishlist" navigates to `/destinations/new` with query-param pre-fill
+- [x] Best Time to Visit — button on destination detail → JSON parse → best-months chips + season breakdown → "Apply to Best Months" patches the destination
+- [x] Packing Suggestions — already delivered in Phase 2 (packing tab AI Suggest button)
+- [x] Trip Summary — button on active/completed trip detail → Claude narrative → "Save as Journal Entry" wired to JournalService
+- [x] Restaurant Description — AI description panel + "Save to Highlights" button patches `highlights` field
 
 ---
 
-## Phase 5 — Stats & PWA Polish ⬜
+## Phase 5 — Stats & PWA Polish ✅
 
-**Stats Page**
-- [ ] Destinations panel — donut chart (want to visit / planned / visited), top 5 states
-- [ ] Trips panel — bar chart (trips per year), avg duration, total days traveled
-- [ ] Spending panel — bar chart (expenses by category across all trips), avg cost per trip
-- [ ] Road stats — total miles (odometer deltas), fuel cost trend line
+**Stats Page** (`StatsComponent` + `StatsService` + `GET /api/stats`)
+- [x] Backend: single CTE-free parallel-query endpoint returning destinations, trips, expenses, fuel stats
+- [x] Destinations panel — donut chart by status, summary counts, top 5 states list
+- [x] Trips panel — bar chart trips per year, avg duration, total days traveled
+- [x] Spending panel — donut chart by category, total + avg per trip, per-category breakdown chips
+- [x] Road stats panel — miles (odometer deltas), gallons, fuel cost, cost-per-mile
 
 **PWA Polish**
-- [ ] Install prompt banner (dismissable)
-- [ ] Offline fallback page (branded "You're offline" message)
-- [ ] `ngsw-config` update — cache destinations + restaurants for offline browsing
-- [ ] `manifest.webmanifest` — app icons, theme color, home screen shortcuts
+- [x] Install prompt banner — `beforeinstallprompt` caught in shell, dismissable with close button
+- [x] `manifest.webmanifest` — name, theme color (#00695C), shortcuts for Trips/Destinations/Map
+- [x] `manifest` linked from `index.html`, added to `angular.json` assets
+- [x] `ngsw-config` update — entity lists cached 1 day with 5s timeout for offline fallback
+- [ ] Offline fallback page — deferred (service worker serves cached index.html automatically)
 
 **UX / Performance**
-- [ ] Skeleton loading cards (shimmer) replacing spinners on list pages
-- [ ] Empty-state illustrations (inline SVG) for lists with no data
-- [ ] Keyboard navigation (Esc closes dialogs, Enter submits forms)
+- [x] `SkeletonGridComponent` — shimmer animation replacing spinners on all 4 list pages
+- [x] Empty states with emoji + descriptive text already on all list pages (Phase 1–2)
+- [ ] Keyboard navigation — deferred to post-Phase 6
 
 ---
 
-## Phase 6 — Railway Production Deployment ⬜
+## Phase 6 — Railway Production Deployment 🔄
 
-**Railway Setup**
-- [ ] Create Railway project with two services (backend, frontend) + PostgreSQL plugin
-- [ ] Copy `DATABASE_URL` from Postgres plugin → backend Variables
-- [ ] Set backend env vars (`ANTHROPIC_API_KEY`, `R2_*`, `PORT`)
-- [ ] Set frontend env var `BACKEND_URL` → backend private Railway URL
-- [ ] Deploy backend service (Dockerfile: `backend/Dockerfile`, build context: repo root)
-- [ ] Deploy frontend service (Dockerfile: `frontend/Dockerfile`, build context: repo root)
-- [ ] Verify `/health` endpoint returns 200 in production
-- [ ] Verify migrations ran on first deploy
+> See `docs/deploy.md` for the full step-by-step guide.
 
-**Cloudflare DNS**
-- [ ] CNAME `waypoint.<domain>` → Railway frontend public domain
-- [ ] Enable "Full (strict)" SSL mode in Cloudflare
-- [ ] Optional: cache rules for `*.js` / `*.css` at edge
+**Code — done**
+- [x] `backend/Dockerfile` — multi-stage node:20 build, explicit COPY paths
+- [x] `frontend/Dockerfile` — node:20 build → nginx:1.25 serve, envsubst for `$BACKEND_URL`
+- [x] `frontend/nginx/nginx.conf` — `proxy_ssl_verify off`, `proxy_ssl_server_name on`, `proxy_set_header Host $proxy_host`
+- [x] `frontend/nginx/docker-entrypoint.sh` — `envsubst '$BACKEND_URL'` (limits substitution)
+- [x] CORS respects `CORS_ORIGIN` env var — comma-separated origins, defaults to `*` in dev
+- [x] `backend/.env.example` updated with `CORS_ORIGIN`
+- [x] `docs/deploy.md` written — full 7-step guide with troubleshooting table
 
-**Production Hardening**
-- [ ] Lock CORS to production frontend domain via `CORS_ORIGIN` env var
-- [ ] Confirm `DATABASE_URL` uses Railway's private network URL (not public)
-- [ ] Smoke test all 6 nav routes in production
-- [ ] Smoke test add/edit destination end-to-end in production
+**Infra — you run these steps**
+- [ ] Push repo to GitHub
+- [ ] Create Railway project + PostgreSQL plugin
+- [ ] Backend service: Dockerfile `backend/Dockerfile`, set all env vars
+- [ ] Verify `/health` + migration logs on first deploy
+- [ ] Frontend service: Dockerfile `frontend/Dockerfile`, set `BACKEND_URL`
+- [ ] Set `CORS_ORIGIN` on backend after frontend URL is known
+- [ ] (Optional) Cloudflare CNAME → Railway domain, Full (strict) SSL
+- [ ] Smoke test 7-item checklist in `docs/deploy.md`
 
 ---
 

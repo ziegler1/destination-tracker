@@ -234,6 +234,20 @@ export class DestinationFormComponent implements OnInit {
         this.selectedMonths.set(d.best_months ?? []);
         this.updateFilteredMonths();
       });
+    } else {
+      // Pre-fill from query params (e.g. coming from /destinations/suggest)
+      const qp = this.route.snapshot.queryParamMap;
+      if (qp.get('name')) {
+        this.form.patchValue({
+          name:           qp.get('name') ?? '',
+          state_province: qp.get('state_province') ?? '',
+          country:        (qp.get('country') as 'USA' | 'Canada') ?? 'USA',
+          description:    qp.get('description') ?? '',
+        });
+        const months = qp.get('best_months')?.split(',').filter(Boolean) ?? [];
+        this.selectedMonths.set(months);
+        this.updateFilteredMonths();
+      }
     }
   }
 

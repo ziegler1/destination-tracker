@@ -13,6 +13,9 @@ import { MatListModule } from '@angular/material/list';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { DestinationService } from '../../../core/services/destination.service';
 import { WeatherService, weatherEmoji } from '../../../core/services/weather.service';
+import { ClaudeService } from '../../../core/services/claude.service';
+import { MiniMapComponent } from '../../../shared/mini-map/mini-map.component';
+import { PhotoUploaderComponent } from '../../../shared/photo-uploader/photo-uploader.component';
 import { Destination, WeatherResponse } from '../../../types/schema.types';
 
 interface WeatherDay {
@@ -31,6 +34,7 @@ interface WeatherDay {
     RouterLink, DatePipe, DecimalPipe,
     MatCardModule, MatChipsModule, MatIconModule, MatButtonModule,
     MatDividerModule, MatProgressSpinnerModule, MatListModule, MatTooltipModule,
+    MiniMapComponent, PhotoUploaderComponent,
   ],
   styles: [`
     .back-btn { margin-bottom: 16px; }
@@ -224,6 +228,61 @@ interface WeatherDay {
               }
             </div>
 
+            <!-- Best Time to Visit -->
+            <div class="info-card" style="margin-bottom:16px">
+              <p class="section-title">Best Time to Visit</p>
+              <button mat-stroked-button (click)="getBestTime()" [disabled]="btLoading()">
+                <mat-icon>auto_awesome</mat-icon>
+                {{ btLoading() ? 'Asking Claude…' : 'Ask Claude' }}
+              </button>
+              @if (btResult(); as bt) {
+                <div style="margin-top:12px">
+                  @if (bt.best_months?.length) {
+                    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">
+                      @for (m of bt.best_months; track m) {
+                        <span style="padding:3px 12px;border-radius:14px;background:var(--wp-primary);color:white;font-size:13px">{{ m }}</span>
+                      }
+                    </div>
+                  }
+                  <p style="font-size:14px;color:var(--wp-text-secondary);line-height:1.6;margin:0 0 10px">{{ bt.summary }}</p>
+                  @if (bt.seasons && (bt.seasons['spring'] || bt.seasons['summer'])) {
+                    @for (season of ['spring','summer','fall','winter']; track season) {
+                      @if (bt.seasons[season]) {
+                        <p style="font-size:13px;margin:4px 0"><strong style="text-transform:capitalize">{{ season }}:</strong> {{ bt.seasons[season] }}</p>
+                      }
+                    }
+                  }
+                  @if (bt.best_months?.length) {
+                    <button mat-stroked-button color="primary" style="margin-top:10px" (click)="applyBestMonths()">
+                      <mat-icon>done</mat-icon> Apply to Best Months
+                    </button>
+                  }
+                </div>
+              }
+            </div>
+
+            <!-- Mini map -->
+            @if (dest()!.latitude && dest()!.longitude) {
+              <div class="info-card">
+                <p class="section-title">Location</p>
+                <app-mini-map
+                  [lat]="dest()!.latitude!"
+                  [lon]="dest()!.longitude!"
+                  [label]="dest()!.name"
+                  height="220px" />
+              </div>
+            }
+
+            <!-- Photos -->
+            <div class="info-card">
+              <p class="section-title">Photos</p>
+              <app-photo-uploader
+                entityType="destinations"
+                [entityId]="entityId"
+                [photos]="dest()!.photos ?? []"
+                (changed)="onPhotosChanged()" />
+            </div>
+
             <!-- Photo gallery -->
             @if (dest()!.photos && dest()!.photos!.length > 1) {
               <div class="info-card">
@@ -242,14 +301,23 @@ interface WeatherDay {
   `,
 })
 export class DestinationDetailComponent implements OnInit {
-  private route = inject(ActivatedRoute);
-  private destSvc = inject(DestinationService);
+  private route      = inject(ActivatedRoute);
+  private router     = inject(Router);
+  private destSvc    = inject(DestinationService);
   private weatherSvc = inject(WeatherService);
+  private claudeSvc  = inject(ClaudeService);
 
-  loading = signal(true);
+  loading        = signal(true);
   weatherLoading = signal(false);
-  dest = signal<Destination | null>(null);
-  weatherDays = signal<WeatherDay[]>([]);
+  dest           = signal<Destination | null>(null);
+  weatherDays    = signal<WeatherDay[]>([]);
+
+  // Best Time to Visit
+  btLoading     = signal(false);
+  btResult      = signal<{ best_months: string[]; summary: string; seasons: Record<string, string> } | null>(null);
+
+  // Photos
+  protected get entityId(): number { return this.dest()?.id ?? 0; }
 
   ngOnInit(): void {
     const id = Number(this.route.snapshot.paramMap.get('id'));
@@ -297,5 +365,38 @@ export class DestinationDetailComponent implements OnInit {
 
   statusLabel(s: string): string {
     return { want_to_visit: 'Want to Visit', planned: 'Planned', visited: 'Visited' }[s] ?? s;
+  }
+
+  getBestTime(): void {
+    const d = this.dest();
+    if (!d) return;
+    this.btLoading.set(true);
+    this.btResult.set(null);
+    this.claudeSvc.bestTimeToVisit(d.name, `${d.city}, ${d.state_province}`).subscribe({
+      next: (res) => {
+        try {
+          this.btResult.set(JSON.parse(res.result));
+        } catch {
+          this.btResult.set({ best_months: [], summary: res.result, seasons: {} });
+        }
+        this.btLoading.set(false);
+      },
+      error: () => this.btLoading.set(false),
+    });
+  }
+
+  applyBestMonths(): void {
+    const d = this.dest();
+    const months = this.btResult()?.best_months;
+    if (!d || !months?.length) return;
+    this.destSvc.update(d.id, { ...d, best_months: months }).subscribe((updated) => {
+      this.dest.update((cur) => cur ? { ...cur, best_months: updated.best_months } : cur);
+    });
+  }
+
+  onPhotosChanged(): void {
+    const d = this.dest();
+    if (!d) return;
+    this.destSvc.get(d.id).subscribe((updated) => this.dest.set(updated));
   }
 }

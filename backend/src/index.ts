@@ -15,11 +15,17 @@ import fuelRouter from './routes/fuel';
 import weatherRouter from './routes/weather';
 import uploadsRouter from './routes/uploads';
 import claudeRouter from './routes/claude';
+import statsRouter from './routes/stats';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
-app.use(cors());
+// In production set CORS_ORIGIN to the frontend domain (comma-separated for multiple)
+const allowedOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',').map((s) => s.trim())
+  : true; // allow all in dev
+
+app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(express.json());
 
 app.get('/health', (_req, res) => res.json({ status: 'ok', ts: new Date().toISOString() }));
@@ -39,6 +45,7 @@ app.use('/api/trips/:tripId/fuel',     fuelRouter);
 app.use('/api/weather', weatherRouter);
 app.use('/api/uploads', uploadsRouter);
 app.use('/api/claude',  claudeRouter);
+app.use('/api/stats',   statsRouter);
 
 app.use(errorHandler);
 

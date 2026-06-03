@@ -9,6 +9,13 @@ export const DESTINATION_ROUTES: Routes = [
       ),
   },
   {
+    path: 'suggest',
+    loadComponent: () =>
+      import('./destination-suggest/destination-suggest.component').then(
+        (m) => m.DestinationSuggestComponent,
+      ),
+  },
+  {
     path: 'new',
     loadComponent: () =>
       import('./destination-form/destination-form.component').then(

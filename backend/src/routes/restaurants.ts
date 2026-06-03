@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import pool from '../db';
 import { asyncHandler } from '../lib/asyncHandler';
+import { deleteFile } from '../lib/r2';
 
 const router = Router();
 
@@ -84,6 +85,41 @@ router.delete('/:id', asyncHandler(async (req, res) => {
   const { rowCount } = await pool.query('DELETE FROM restaurants WHERE id=$1', [req.params.id]);
   if (!rowCount) return void res.status(404).json({ error: 'Restaurant not found' });
   res.status(204).send();
+}));
+
+// ── Photo management ──────────────────────────────────────────────────────────
+
+router.post('/:id/photos', asyncHandler(async (req, res) => {
+  const { r2_key, url, caption, is_primary } = req.body;
+  if (is_primary) {
+    await pool.query('UPDATE restaurant_photos SET is_primary=false WHERE restaurant_id=$1', [req.params.id]);
+  }
+  const { rows } = await pool.query(
+    `INSERT INTO restaurant_photos (restaurant_id, r2_key, url, caption, is_primary)
+     VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+    [req.params.id, r2_key, url, caption ?? null, is_primary ?? false],
+  );
+  res.status(201).json(rows[0]);
+}));
+
+router.delete('/:id/photos/:photoId', asyncHandler(async (req, res) => {
+  const { rows } = await pool.query(
+    'DELETE FROM restaurant_photos WHERE id=$1 AND restaurant_id=$2 RETURNING r2_key',
+    [req.params.photoId, req.params.id],
+  );
+  if (!rows[0]) return void res.status(404).json({ error: 'Photo not found' });
+  try { await deleteFile(rows[0].r2_key); } catch { /* ignore */ }
+  res.status(204).send();
+}));
+
+router.patch('/:id/photos/:photoId/primary', asyncHandler(async (req, res) => {
+  await pool.query('UPDATE restaurant_photos SET is_primary=false WHERE restaurant_id=$1', [req.params.id]);
+  const { rows } = await pool.query(
+    'UPDATE restaurant_photos SET is_primary=true WHERE id=$1 AND restaurant_id=$2 RETURNING *',
+    [req.params.photoId, req.params.id],
+  );
+  if (!rows[0]) return void res.status(404).json({ error: 'Photo not found' });
+  res.json(rows[0]);
 }));
 
 export default router;

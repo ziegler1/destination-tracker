@@ -1,5 +1,5 @@
 import {
-  Component, OnInit, ViewChild, ChangeDetectionStrategy, inject, signal,
+  Component, OnInit, ViewChild, ChangeDetectionStrategy, inject, signal, HostListener,
 } from '@angular/core';
 import { RouterOutlet, RouterLink, RouterLinkActive, Router, NavigationEnd } from '@angular/router';
 import { filter } from 'rxjs/operators';
@@ -120,6 +120,14 @@ interface NavItem { icon: string; label: string; path: string; }
           <span class="page-title">{{ pageTitle() }}</span>
         </mat-toolbar>
 
+        @if (showInstall()) {
+          <div style="background:var(--wp-primary);color:white;padding:10px 20px;display:flex;align-items:center;gap:12px;font-size:14px">
+            <mat-icon>install_mobile</mat-icon>
+            <span style="flex:1">Install Waypoint for offline access and home screen shortcut</span>
+            <button mat-stroked-button style="color:white;border-color:rgba(255,255,255,.6)" (click)="installApp()">Install</button>
+            <button mat-icon-button style="color:white" (click)="showInstall.set(false)"><mat-icon>close</mat-icon></button>
+          </div>
+        }
         <div class="content-wrap">
           <router-outlet />
         </div>
@@ -134,8 +142,22 @@ export class ShellComponent implements OnInit {
   private router = inject(Router);
   private bp = inject(BreakpointObserver);
 
-  isMobile = signal(false);
-  pageTitle = signal('Waypoint');
+  isMobile   = signal(false);
+  pageTitle  = signal('Waypoint');
+  showInstall = signal(false);
+  private installPrompt: Event | null = null;
+
+  @HostListener('window:beforeinstallprompt', ['$event'])
+  onBeforeInstallPrompt(e: Event) {
+    e.preventDefault();
+    this.installPrompt = e;
+    this.showInstall.set(true);
+  }
+
+  installApp() {
+    (this.installPrompt as any)?.prompt?.();
+    this.showInstall.set(false);
+  }
 
   readonly navItems: NavItem[] = [
     { icon: '✈️',  label: 'Trips',        path: '/trips' },
