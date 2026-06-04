@@ -9,7 +9,7 @@ export const TRIP_ROUTES: Routes = [
   {
     path: 'new',
     loadComponent: () =>
-      import('./trip-form/trip-form.component').then((m) => m.TripFormComponent),
+      import('./trip-wizard/trip-wizard.component').then((m) => m.TripWizardComponent),
   },
   {
     path: ':id',

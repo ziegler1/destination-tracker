@@ -88,6 +88,15 @@ interface NavItem { icon: string; label: string; path: string; }
           <span class="brand-name">Waypoint</span>
         </div>
 
+        <!-- Primary CTA -->
+        <div style="padding:12px 12px 4px">
+          <a mat-raised-button [routerLink]="['/trips/new']"
+             (click)="isMobile() && sidenav.close()"
+             style="width:100%;background:#FFB300;color:#000;font-weight:700;letter-spacing:.3px">
+            <mat-icon>add_road</mat-icon> Plan a Trip
+          </a>
+        </div>
+
         <mat-nav-list>
           @for (item of navItems; track item.path) {
             <a mat-list-item class="nav-item"
@@ -160,7 +169,7 @@ export class ShellComponent implements OnInit {
   }
 
   readonly navItems: NavItem[] = [
-    { icon: '✈️',  label: 'Trips',        path: '/trips' },
+    { icon: '🗺️', label: 'My Trips',      path: '/trips' },
     { icon: '📍',  label: 'Destinations', path: '/destinations' },
     { icon: '🍽️', label: 'Restaurants',  path: '/restaurants' },
     { icon: '🏨',  label: 'Lodging',      path: '/lodging' },

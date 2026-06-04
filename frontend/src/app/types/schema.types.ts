@@ -256,3 +256,93 @@ export interface WeatherResponse {
     precipitation_sum: number[];
   };
 }
+
+// ─── Trip Wizard ──────────────────────────────────────────────────────────────
+
+export interface WizardPlaceSuggestion {
+  google_verified: boolean;
+  place_id:           string | null;
+  formatted_address:  string | null;
+  google_rating:      number | null;
+  photo_url:          string | null;
+  website:            string | null;
+  approved?:          boolean;
+}
+
+export interface WizardLodgingSuggestion extends WizardPlaceSuggestion {
+  name:                      string;
+  area:                      string;
+  lodging_type:              string;
+  estimated_price_per_night: number;
+  why_recommended:           string;
+}
+
+export interface WizardRestaurantSuggestion extends WizardPlaceSuggestion {
+  name:            string;
+  cuisine_type:    string;
+  price_range:     string;
+  why_recommended: string;
+}
+
+export interface WizardPoiSuggestion {
+  name:             string;
+  poi_type:         string;
+  why_recommended:  string;
+  google_verified:  boolean;
+  place_id:         string | null;
+  formatted_address:string | null;
+  photo_url:        string | null;
+  approved?:        boolean;
+}
+
+export interface WizardStop {
+  stop_order:              number;
+  city:                    string;
+  state_province:          string;
+  country:                 string;
+  arrive_date:             string;
+  depart_date:             string;
+  drive_minutes_from_prev: number;
+  gas_stop_before:         boolean;
+  estimated_fuel_cost:     number;
+  lodging_suggestions:     WizardLodgingSuggestion[];
+  restaurant_suggestions:  WizardRestaurantSuggestion[];
+  poi_suggestions:         WizardPoiSuggestion[];
+}
+
+export interface WizardTripMeta {
+  name:       string;
+  origin:     string;
+  destination:string;
+  start_date: string;
+  end_date:   string;
+  budget:     number;
+  estimated_costs: {
+    lodging:    number;
+    food:       number;
+    fuel:       number;
+    activities: number;
+    total:      number;
+  };
+  travel_notes:        string;
+  packing_suggestions: Array<{ category: string; items: string[] }>;
+}
+
+export interface WizardPlan {
+  trip:  WizardTripMeta;
+  stops: WizardStop[];
+}
+
+export interface WizardGenerateRequest {
+  origin:      string;
+  destination: string;
+  start_date:  string;
+  end_date:    string;
+  budget:      number;
+  preferences: {
+    lodging_type?:        string;
+    cuisine_preferences?: string[];
+    pet_friendly?:        boolean;
+    interests?:           string[];
+  };
+}
