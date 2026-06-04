@@ -193,6 +193,26 @@
 
 ---
 
+## Trip Wizard — Complete ✅
+
+**Backend**
+- [x] `002_ai_fields.sql` — `suggested_by_ai`, `google_place_id` on lodging/restaurants/POIs
+- [x] `googlePlaces.ts` — Text Search + Place Details + photo URL; `enrichBatch` (3 concurrent, 200ms gap)
+- [x] `POST /api/trips/wizard/generate` — Claude plans route, Google enriches every suggestion; returns preview (nothing saved)
+- [x] `POST /api/trips/wizard/confirm` — transactionally saves trip, stops, lodging, restaurants, POIs, packing list from approved plan
+- [x] Normalizers for `poi_type`, `lodging_type`, `country`, `price_range` — guards against Claude inventing invalid enum values
+
+**Frontend**
+- [x] 4-step `TripWizardComponent` at `/trips/new`
+- [x] Step 1: basics form + cuisine/interest chips
+- [x] Step 2: animated loading screen with cycling Claude progress messages
+- [x] Step 3: full review — lodging radio select, restaurant/POI toggles, packing checkboxes, budget estimate
+- [x] Step 4: confirmed with Open Trip Companion button
+- [x] Two-panel Trip Companion at `/trips/:id` — stop cards left, Leaflet route map right
+- [x] Sidebar: amber "Plan a Trip" CTA button + "My Trips" nav reorder
+
+---
+
 ## Backlog (Post-Phase 6)
 
 - [ ] Multi-user support (remove `user_id DEFAULT 1`, add auth)
