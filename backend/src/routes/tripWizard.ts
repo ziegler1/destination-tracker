@@ -8,6 +8,58 @@ const router = Router();
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const MODEL = 'claude-sonnet-4-5';
 
+// ── Value normalizers (guard against Claude returning values outside CHECK constraints) ──
+
+const VALID_COUNTRIES    = new Set(['USA', 'Canada']);
+const VALID_LODGING_TYPES = new Set(['hotel','motel','airbnb','resort','campground','other']);
+const VALID_POI_TYPES    = new Set(['scenic_overlook','roadside_attraction','state_park','national_park','historic_site','other']);
+const VALID_PRICE_RANGES = new Set(['$','$$','$$$','$$$$']);
+
+function normalizeCountry(c: string | undefined): 'USA' | 'Canada' {
+  if (!c) return 'USA';
+  const u = c.toUpperCase();
+  if (u.includes('CANADA') || u === 'CA' || u === 'CAN') return 'Canada';
+  return 'USA';
+}
+
+function normalizeLodgingType(t: string | undefined): string {
+  if (!t) return 'hotel';
+  const l = t.toLowerCase().replace(/\s+/g, '_');
+  if (VALID_LODGING_TYPES.has(l)) return l;
+  // Map common variants
+  if (l.includes('motel') || l.includes('motor'))  return 'motel';
+  if (l.includes('airbnb') || l.includes('vrbo') || l.includes('vacation')) return 'airbnb';
+  if (l.includes('resort') || l.includes('spa'))   return 'resort';
+  if (l.includes('camp') || l.includes('rv'))      return 'campground';
+  if (l.includes('hotel') || l.includes('inn') || l.includes('lodge')) return 'hotel';
+  return 'other';
+}
+
+function normalizePriceRange(p: string | undefined): string | null {
+  if (!p) return null;
+  const trimmed = p.trim();
+  if (VALID_PRICE_RANGES.has(trimmed)) return trimmed;
+  // Count $ signs as a fallback
+  const count = (trimmed.match(/\$/g) ?? []).length;
+  if (count >= 4) return '$$$$';
+  if (count === 3) return '$$$';
+  if (count === 2) return '$$';
+  if (count === 1) return '$';
+  return null;
+}
+
+function normalizePoiType(t: string | undefined): string {
+  if (!t) return 'other';
+  const l = t.toLowerCase().replace(/\s+/g, '_');
+  if (VALID_POI_TYPES.has(l)) return l;
+  if (l.includes('overlook') || l.includes('scenic') || l.includes('viewpoint')) return 'scenic_overlook';
+  if (l.includes('roadside') || l.includes('attraction') || l.includes('quirky')) return 'roadside_attraction';
+  if (l.includes('state_park') || l.includes('state park')) return 'state_park';
+  if (l.includes('national') || l.includes('nat_park'))     return 'national_park';
+  if (l.includes('historic') || l.includes('history') || l.includes('museum') || l.includes('monument')) return 'historic_site';
+  return 'other';
+}
+
 // ── Shared Claude system prompt (cached) ────────────────────────────────────
 const WIZARD_SYSTEM: Anthropic.Messages.TextBlockParam = {
   type: 'text',
@@ -287,7 +339,7 @@ router.post('/confirm', asyncHandler(async (req, res) => {
           `INSERT INTO destinations (name, city, state_province, country, status)
            VALUES ($1, $2, $3, $4, 'want_to_visit')
            RETURNING id`,
-          [stop.city, stop.city, stop.state_province, stop.country ?? 'USA'],
+          [stop.city, stop.city, stop.state_province, normalizeCountry(stop.country)],
         );
         destinationId = newDest.id;
       }
@@ -308,8 +360,8 @@ router.post('/confirm', asyncHandler(async (req, res) => {
             approvedLodging.name,
             stop.city,
             stop.state_province,
-            stop.country ?? 'USA',
-            approvedLodging.lodging_type ?? 'hotel',
+            normalizeCountry(stop.country),
+            normalizeLodgingType(approvedLodging.lodging_type),
             approvedLodging.estimated_price_per_night ?? null,
             approvedLodging.website ?? null,
             false,
@@ -352,9 +404,9 @@ router.post('/confirm', asyncHandler(async (req, res) => {
             r.name,
             stop.city,
             stop.state_province,
-            stop.country ?? 'USA',
+            normalizeCountry(stop.country),
             r.cuisine_type ?? null,
-            r.price_range ?? null,
+            normalizePriceRange(r.price_range),
             r.website ?? null,
             false,
             true,
@@ -377,7 +429,7 @@ router.post('/confirm', asyncHandler(async (req, res) => {
           [
             destinationId,
             p.name,
-            p.poi_type ?? 'other',
+            normalizePoiType(p.poi_type),
             p.why_recommended ?? null,
             true,
             p.place_id ?? null,
