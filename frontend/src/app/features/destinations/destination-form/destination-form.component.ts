@@ -14,6 +14,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { COMMA, ENTER } from '@angular/cdk/keycodes';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { DestinationService } from '../../../core/services/destination.service';
 import { GeocodingService } from '../../../core/services/geocoding.service';
 
@@ -30,7 +31,7 @@ const MONTHS = [
     RouterLink, ReactiveFormsModule,
     MatCardModule, MatFormFieldModule, MatInputModule, MatSelectModule,
     MatChipsModule, MatAutocompleteModule, MatIconModule, MatButtonModule,
-    MatProgressSpinnerModule, MatDatepickerModule,
+    MatProgressSpinnerModule, MatDatepickerModule, MatSnackBarModule,
   ],
   styles: [`
     .form-card { max-width: 720px; margin: 0 auto; }
@@ -129,17 +130,19 @@ const MONTHS = [
                 <mat-label>Longitude</mat-label>
                 <input matInput type="number" step="0.0001" formControlName="longitude" />
               </mat-form-field>
-              <button mat-icon-button type="button" style="margin-top:8px"
-                      [disabled]="geoLoading() || !form.value.city"
-                      (click)="lookupCoords()"
-                      [title]="geoLoading() ? 'Looking up…' : 'Look up coordinates from city/state'">
-                @if (geoLoading()) {
-                  <mat-spinner diameter="20" />
-                } @else {
-                  <mat-icon>my_location</mat-icon>
-                }
-              </button>
             </div>
+            <button mat-stroked-button type="button"
+                    [disabled]="geoLoading() || !form.value.city"
+                    (click)="lookupCoords()"
+                    style="margin-bottom:12px">
+              @if (geoLoading()) {
+                <mat-spinner diameter="18" style="display:inline-block;margin-right:6px" />
+                Looking up…
+              } @else {
+                <mat-icon>my_location</mat-icon>
+                Look up coordinates from City / State
+              }
+            </button>
 
             <!-- Best months -->
             <p class="section">Best Months to Visit</p>
@@ -203,6 +206,7 @@ export class DestinationFormComponent implements OnInit {
   private router  = inject(Router);
   private svc     = inject(DestinationService);
   private geoSvc  = inject(GeocodingService);
+  private snack   = inject(MatSnackBar);
   private fb      = inject(FormBuilder);
 
   isEdit     = signal(false);
@@ -274,8 +278,9 @@ export class DestinationFormComponent implements OnInit {
       this.geoLoading.set(false);
       if (r) {
         this.form.patchValue({ latitude: r.lat, longitude: r.lon });
+        this.snack.open(`Found: ${r.displayName.split(',').slice(0, 2).join(',')}`, 'OK', { duration: 3000 });
       } else {
-        // snack not injected here — silently leave fields blank so user can type manually
+        this.snack.open('Location not found — enter coordinates manually', 'Dismiss', { duration: 4000 });
       }
     });
   }
