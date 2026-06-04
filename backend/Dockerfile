@@ -5,7 +5,7 @@ WORKDIR /app
 
 # Install deps first so this layer is cached when only source changes
 COPY backend/package*.json  ./
-RUN npm ci
+RUN npm install
 
 COPY backend/tsconfig.json  ./
 COPY backend/src            ./src
@@ -19,7 +19,7 @@ FROM node:20-alpine AS runtime
 WORKDIR /app
 
 COPY --from=builder /app/package*.json ./
-RUN npm ci --omit=dev
+RUN npm install --omit=dev
 
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/db   ./db

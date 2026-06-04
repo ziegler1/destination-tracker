@@ -5,7 +5,7 @@ WORKDIR /app
 
 # Install deps (cached layer when only source changes)
 COPY frontend/package*.json ./
-RUN npm ci
+RUN npm install --legacy-peer-deps
 
 # Copy source — explicit paths, full repo is the Docker build context
 COPY frontend/angular.json       ./
