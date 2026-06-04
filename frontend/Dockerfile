@@ -1,4 +1,4 @@
-# ─── Build stage ──────────────────────────────────────────────────────────────
+# ─── Build stage — Trip Wizard release ────────────────────────────────────────
 FROM node:20-alpine AS builder
 
 WORKDIR /app
