@@ -58,6 +58,8 @@ export interface Restaurant {
   phone?: string;
   pet_friendly: boolean;
   image_url?: string;
+  suggested_by_ai?: boolean;
+  google_place_id?: string;
   created_at: string;
   updated_at: string;
   photos?: RestaurantPhoto[];
@@ -98,6 +100,8 @@ export interface Lodging {
   phone?: string;
   pet_friendly: boolean;
   image_url?: string;
+  suggested_by_ai?: boolean;
+  google_place_id?: string;
   created_at: string;
   updated_at: string;
   photos?: LodgingPhoto[];
@@ -227,6 +231,8 @@ export interface PointOfInterest {
   longitude?: number;
   description?: string;
   notes?: string;
+  suggested_by_ai?: boolean;
+  google_place_id?: string;
   created_at: string;
 }
 
