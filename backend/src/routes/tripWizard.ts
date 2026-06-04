@@ -172,17 +172,33 @@ Include 2–3 lodging suggestions, 3–4 restaurant suggestions, and 2–3 POI s
 
   const claudeMsg = await anthropic.messages.create({
     model: MODEL,
-    max_tokens: 4096,
+    max_tokens: 8192,
     system: [WIZARD_SYSTEM],
     messages: [{ role: 'user', content: userPrompt }],
   });
 
   const rawText = claudeMsg.content[0].type === 'text' ? claudeMsg.content[0].text : '';
+
+  // Strip markdown code fences that Claude sometimes adds despite instructions
+  let jsonText = rawText.trim();
+  const fenceMatch = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fenceMatch) jsonText = fenceMatch[1].trim();
+
+  // If still not starting with { try to find the first { ... } block
+  if (!jsonText.startsWith('{')) {
+    const braceStart = jsonText.indexOf('{');
+    const braceEnd   = jsonText.lastIndexOf('}');
+    if (braceStart !== -1 && braceEnd > braceStart) {
+      jsonText = jsonText.slice(braceStart, braceEnd + 1);
+    }
+  }
+
   let plan: WizardPlan;
   try {
-    plan = JSON.parse(rawText) as WizardPlan;
+    plan = JSON.parse(jsonText) as WizardPlan;
   } catch {
-    res.status(502).json({ error: 'Claude returned invalid JSON', raw: rawText.slice(0, 500) });
+    console.error('Claude JSON parse failed. Raw (first 800 chars):', rawText.slice(0, 800));
+    res.status(502).json({ error: 'Claude returned invalid JSON', raw: rawText.slice(0, 800) });
     return;
   }
 
