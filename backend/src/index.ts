@@ -15,8 +15,9 @@ import fuelRouter from './routes/fuel';
 import weatherRouter from './routes/weather';
 import uploadsRouter from './routes/uploads';
 import claudeRouter from './routes/claude';
-import statsRouter from './routes/stats';
-import geocodeRouter from './routes/geocode';
+import statsRouter    from './routes/stats';
+import geocodeRouter  from './routes/geocode';
+import wizardRouter   from './routes/tripWizard';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -46,8 +47,9 @@ app.use('/api/trips/:tripId/fuel',     fuelRouter);
 app.use('/api/weather', weatherRouter);
 app.use('/api/uploads', uploadsRouter);
 app.use('/api/claude',  claudeRouter);
-app.use('/api/stats',    statsRouter);
-app.use('/api/geocode', geocodeRouter);
+app.use('/api/stats',         statsRouter);
+app.use('/api/geocode',       geocodeRouter);
+app.use('/api/trips/wizard',  wizardRouter);
 
 app.use(errorHandler);
 
