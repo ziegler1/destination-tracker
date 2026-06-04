@@ -15,6 +15,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { COMMA, ENTER } from '@angular/cdk/keycodes';
 import { DestinationService } from '../../../core/services/destination.service';
+import { GeocodingService } from '../../../core/services/geocoding.service';
 
 const MONTHS = [
   'January','February','March','April','May','June',
@@ -119,7 +120,7 @@ const MONTHS = [
 
             <!-- Location -->
             <p class="section">Location</p>
-            <div class="row">
+            <div class="row" style="align-items:flex-start">
               <mat-form-field appearance="outline">
                 <mat-label>Latitude</mat-label>
                 <input matInput type="number" step="0.0001" formControlName="latitude" />
@@ -128,6 +129,16 @@ const MONTHS = [
                 <mat-label>Longitude</mat-label>
                 <input matInput type="number" step="0.0001" formControlName="longitude" />
               </mat-form-field>
+              <button mat-icon-button type="button" style="margin-top:8px"
+                      [disabled]="geoLoading() || !form.value.city"
+                      (click)="lookupCoords()"
+                      [title]="geoLoading() ? 'Looking up…' : 'Look up coordinates from city/state'">
+                @if (geoLoading()) {
+                  <mat-spinner diameter="20" />
+                } @else {
+                  <mat-icon>my_location</mat-icon>
+                }
+              </button>
             </div>
 
             <!-- Best months -->
@@ -188,13 +199,15 @@ const MONTHS = [
   `,
 })
 export class DestinationFormComponent implements OnInit {
-  private route = inject(ActivatedRoute);
-  private router = inject(Router);
-  private svc = inject(DestinationService);
-  private fb = inject(FormBuilder);
+  private route   = inject(ActivatedRoute);
+  private router  = inject(Router);
+  private svc     = inject(DestinationService);
+  private geoSvc  = inject(GeocodingService);
+  private fb      = inject(FormBuilder);
 
-  isEdit = signal(false);
-  saving = signal(false);
+  isEdit     = signal(false);
+  saving     = signal(false);
+  geoLoading = signal(false);
   error = signal('');
   selectedMonths = signal<string[]>([]);
 
@@ -252,6 +265,20 @@ export class DestinationFormComponent implements OnInit {
   }
 
   setRating(n: number): void { this.form.patchValue({ rating: n }); }
+
+  lookupCoords(): void {
+    const { city, state_province, country } = this.form.getRawValue();
+    if (!city) return;
+    this.geoLoading.set(true);
+    this.geoSvc.lookup(city ?? '', state_province ?? '', country ?? 'USA').subscribe((r) => {
+      this.geoLoading.set(false);
+      if (r) {
+        this.form.patchValue({ latitude: r.lat, longitude: r.lon });
+      } else {
+        // snack not injected here — silently leave fields blank so user can type manually
+      }
+    });
+  }
 
   addMonth(event: MatChipInputEvent): void {
     const val = (event.value ?? '').trim();

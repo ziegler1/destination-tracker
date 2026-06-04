@@ -15,6 +15,7 @@ import { MatChipsModule, MatChipInputEvent } from '@angular/material/chips';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { LodgingService } from '../../../core/services/lodging.service';
+import { GeocodingService } from '../../../core/services/geocoding.service';
 
 const AMENITY_SUGGESTIONS = [
   'AC', 'Breakfast', 'EV Charging', 'Fireplace', 'Fitness Center', 'Hot Tub',
@@ -108,6 +109,12 @@ const AMENITY_SUGGESTIONS = [
               <mat-form-field appearance="outline">
                 <mat-label>Latitude</mat-label>
                 <input matInput type="number" step="any" formControlName="latitude" />
+                <button matSuffix mat-icon-button type="button"
+                        [disabled]="geoLoading() || !form.value.city"
+                        (click)="lookupCoords()" title="Look up coordinates">
+                  @if (geoLoading()) { <mat-spinner diameter="16" /> }
+                  @else { <mat-icon>my_location</mat-icon> }
+                </button>
               </mat-form-field>
 
               <mat-form-field appearance="outline">
@@ -225,10 +232,12 @@ export class LodgingFormComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private svc = inject(LodgingService);
-  private snack = inject(MatSnackBar);
-  private fb = inject(FormBuilder);
+  private geoSvc = inject(GeocodingService);
+  private snack  = inject(MatSnackBar);
+  private fb     = inject(FormBuilder);
 
-  isEdit = signal(false);
+  isEdit     = signal(false);
+  geoLoading = signal(false);
   loading = signal(false);
   saving = signal(false);
   lodgingId = signal<number | null>(null);
@@ -284,6 +293,17 @@ export class LodgingFormComponent implements OnInit {
     if (!this.amenities().includes(s)) this.amenities.update((a) => [...a, s]);
   }
   removeAmenity(s: string) { this.amenities.update((a) => a.filter((x) => x !== s)); }
+
+  lookupCoords() {
+    const v = this.form.getRawValue();
+    if (!v.city) return;
+    this.geoLoading.set(true);
+    this.geoSvc.lookup(v.city ?? '', v.state_province ?? '', v.country ?? 'USA').subscribe((r) => {
+      this.geoLoading.set(false);
+      if (r) this.form.patchValue({ latitude: r.lat, longitude: r.lon });
+      else this.snack.open('Location not found — enter coordinates manually', 'Dismiss', { duration: 3000 });
+    });
+  }
 
   submit() {
     if (this.form.invalid) return;

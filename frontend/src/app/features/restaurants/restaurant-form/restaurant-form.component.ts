@@ -13,6 +13,7 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { RestaurantService } from '../../../core/services/restaurant.service';
+import { GeocodingService } from '../../../core/services/geocoding.service';
 
 const CUISINES = [
   'American', 'BBQ', 'Bakery / Cafe', 'Breakfast', 'Burgers', 'Chinese',
@@ -103,6 +104,12 @@ const CUISINES = [
               <mat-form-field appearance="outline">
                 <mat-label>Latitude</mat-label>
                 <input matInput type="number" step="any" formControlName="latitude" />
+                <button matSuffix mat-icon-button type="button"
+                        [disabled]="geoLoading() || !form.value.city"
+                        (click)="lookupCoords()" title="Look up coordinates">
+                  @if (geoLoading()) { <mat-spinner diameter="16" /> }
+                  @else { <mat-icon>my_location</mat-icon> }
+                </button>
               </mat-form-field>
 
               <mat-form-field appearance="outline">
@@ -181,10 +188,12 @@ export class RestaurantFormComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private svc = inject(RestaurantService);
-  private snack = inject(MatSnackBar);
-  private fb = inject(FormBuilder);
+  private geoSvc = inject(GeocodingService);
+  private snack  = inject(MatSnackBar);
+  private fb     = inject(FormBuilder);
 
-  isEdit = signal(false);
+  isEdit     = signal(false);
+  geoLoading = signal(false);
   loading = signal(false);
   saving = signal(false);
   restaurantId = signal<number | null>(null);
@@ -228,6 +237,17 @@ export class RestaurantFormComponent implements OnInit {
   }
 
   setRating(n: number) { this.form.patchValue({ rating: n }); }
+
+  lookupCoords() {
+    const v = this.form.getRawValue();
+    if (!v.city) return;
+    this.geoLoading.set(true);
+    this.geoSvc.lookup(v.city ?? '', v.state_province ?? '', v.country ?? 'USA').subscribe((r) => {
+      this.geoLoading.set(false);
+      if (r) this.form.patchValue({ latitude: r.lat, longitude: r.lon });
+      else this.snack.open('Location not found — enter coordinates manually', 'Dismiss', { duration: 3000 });
+    });
+  }
 
   submit() {
     if (this.form.invalid) return;
