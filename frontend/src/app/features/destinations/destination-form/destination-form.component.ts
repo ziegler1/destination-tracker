@@ -271,18 +271,22 @@ export class DestinationFormComponent implements OnInit {
   setRating(n: number): void { this.form.patchValue({ rating: n }); }
 
   lookupCoords(): void {
-    const { city, state_province, country } = this.form.getRawValue();
+    const { city, state_province, country, description } = this.form.getRawValue();
+    // Use address/description field for street-level precision if populated
+    const addressHint = (this.form.getRawValue() as Record<string, unknown>)['address'] as string | undefined;
     if (!city) return;
     this.geoLoading.set(true);
-    this.geoSvc.lookup(city ?? '', state_province ?? '', country ?? 'USA').subscribe((r) => {
-      this.geoLoading.set(false);
-      if (r) {
-        this.form.patchValue({ latitude: r.lat, longitude: r.lon });
-        this.snack.open(`Found: ${r.displayName.split(',').slice(0, 2).join(',')}`, 'OK', { duration: 3000 });
-      } else {
-        this.snack.open('Location not found — enter coordinates manually', 'Dismiss', { duration: 4000 });
-      }
-    });
+    this.geoSvc
+      .lookup(city ?? '', state_province ?? '', country ?? 'USA', addressHint ?? undefined)
+      .subscribe((r) => {
+        this.geoLoading.set(false);
+        if (r) {
+          this.form.patchValue({ latitude: r.lat, longitude: r.lon });
+          this.snack.open(`Found: ${r.displayName.split(',').slice(0, 2).join(',')}`, 'OK', { duration: 3000 });
+        } else {
+          this.snack.open('Location not found — enter coordinates manually', 'Dismiss', { duration: 4000 });
+        }
+      });
   }
 
   addMonth(event: MatChipInputEvent): void {

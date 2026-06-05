@@ -242,11 +242,18 @@ export class RestaurantFormComponent implements OnInit {
     const v = this.form.getRawValue();
     if (!v.city) return;
     this.geoLoading.set(true);
-    this.geoSvc.lookup(v.city ?? '', v.state_province ?? '', v.country ?? 'USA').subscribe((r) => {
-      this.geoLoading.set(false);
-      if (r) this.form.patchValue({ latitude: r.lat, longitude: r.lon });
-      else this.snack.open('Location not found — enter coordinates manually', 'Dismiss', { duration: 3000 });
-    });
+    // Pass street address for precise coordinates when filled in
+    this.geoSvc
+      .lookup(v.city ?? '', v.state_province ?? '', v.country ?? 'USA', v.address ?? undefined)
+      .subscribe((r) => {
+        this.geoLoading.set(false);
+        if (r) {
+          this.form.patchValue({ latitude: r.lat, longitude: r.lon });
+          this.snack.open('Coordinates updated', 'OK', { duration: 2000 });
+        } else {
+          this.snack.open('Location not found — enter coordinates manually', 'Dismiss', { duration: 3000 });
+        }
+      });
   }
 
   submit() {

@@ -3,15 +3,22 @@ import { asyncHandler } from '../lib/asyncHandler';
 
 const router = Router();
 
-// GET /api/geocode?city=Holden Beach&state_province=North Carolina&country=USA
+// GET /api/geocode?city=Denver&state_province=CO&country=USA&address=1234+Main+St
+// When 'address' is provided it is prepended for street-level precision.
 router.get('/', asyncHandler(async (req, res) => {
-  const city           = String(req.query.city           ?? '');
-  const state_province = String(req.query.state_province ?? '');
-  const country        = String(req.query.country        ?? '');
+  const address        = String(req.query.address        ?? '').trim();
+  const city           = String(req.query.city           ?? '').trim();
+  const state_province = String(req.query.state_province ?? '').trim();
+  const country        = String(req.query.country        ?? '').trim();
 
-  const q = [city, state_province, country].filter(Boolean).join(', ');
+  // Full address query is much more accurate than city-only
+  const parts = address
+    ? [address, city, state_province, country]
+    : [city, state_province, country];
+  const q = parts.filter(Boolean).join(', ');
+
   if (!q) {
-    res.status(400).json({ error: 'city is required' });
+    res.status(400).json({ error: 'city or address is required' });
     return;
   }
 

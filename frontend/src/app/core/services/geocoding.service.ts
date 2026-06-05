@@ -8,15 +8,15 @@ export interface GeoResult { lat: number; lon: number; displayName: string; }
 export class GeocodingService {
   private http = inject(HttpClient);
 
-  /** Look up coordinates via the backend proxy → Nominatim/OpenStreetMap. No API key required. */
-  lookup(city: string, stateProvince: string, country: string): Observable<GeoResult | null> {
-    const params = new URLSearchParams({
-      city,
-      state_province: stateProvince,
-      country,
-    });
+  /**
+   * Look up coordinates via backend proxy → Nominatim/OpenStreetMap.
+   * Pass a full `address` for street-level precision; omit for city-level.
+   */
+  lookup(city: string, stateProvince: string, country: string, address?: string): Observable<GeoResult | null> {
+    const params: Record<string, string> = { city, state_province: stateProvince, country };
+    if (address?.trim()) params['address'] = address.trim();
     return this.http
-      .get<GeoResult | null>(`/api/geocode?${params}`)
+      .get<GeoResult | null>(`/api/geocode?${new URLSearchParams(params)}`)
       .pipe(catchError(() => of(null)));
   }
 }
