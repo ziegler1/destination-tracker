@@ -3,10 +3,38 @@ import {
   ChangeDetectionStrategy, NgZone, inject, signal, computed,
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { DatePipe, CurrencyPipe, TitleCasePipe } from '@angular/common';
+import { DatePipe, CurrencyPipe, TitleCasePipe, DecimalPipe } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import * as L from 'leaflet';
 import { forkJoin } from 'rxjs';
+
+// ── OSRM road-routing helper ───────────────────────────────────────────────
+interface OsrmRoute {
+  geometry: { type: 'LineString'; coordinates: [number, number][] };
+  duration: number;   // seconds
+  distance: number;   // metres
+  legs: Array<{ duration: number; distance: number }>;
+}
+
+async function fetchRoadRoute(waypoints: [number, number][]): Promise<OsrmRoute | null> {
+  if (waypoints.length < 2) return null;
+  // OSRM expects longitude,latitude (reversed from Leaflet)
+  const coords = waypoints
+    .map(([lat, lon]) => `${lon.toFixed(6)},${lat.toFixed(6)}`)
+    .join(';');
+  const url =
+    `https://router.project-osrm.org/route/v1/driving/${coords}` +
+    `?overview=full&geometries=geojson&steps=false`;
+  try {
+    const res  = await fetch(url, { headers: { Accept: 'application/json' } });
+    if (!res.ok) return null;
+    const data = await res.json() as { code: string; routes: OsrmRoute[] };
+    if (data.code !== 'Ok' || !data.routes?.length) return null;
+    return data.routes[0];
+  } catch {
+    return null;
+  }
+}
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -62,7 +90,7 @@ function lodgingIcon(): L.DivIcon {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    RouterLink, ReactiveFormsModule, DatePipe, CurrencyPipe, TitleCasePipe,
+    RouterLink, ReactiveFormsModule, DatePipe, CurrencyPipe, TitleCasePipe, DecimalPipe,
     MatCardModule, MatButtonModule, MatIconModule, MatTabsModule,
     MatProgressSpinnerModule, MatSnackBarModule, MatDividerModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatDatepickerModule,
@@ -163,7 +191,19 @@ function lodgingIcon(): L.DivIcon {
               @if (t.total_budget) {
                 <span style="font-size:12px;color:var(--wp-text-hint)">{{ t.total_budget | currency:'USD':'symbol':'1.0-0' }} budget</span>
               }
-              <span style="margin-left:auto;display:flex;gap:4px">
+              @if (routeStats()) {
+                <span style="font-size:12px;color:var(--wp-text-hint)">
+                  {{ routeStats()!.distanceKm | number:'1.0-0' }} km · {{ routeStats()!.durationMin | number:'1.0-0' }} min drive
+                </span>
+              }
+              <span style="margin-left:auto;display:flex;gap:4px;align-items:center">
+                @if (googleMapsUrl()) {
+                  <a [href]="googleMapsUrl()!" target="_blank" rel="noopener">
+                    <button mat-icon-button title="Open full route in Google Maps" style="color:#4285f4">
+                      <mat-icon>map</mat-icon>
+                    </button>
+                  </a>
+                }
                 <button mat-icon-button [routerLink]="['/trips', t.id, 'edit']" title="Edit trip"><mat-icon style="font-size:18px">edit</mat-icon></button>
                 <button mat-icon-button color="warn" (click)="confirmDelete()" title="Delete"><mat-icon style="font-size:18px">delete</mat-icon></button>
               </span>
@@ -373,6 +413,7 @@ export class TripDetailComponent implements OnInit, AfterViewInit, OnDestroy {
   editingStopId      = signal<number | null>(null);
   savingStop         = signal(false);
   cityLodgings       = signal<Lodging[]>([]);
+  routeStats         = signal<{ distanceKm: number; durationMin: number } | null>(null);
 
   private tripSig = signal<Trip | null>(null);
   protected get t(): Trip | null { return this.tripSig(); }
@@ -380,6 +421,20 @@ export class TripDetailComponent implements OnInit, AfterViewInit, OnDestroy {
   sortedStops = computed(() =>
     [...(this.tripSig()?.stops ?? [])].sort((a, b) => a.stop_order - b.stop_order),
   );
+
+  // Google Maps URL using actual coordinates or city names as fallback
+  googleMapsUrl = computed(() => {
+    const positioned = this.sortedStops()
+      .map(s => {
+        const c = this.stopCoords(s);
+        if (c) return `${c[0]},${c[1]}`;
+        const d = s.destination;
+        return d ? `${encodeURIComponent(d.city + ' ' + d.state_province)}` : null;
+      })
+      .filter(Boolean);
+    if (positioned.length < 2) return null;
+    return `https://www.google.com/maps/dir/${positioned.join('/')}`;
+  });
 
   readonly STOP_STATUS_COLOR = STOP_STATUS_COLOR;
 
@@ -460,7 +515,7 @@ export class TripDetailComponent implements OnInit, AfterViewInit, OnDestroy {
     this.drawRoute();
   }
 
-  private drawRoute() {
+  private async drawRoute() {
     if (!this.map) return;
     this.routeLayer.clearLayers();
 
@@ -473,39 +528,66 @@ export class TripDetailComponent implements OnInit, AfterViewInit, OnDestroy {
 
     const latlngs = positioned.map((x) => x.coords);
 
-    // Route polyline
+    // ── Draw road route via OSRM (falls back to straight line if unavailable) ──
     if (latlngs.length > 1) {
-      L.polyline(latlngs, { color: '#00695C', weight: 3, dashArray: '10,8', opacity: .85 })
-        .addTo(this.routeLayer);
-    }
+      const osrm = await fetchRoadRoute(latlngs);
+      if (osrm) {
+        // OSRM returns [lon, lat] — convert to Leaflet [lat, lon]
+        const roadCoords = osrm.geometry.coordinates.map(
+          ([lon, lat]) => [lat, lon] as [number, number],
+        );
+        L.polyline(roadCoords, { color: '#00695C', weight: 4, opacity: .85 })
+          .addTo(this.routeLayer);
 
-    // Stop markers
-    for (const { stop, coords } of positioned) {
-      const popupHtml = `
-        <strong>${stop.destination?.name ?? 'Stop ' + stop.stop_order}</strong><br/>
-        <small>${stop.destination?.city ?? ''}, ${stop.destination?.state_province ?? ''}</small><br/>
-        <small>Status: <b>${stop.status}</b></small>
-        ${stop.arrival_date  ? '<br/><small>Arrive: '  + stop.arrival_date  + '</small>' : ''}
-        ${stop.departure_date? '<br/><small>Depart: '  + stop.departure_date+ '</small>' : ''}
-        ${stop.lodging ? '<br/><small>🏨 ' + stop.lodging.name + '</small>' : ''}
-      `;
-      L.marker(coords, { icon: stopMarkerIcon(stop) })
-        .bindPopup(popupHtml)
-        .addTo(this.routeLayer);
-
-      // Lodging marker if it has coordinates
-      if (stop.lodging?.latitude && stop.lodging?.longitude) {
-        L.marker([Number(stop.lodging.latitude), Number(stop.lodging.longitude)], { icon: lodgingIcon() })
-          .bindPopup(`<strong>🏨 ${stop.lodging.name}</strong><br/><small>${stop.lodging.address ?? ''}</small>`)
+        // Update route stats signal (must re-enter Angular zone)
+        const distanceKm  = Math.round(osrm.distance / 1000);
+        const durationMin = Math.round(osrm.duration / 60);
+        this.ngZone.run(() => this.routeStats.set({ distanceKm, durationMin }));
+      } else {
+        // Fallback — straight dashed line
+        L.polyline(latlngs, { color: '#00695C', weight: 3, dashArray: '10,8', opacity: .75 })
           .addTo(this.routeLayer);
       }
     }
 
-    // Fit to route
+    // ── Stop markers ──────────────────────────────────────────────────────────
+    for (const { stop, coords } of positioned) {
+      const popup = `
+        <div style="font-family:Roboto,sans-serif;min-width:160px">
+          <strong>${stop.destination?.name ?? 'Stop ' + stop.stop_order}</strong><br/>
+          <small style="color:#666">${stop.destination?.city ?? ''}, ${stop.destination?.state_province ?? ''}</small><br/>
+          <small>Status: <b>${stop.status}</b></small>
+          ${stop.arrival_date   ? '<br/><small>Arrive: '  + stop.arrival_date   + '</small>' : ''}
+          ${stop.departure_date ? '<br/><small>Depart: '  + stop.departure_date + '</small>' : ''}
+          ${stop.lodging ? '<br/><small>🏨 ' + stop.lodging.name + '</small>' : ''}
+          <br/><button onclick="window._wpNav('/trips/${this.tripSig()!.id}')"
+            style="margin-top:6px;padding:3px 10px;background:#00695C;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px">
+            Open Companion
+          </button>
+        </div>`;
+      L.marker(coords, { icon: stopMarkerIcon(stop) })
+        .bindPopup(popup)
+        .addTo(this.routeLayer);
+
+      // Hotel marker
+      if (stop.lodging?.latitude && stop.lodging?.longitude) {
+        L.marker(
+          [Number(stop.lodging.latitude), Number(stop.lodging.longitude)],
+          { icon: lodgingIcon() },
+        )
+          .bindPopup(
+            `<strong>🏨 ${stop.lodging.name}</strong>` +
+            `${stop.lodging.address ? '<br/><small>' + stop.lodging.address + '</small>' : ''}`,
+          )
+          .addTo(this.routeLayer);
+      }
+    }
+
+    // ── Fit map to route ──────────────────────────────────────────────────────
     if (latlngs.length > 1) {
-      this.map.fitBounds(latlngs, { padding: [50, 50], maxZoom: 10 });
+      this.map.fitBounds(latlngs, { padding: [50, 50], maxZoom: 11 });
     } else {
-      this.map.setView(latlngs[0], 10);
+      this.map.setView(latlngs[0], 11);
     }
   }
 
