@@ -2,53 +2,94 @@ import { Router } from 'express';
 import { asyncHandler } from '../lib/asyncHandler';
 
 const router = Router();
+const GOOGLE_KEY = process.env.GOOGLE_PLACES_API_KEY ?? '';
 
-// GET /api/geocode?city=Denver&state_province=CO&country=USA&address=1234+Main+St
-// When 'address' is provided it is prepended for street-level precision.
+interface GeoResult { lat: number; lon: number; displayName: string; }
+
+// ── Google Geocoding API (precise street-level) ───────────────────────────
+async function geocodeWithGoogle(q: string): Promise<GeoResult | null> {
+  if (!GOOGLE_KEY) return null;
+  try {
+    const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(q)}&key=${GOOGLE_KEY}`;
+    const res  = await fetch(url, { headers: { Accept: 'application/json' } });
+    const data = await res.json() as {
+      status: string;
+      results: Array<{
+        formatted_address: string;
+        geometry: { location: { lat: number; lng: number } };
+      }>;
+    };
+    if (data.status !== 'OK' || !data.results.length) return null;
+    const r = data.results[0];
+    return {
+      lat:         r.geometry.location.lat,
+      lon:         r.geometry.location.lng,
+      displayName: r.formatted_address,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// ── Nominatim fallback (city-level, free, no key) ─────────────────────────
+async function geocodeWithNominatim(q: string): Promise<GeoResult | null> {
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&addressdetails=0`;
+    const res  = await fetch(url, {
+      headers: {
+        'User-Agent':      'Waypoint Travel App (https://github.com/ziegler1/destination-tracker)',
+        'Accept-Language': 'en',
+      },
+    });
+    if (!res.ok) return null;
+    const results = await res.json() as Array<{ lat: string; lon: string; display_name: string }>;
+    if (!results.length) return null;
+    return {
+      lat:         parseFloat(results[0].lat),
+      lon:         parseFloat(results[0].lon),
+      displayName: results[0].display_name,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// ── GET /api/geocode ──────────────────────────────────────────────────────
+// Params: city, state_province, country, address (optional)
+// When address is provided → tries Google first (precise), falls back to Nominatim.
+// When only city is provided → Nominatim is sufficient.
 router.get('/', asyncHandler(async (req, res) => {
   const address        = String(req.query.address        ?? '').trim();
   const city           = String(req.query.city           ?? '').trim();
   const state_province = String(req.query.state_province ?? '').trim();
   const country        = String(req.query.country        ?? '').trim();
 
-  // Full address query is much more accurate than city-only
-  const parts = address
-    ? [address, city, state_province, country]
-    : [city, state_province, country];
-  const q = parts.filter(Boolean).join(', ');
-
-  if (!q) {
+  if (!city && !address) {
     res.status(400).json({ error: 'city or address is required' });
     return;
   }
 
-  const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&addressdetails=0`;
+  const fullQuery = [address, city, state_province, country].filter(Boolean).join(', ');
+  const cityQuery = [city, state_province, country].filter(Boolean).join(', ');
 
-  const response = await fetch(url, {
-    headers: {
-      'User-Agent': 'Waypoint Travel App (https://github.com/ziegler1/destination-tracker)',
-      'Accept-Language': 'en',
-      'Referer': 'https://nominatim.openstreetmap.org',
-    },
-  });
+  let result: GeoResult | null = null;
 
-  if (!response.ok) {
-    res.status(502).json({ error: 'Nominatim request failed' });
-    return;
+  if (address && GOOGLE_KEY) {
+    // Street address + Google key → precise result
+    result = await geocodeWithGoogle(fullQuery);
   }
 
-  const results = await response.json() as Array<{ lat: string; lon: string; display_name: string }>;
-
-  if (!results.length) {
-    res.json(null);
-    return;
+  if (!result) {
+    // Fallback: Nominatim with full query first, then city only
+    result = await geocodeWithNominatim(fullQuery);
   }
 
-  res.json({
-    lat:         parseFloat(results[0].lat),
-    lon:         parseFloat(results[0].lon),
-    displayName: results[0].display_name,
-  });
+  if (!result && address) {
+    // Last resort: city-only Nominatim
+    result = await geocodeWithNominatim(cityQuery);
+  }
+
+  res.json(result);
 }));
 
 export default router;
