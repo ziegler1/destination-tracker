@@ -53,7 +53,9 @@ router.get('/:id', asyncHandler(async (req, res) => {
             ) ELSE NULL END,
             'lodging', CASE WHEN l.id IS NOT NULL THEN jsonb_build_object(
               'id', l.id, 'name', l.name, 'city', l.city,
-              'lodging_type', l.lodging_type, 'price_per_night', l.price_per_night
+              'lodging_type', l.lodging_type, 'price_per_night', l.price_per_night,
+              'address', l.address, 'latitude', l.latitude, 'longitude', l.longitude,
+              'website', l.website, 'phone', l.phone
             ) ELSE NULL END
           )
           ORDER BY ts.stop_order

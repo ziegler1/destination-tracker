@@ -20,6 +20,8 @@ export interface PlaceEnrichment {
   photo_url:          string | null;
   website:            string | null;
   phone:              string | null;
+  lat:                number | null;
+  lng:                number | null;
 }
 
 interface TextSearchResult {
@@ -28,6 +30,7 @@ interface TextSearchResult {
   rating?:            number;
   user_ratings_total?: number;
   price_level?:       number;
+  geometry?:          { location: { lat: number; lng: number } };
   photos?:            Array<{ photo_reference: string }>;
 }
 
@@ -119,6 +122,8 @@ export async function enrichPlace(
       photo_url:          photoRef ? buildPhotoUrl(photoRef) : null,
       website,
       phone,
+      lat:  match.geometry?.location.lat ?? null,
+      lng:  match.geometry?.location.lng ?? null,
     };
   } catch {
     // Network error, quota exceeded, etc. — degrade gracefully.

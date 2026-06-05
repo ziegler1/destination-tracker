@@ -60,6 +60,22 @@ function normalizePoiType(t: string | undefined): string {
   return 'other';
 }
 
+// ── City geocoding via Nominatim (server-side, no CORS) ─────────────────────
+async function geocodeCity(city: string, state: string): Promise<{ lat: number; lon: number } | null> {
+  try {
+    const q = `${city}, ${state}`;
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&addressdetails=0`;
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'Waypoint/1.0 (road trip planning app)' },
+    });
+    const data = await res.json() as Array<{ lat: string; lon: string }>;
+    if (!data.length) return null;
+    return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+  } catch {
+    return null;
+  }
+}
+
 // ── Shared Claude system prompt (cached) ────────────────────────────────────
 const WIZARD_SYSTEM: Anthropic.Messages.TextBlockParam = {
   type: 'text',
@@ -265,8 +281,8 @@ Include 2–3 lodging suggestions, 3–4 restaurant suggestions, and 2–3 POI s
       stop.lodging_suggestions = stop.lodging_suggestions.map((s, i) => {
         const e = lodgingEnrichments[i];
         return e
-          ? { ...s, google_verified: true,  place_id: e.place_id, formatted_address: e.formatted_address, google_rating: e.google_rating, photo_url: e.photo_url, website: e.website }
-          : { ...s, google_verified: false, place_id: null, formatted_address: null, google_rating: null, photo_url: null, website: null };
+          ? { ...s, google_verified: true,  place_id: e.place_id, formatted_address: e.formatted_address, google_rating: e.google_rating, photo_url: e.photo_url, website: e.website, lat: e.lat, lng: e.lng }
+          : { ...s, google_verified: false, place_id: null, formatted_address: null, google_rating: null, photo_url: null, website: null, lat: null, lng: null };
       });
 
       // Enrich restaurants (no details call — faster)
@@ -274,8 +290,8 @@ Include 2–3 lodging suggestions, 3–4 restaurant suggestions, and 2–3 POI s
       stop.restaurant_suggestions = stop.restaurant_suggestions.map((s, i) => {
         const e = restEnrichments[i];
         return e
-          ? { ...s, google_verified: true,  place_id: e.place_id, formatted_address: e.formatted_address, google_rating: e.google_rating, photo_url: e.photo_url, website: e.website }
-          : { ...s, google_verified: false, place_id: null, formatted_address: null, google_rating: null, photo_url: null, website: null };
+          ? { ...s, google_verified: true,  place_id: e.place_id, formatted_address: e.formatted_address, google_rating: e.google_rating, photo_url: e.photo_url, website: e.website, lat: e.lat, lng: e.lng }
+          : { ...s, google_verified: false, place_id: null, formatted_address: null, google_rating: null, photo_url: null, website: null, lat: null, lng: null };
       });
 
       // Enrich POIs
@@ -283,8 +299,8 @@ Include 2–3 lodging suggestions, 3–4 restaurant suggestions, and 2–3 POI s
       stop.poi_suggestions = stop.poi_suggestions.map((s, i) => {
         const e = poiEnrichments[i];
         return e
-          ? { ...s, google_verified: true,  place_id: e.place_id, formatted_address: e.formatted_address, photo_url: e.photo_url }
-          : { ...s, google_verified: false, place_id: null, formatted_address: null, photo_url: null };
+          ? { ...s, google_verified: true,  place_id: e.place_id, formatted_address: e.formatted_address, photo_url: e.photo_url, lat: e.lat, lng: e.lng }
+          : { ...s, google_verified: false, place_id: null, formatted_address: null, photo_url: null, lat: null, lng: null };
       });
     }),
   );
@@ -325,8 +341,11 @@ router.post('/confirm', asyncHandler(async (req, res) => {
     for (const stop of stops.sort((a, b) => a.stop_order - b.stop_order)) {
 
       // 2a. Ensure a destination record exists for this city
-      const { rows: existingDest } = await client.query<{ id: number }>(
-        `SELECT id FROM destinations
+      // Geocode the stop city so map pins work
+      const coords = await geocodeCity(stop.city, stop.state_province);
+
+      const { rows: existingDest } = await client.query<{ id: number; latitude: number | null }>(
+        `SELECT id, latitude FROM destinations
          WHERE city = $1 AND state_province = $2
          LIMIT 1`,
         [stop.city, stop.state_province],
@@ -334,12 +353,22 @@ router.post('/confirm', asyncHandler(async (req, res) => {
       let destinationId: number;
       if (existingDest.length > 0) {
         destinationId = existingDest[0].id;
+        // Backfill coordinates if missing
+        if (!existingDest[0].latitude && coords) {
+          await client.query(
+            'UPDATE destinations SET latitude=$1, longitude=$2 WHERE id=$3',
+            [coords.lat, coords.lon, destinationId],
+          );
+        }
       } else {
         const { rows: [newDest] } = await client.query<{ id: number }>(
-          `INSERT INTO destinations (name, city, state_province, country, status)
-           VALUES ($1, $2, $3, $4, 'want_to_visit')
+          `INSERT INTO destinations (name, city, state_province, country, status, latitude, longitude)
+           VALUES ($1, $2, $3, $4, 'want_to_visit', $5, $6)
            RETURNING id`,
-          [stop.city, stop.city, stop.state_province, normalizeCountry(stop.country)],
+          [
+            stop.city, stop.city, stop.state_province, normalizeCountry(stop.country),
+            coords?.lat ?? null, coords?.lon ?? null,
+          ],
         );
         destinationId = newDest.id;
       }
@@ -352,9 +381,10 @@ router.post('/confirm', asyncHandler(async (req, res) => {
         const { rows: [savedLodging] } = await client.query<{ id: number }>(
           `INSERT INTO lodging
              (name, city, state_province, country, lodging_type,
+              address, latitude, longitude,
               price_per_night, website, pet_friendly,
               suggested_by_ai, google_place_id)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
            RETURNING id`,
           [
             approvedLodging.name,
@@ -362,6 +392,9 @@ router.post('/confirm', asyncHandler(async (req, res) => {
             stop.state_province,
             normalizeCountry(stop.country),
             normalizeLodgingType(approvedLodging.lodging_type),
+            (approvedLodging as any).formatted_address ?? null,
+            (approvedLodging as any).lat ?? null,
+            (approvedLodging as any).lng ?? null,
             approvedLodging.estimated_price_per_night ?? null,
             approvedLodging.website ?? null,
             false,
@@ -397,8 +430,9 @@ router.post('/confirm', asyncHandler(async (req, res) => {
         const { rows: [savedRest] } = await client.query<{ id: number }>(
           `INSERT INTO restaurants
              (name, city, state_province, country, cuisine_type, price_range,
+              address, latitude, longitude,
               website, pet_friendly, suggested_by_ai, google_place_id)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
            RETURNING id`,
           [
             r.name,
@@ -407,6 +441,9 @@ router.post('/confirm', asyncHandler(async (req, res) => {
             normalizeCountry(stop.country),
             r.cuisine_type ?? null,
             normalizePriceRange(r.price_range),
+            (r as any).formatted_address ?? null,
+            (r as any).lat ?? null,
+            (r as any).lng ?? null,
             r.website ?? null,
             false,
             true,
