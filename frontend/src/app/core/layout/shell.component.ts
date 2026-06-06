@@ -4,6 +4,7 @@ import {
 } from '@angular/core';
 import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { DatePipe } from '@angular/common';
+import { MatBottomSheet } from '@angular/material/bottom-sheet';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -12,8 +13,13 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { ThemeService } from '../services/theme.service';
 import { TripService } from '../services/trip.service';
 import { Trip } from '../../types/schema.types';
+import { QuickAddRestaurantComponent } from '../../shared/components/quick-add/quick-add-restaurant.component';
+import { QuickAddLodgingComponent } from '../../shared/components/quick-add/quick-add-lodging.component';
+import { QuickAddDestinationComponent } from '../../shared/components/quick-add/quick-add-destination.component';
+import { QuickAddFuelComponent } from '../../shared/components/quick-add/quick-add-fuel.component';
 
 interface NavItem { icon: string; label: string; path: string; exact?: boolean; }
+interface QuickAddItem { icon: string; label: string; type: string; }
 
 const PRIMARY_NAV: NavItem[] = [
   { icon: '🏠',  label: 'Home',            path: '/',            exact: true },
@@ -28,11 +34,11 @@ const SECONDARY_NAV: NavItem[] = [
   { icon: '🏨',  label: 'Lodging',       path: '/lodging' },
 ];
 
-const QUICK_ADD_ITEMS = [
-  { icon: '📍', label: 'Destination',  path: '/destinations/new' },
-  { icon: '🍽️', label: 'Restaurant',  path: '/restaurants/new' },
-  { icon: '🏨', label: 'Lodging',      path: '/lodging/new' },
-  { icon: '✈️',  label: 'Trip',        path: '/trips/new' },
+const QUICK_ADD_ITEMS: QuickAddItem[] = [
+  { icon: '📍', label: 'Destination', type: 'destination' },
+  { icon: '🍽️', label: 'Restaurant', type: 'restaurant' },
+  { icon: '🏨', label: 'Lodging',     type: 'lodging' },
+  { icon: '⛽', label: 'Fuel Stop',   type: 'fuel' },
 ];
 
 @Component({
@@ -229,10 +235,10 @@ const QUICK_ADD_ITEMS = [
         </button>
         @if (qaOpen()) {
           <div class="qa-items">
-            @for (item of quickAddItems; track item.path) {
-              <a class="qa-item" [routerLink]="item.path" (click)="qaOpen.set(false)">
+            @for (item of quickAddItems; track item.type) {
+              <button class="qa-item" (click)="openQuickAdd(item.type)">
                 <span>{{ item.icon }}</span> {{ item.label }}
-              </a>
+              </button>
             }
           </div>
         }
@@ -321,10 +327,10 @@ const QUICK_ADD_ITEMS = [
     @if (qaOpen() && isMobile()) {
       <div class="more-overlay">
         <div class="more-grid">
-          @for (item of quickAddItems; track item.path) {
-            <a class="more-item" [routerLink]="item.path" (click)="qaOpen.set(false)">
+          @for (item of quickAddItems; track item.type) {
+            <button class="more-item" (click)="openQuickAdd(item.type)">
               <span style="font-size:24px">{{ item.icon }}</span>{{ item.label }}
-            </a>
+            </button>
           }
         </div>
       </div>
@@ -352,9 +358,10 @@ const QUICK_ADD_ITEMS = [
   `,
 })
 export class ShellComponent implements OnInit {
-  protected theme = inject(ThemeService);
-  private tripSvc = inject(TripService);
-  private snack   = inject(MatSnackBar);
+  protected theme      = inject(ThemeService);
+  private tripSvc      = inject(TripService);
+  private snack        = inject(MatSnackBar);
+  private bottomSheet  = inject(MatBottomSheet);
 
   showInstall  = signal(false);
   qaOpen       = signal(false);
@@ -395,6 +402,19 @@ export class ShellComponent implements OnInit {
 
   toggleQA()   { this.qaOpen.set(!this.qaOpen());     this.moreOpen.set(false); }
   toggleMore() { this.moreOpen.set(!this.moreOpen()); this.qaOpen.set(false); }
+
+  openQuickAdd(type: string) {
+    this.qaOpen.set(false);
+    this.moreOpen.set(false);
+    const map: Record<string, unknown> = {
+      restaurant:  QuickAddRestaurantComponent,
+      lodging:     QuickAddLodgingComponent,
+      destination: QuickAddDestinationComponent,
+      fuel:        QuickAddFuelComponent,
+    };
+    const component = map[type] as Parameters<MatBottomSheet['open']>[0];
+    if (component) this.bottomSheet.open(component);
+  }
 
   installApp() {
     (this.installPrompt as any)?.prompt?.();
