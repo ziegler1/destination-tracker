@@ -1,6 +1,8 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { switchMap } from 'rxjs/operators';
+import { throwError } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 import { DestinationPhoto, RestaurantPhoto, LodgingPhoto } from '../../types/schema.types';
 
 export type EntityPhoto = DestinationPhoto | RestaurantPhoto | LodgingPhoto;
@@ -19,11 +21,15 @@ export class PhotoService {
     return this.http
       .post<{ key: string; url: string }>('/api/uploads', fd)
       .pipe(
+        catchError((err) => {
+          const msg = err?.error?.error ?? err?.message ?? 'Upload failed';
+          return throwError(() => new Error(msg));
+        }),
         switchMap(({ key, url }) =>
           this.http.post<EntityPhoto>(`/api/${entityType}/${entityId}/photos`, {
             r2_key: key,
             url,
-            is_primary: isFirst, // first uploaded photo becomes primary
+            is_primary: isFirst,
           }),
         ),
       );

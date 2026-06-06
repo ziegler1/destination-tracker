@@ -135,8 +135,8 @@ export class PhotoUploaderComponent {
     const isFirst = this.photos().length === 0;
     this.svc.upload(file, this.entityType(), this.entityId(), isFirst).subscribe({
       next: () => { this.uploading.set(false); this.changed.emit(); },
-      error: () => {
-        this.snack.open('Upload failed', 'Dismiss', { duration: 3000 });
+      error: (err: Error) => {
+        this.snack.open(err?.message ?? 'Upload failed', 'Dismiss', { duration: 5000 });
         this.uploading.set(false);
       },
     });
