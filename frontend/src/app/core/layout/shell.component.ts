@@ -160,12 +160,6 @@ const QUICK_ADD_ITEMS: QuickAddItem[] = [
     .sidebar-footer button { color: var(--wp-sidebar-text) !important; }
     .footer-label { font-size: 13px; color: var(--wp-sidebar-text); }
 
-    /* ── Install Banner ──────────────────────────────────────────── */
-    .install-banner {
-      background: var(--wp-primary); color: white;
-      padding: 10px 20px; display: flex; align-items: center; gap: 12px; font-size: 14px;
-    }
-
     /* ── Mobile Bottom Tabs ──────────────────────────────────────── */
     .bottom-tabs {
       display: none;
@@ -291,14 +285,6 @@ const QUICK_ADD_ITEMS: QuickAddItem[] = [
 
     <!-- ── MAIN CONTENT ──────────────────────────────────────────── -->
     <div class="main-content">
-      @if (showInstall()) {
-        <div class="install-banner">
-          <mat-icon>install_mobile</mat-icon>
-          <span style="flex:1">Install Waypoint for offline access and home screen shortcut</span>
-          <button mat-stroked-button style="color:white;border-color:rgba(255,255,255,.6)" (click)="installApp()">Install</button>
-          <button mat-icon-button style="color:white" (click)="showInstall.set(false)"><mat-icon>close</mat-icon></button>
-        </div>
-      }
       <router-outlet />
     </div>
 
@@ -363,13 +349,10 @@ export class ShellComponent implements OnInit {
   private snack        = inject(MatSnackBar);
   private bottomSheet  = inject(MatBottomSheet);
 
-  showInstall  = signal(false);
   qaOpen       = signal(false);
   moreOpen     = signal(false);
   isMobile     = signal(window.innerWidth <= 768);
   activeTrip   = signal<Trip | null>(null);
-
-  private installPrompt: Event | null = null;
 
   readonly primaryNav    = PRIMARY_NAV;
   readonly secondaryNav  = SECONDARY_NAV;
@@ -384,13 +367,6 @@ export class ShellComponent implements OnInit {
 
   @HostListener('window:resize')
   onResize() { this.isMobile.set(window.innerWidth <= 768); }
-
-  @HostListener('window:beforeinstallprompt', ['$event'])
-  onBeforeInstallPrompt(e: Event) {
-    e.preventDefault();
-    this.installPrompt = e;
-    this.showInstall.set(true);
-  }
 
   ngOnInit() {
     // Load trips to detect active trip for sidebar card
@@ -416,8 +392,4 @@ export class ShellComponent implements OnInit {
     if (component) this.bottomSheet.open(component);
   }
 
-  installApp() {
-    (this.installPrompt as any)?.prompt?.();
-    this.showInstall.set(false);
-  }
 }
