@@ -109,7 +109,7 @@ const STYLE_OPTIONS = [
               <p class="dest-loc">{{ dest.state_province }} · {{ dest.country }}</p>
               <p class="dest-desc">{{ dest.description }}</p>
 
-              @if (dest.top_activities?.length) {
+              @if (dest.top_activities.length) {
                 <div class="dest-acts">
                   @for (a of dest.top_activities; track a) {
                     <span class="act-chip">{{ a }}</span>
@@ -117,7 +117,7 @@ const STYLE_OPTIONS = [
                 </div>
               }
 
-              @if (dest.best_months?.length) {
+              @if (dest.best_months.length) {
                 <p class="months-row">
                   Best time: {{ dest.best_months.join(', ') }}
                 </p>

@@ -246,7 +246,7 @@ interface WeatherDay {
               </button>
               @if (btResult(); as bt) {
                 <div style="margin-top:12px">
-                  @if (bt.best_months?.length) {
+                  @if (bt.best_months.length) {
                     <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">
                       @for (m of bt.best_months; track m) {
                         <span style="padding:3px 12px;border-radius:14px;background:var(--wp-primary);color:white;font-size:13px">{{ m }}</span>
@@ -261,7 +261,7 @@ interface WeatherDay {
                       }
                     }
                   }
-                  @if (bt.best_months?.length) {
+                  @if (bt.best_months.length) {
                     <button mat-stroked-button color="primary" style="margin-top:10px" (click)="applyBestMonths()">
                       <mat-icon>done</mat-icon> Apply to Best Months
                     </button>
