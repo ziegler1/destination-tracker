@@ -148,4 +148,23 @@ router.patch('/:id/lodging', asyncHandler(async (req, res) => {
   res.json(rows[0]);
 }));
 
+// POST /api/trips/:tripId/stops/:id/special-interests — link a special interest place to a stop
+router.post('/:id/special-interests', asyncHandler(async (req, res) => {
+  const { tripId, id: stopId } = req.params;
+  const { special_interest_id } = req.body;
+  const { rows: [stop] } = await pool.query(
+    'SELECT id FROM trip_stops WHERE id=$1 AND trip_id=$2',
+    [stopId, tripId],
+  );
+  if (!stop) return void res.status(404).json({ error: 'Stop not found' });
+  const { rows } = await pool.query(
+    `INSERT INTO trip_special_interests (trip_id, trip_stop_id, special_interest_id)
+     VALUES ($1,$2,$3)
+     ON CONFLICT DO NOTHING
+     RETURNING *`,
+    [tripId, stopId, special_interest_id],
+  );
+  res.status(201).json(rows[0] ?? { trip_id: tripId, trip_stop_id: stopId, special_interest_id });
+}));
+
 export default router;

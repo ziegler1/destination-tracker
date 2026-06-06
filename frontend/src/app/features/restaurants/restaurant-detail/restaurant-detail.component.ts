@@ -9,10 +9,12 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { MatBottomSheet, MatBottomSheetModule } from '@angular/material/bottom-sheet';
 import { RestaurantService } from '../../../core/services/restaurant.service';
 import { ClaudeService } from '../../../core/services/claude.service';
 import { MiniMapComponent } from '../../../shared/mini-map/mini-map.component';
 import { PhotoUploaderComponent } from '../../../shared/photo-uploader/photo-uploader.component';
+import { AddToTripSheetComponent } from '../../../shared/components/add-to-trip-sheet/add-to-trip-sheet.component';
 import { Restaurant } from '../../../types/schema.types';
 
 @Component({
@@ -21,7 +23,7 @@ import { Restaurant } from '../../../types/schema.types';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     RouterLink, MatCardModule, MatButtonModule, MatIconModule,
-    MatDividerModule, MatChipsModule, MatProgressSpinnerModule, MatSnackBarModule,
+    MatDividerModule, MatChipsModule, MatProgressSpinnerModule, MatSnackBarModule, MatBottomSheetModule,
     MiniMapComponent, PhotoUploaderComponent,
   ],
   styles: [`
@@ -75,6 +77,9 @@ import { Restaurant } from '../../../types/schema.types';
               <mat-icon>add_location_alt</mat-icon>
               {{ visitLogging() ? 'Logged!' : 'Log a Visit' }}
               @if ((r.visit_count ?? 0) > 0) { &nbsp;({{ r.visit_count }}x) }
+            </button>
+            <button mat-stroked-button color="accent" (click)="openAddToTrip(r)">
+              <mat-icon>add_road</mat-icon> Add to Trip
             </button>
             <button mat-stroked-button [routerLink]="['/restaurants', r.id, 'edit']">
               <mat-icon>edit</mat-icon> Edit
@@ -190,6 +195,7 @@ export class RestaurantDetailComponent implements OnInit {
   private svc = inject(RestaurantService);
   private claudeSvc = inject(ClaudeService);
   private snack = inject(MatSnackBar);
+  private bottomSheet = inject(MatBottomSheet);
 
   loading      = signal(true);
   visitLogging = signal(false);
@@ -255,6 +261,12 @@ export class RestaurantDetailComponent implements OnInit {
         setTimeout(() => this.visitLogging.set(false), 1500);
       },
       error: () => { this.snack.open('Failed to log visit', 'Dismiss', { duration: 3000 }); this.visitLogging.set(false); },
+    });
+  }
+
+  openAddToTrip(r: Restaurant) {
+    this.bottomSheet.open(AddToTripSheetComponent, {
+      data: { entityType: 'restaurant', entityId: r.id, entityName: r.name },
     });
   }
 

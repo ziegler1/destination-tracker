@@ -35,4 +35,8 @@ export class StopService {
   setLodging(tripId: number, stopId: number, lodgingId: number) {
     return this.http.patch<TripStop>(`${this.base(tripId)}/${stopId}/lodging`, { lodging_id: lodgingId });
   }
+
+  addSpecialInterest(tripId: number, stopId: number, specialInterestId: number) {
+    return this.http.post<unknown>(`${this.base(tripId)}/${stopId}/special-interests`, { special_interest_id: specialInterestId });
+  }
 }

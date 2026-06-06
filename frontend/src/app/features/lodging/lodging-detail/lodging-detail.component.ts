@@ -10,9 +10,11 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { MatBottomSheet, MatBottomSheetModule } from '@angular/material/bottom-sheet';
 import { LodgingService } from '../../../core/services/lodging.service';
 import { MiniMapComponent } from '../../../shared/mini-map/mini-map.component';
 import { PhotoUploaderComponent } from '../../../shared/photo-uploader/photo-uploader.component';
+import { AddToTripSheetComponent } from '../../../shared/components/add-to-trip-sheet/add-to-trip-sheet.component';
 import { Lodging, LodgingType } from '../../../types/schema.types';
 
 const TYPE_LABELS: Record<LodgingType, string> = {
@@ -26,7 +28,7 @@ const TYPE_LABELS: Record<LodgingType, string> = {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     RouterLink, CurrencyPipe, MatCardModule, MatButtonModule, MatIconModule,
-    MatDividerModule, MatChipsModule, MatProgressSpinnerModule, MatSnackBarModule,
+    MatDividerModule, MatChipsModule, MatProgressSpinnerModule, MatSnackBarModule, MatBottomSheetModule,
     MiniMapComponent, PhotoUploaderComponent,
   ],
   styles: [`
@@ -76,6 +78,9 @@ const TYPE_LABELS: Record<LodgingType, string> = {
               <mat-icon>add_location_alt</mat-icon>
               {{ visitLogging() ? 'Logged!' : 'Log a Stay' }}
               @if ((l.visit_count ?? 0) > 0) { &nbsp;({{ l.visit_count }}x) }
+            </button>
+            <button mat-stroked-button color="accent" (click)="openAddToTrip(l)">
+              <mat-icon>add_road</mat-icon> Add to Trip
             </button>
             <button mat-stroked-button [routerLink]="['/lodging', l.id, 'edit']">
               <mat-icon>edit</mat-icon> Edit
@@ -188,10 +193,11 @@ const TYPE_LABELS: Record<LodgingType, string> = {
   `,
 })
 export class LodgingDetailComponent implements OnInit {
-  private route = inject(ActivatedRoute);
-  private router = inject(Router);
-  private svc   = inject(LodgingService);
-  private snack = inject(MatSnackBar);
+  private route       = inject(ActivatedRoute);
+  private router      = inject(Router);
+  private svc         = inject(LodgingService);
+  private snack       = inject(MatSnackBar);
+  private bottomSheet = inject(MatBottomSheet);
 
   loading      = signal(true);
   visitLogging = signal(false);
@@ -230,6 +236,12 @@ export class LodgingDetailComponent implements OnInit {
         setTimeout(() => this.visitLogging.set(false), 1500);
       },
       error: () => { this.snack.open('Failed to log stay', 'Dismiss', { duration: 3000 }); this.visitLogging.set(false); },
+    });
+  }
+
+  openAddToTrip(l: Lodging) {
+    this.bottomSheet.open(AddToTripSheetComponent, {
+      data: { entityType: 'lodging', entityId: l.id, entityName: l.name },
     });
   }
 

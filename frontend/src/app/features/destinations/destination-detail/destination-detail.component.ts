@@ -12,11 +12,13 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatListModule } from '@angular/material/list';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { MatBottomSheet, MatBottomSheetModule } from '@angular/material/bottom-sheet';
 import { DestinationService } from '../../../core/services/destination.service';
 import { WeatherService, weatherEmoji } from '../../../core/services/weather.service';
 import { ClaudeService } from '../../../core/services/claude.service';
 import { MiniMapComponent } from '../../../shared/mini-map/mini-map.component';
 import { PhotoUploaderComponent } from '../../../shared/photo-uploader/photo-uploader.component';
+import { AddToTripSheetComponent } from '../../../shared/components/add-to-trip-sheet/add-to-trip-sheet.component';
 import { Destination, WeatherResponse } from '../../../types/schema.types';
 
 interface WeatherDay {
@@ -35,7 +37,7 @@ interface WeatherDay {
     RouterLink, DatePipe, DecimalPipe,
     MatCardModule, MatChipsModule, MatIconModule, MatButtonModule,
     MatDividerModule, MatProgressSpinnerModule, MatListModule, MatTooltipModule,
-    MatSnackBarModule, MiniMapComponent, PhotoUploaderComponent,
+    MatSnackBarModule, MatBottomSheetModule, MiniMapComponent, PhotoUploaderComponent,
   ],
   styles: [`
     .back-btn { margin-bottom: 16px; }
@@ -130,6 +132,9 @@ interface WeatherDay {
             <mat-icon>add_location_alt</mat-icon>
             {{ visitLogging() ? 'Logged!' : 'Log a Visit' }}
             @if ((dest()?.visit_count ?? 0) > 0) { &nbsp;({{ dest()!.visit_count }}x) }
+          </button>
+          <button mat-stroked-button color="accent" (click)="openAddToTrip()">
+            <mat-icon>add_road</mat-icon> Add to Trip
           </button>
           <button mat-stroked-button [routerLink]="['/destinations', dest()!.id, 'edit']">
             <mat-icon>edit</mat-icon> Edit
@@ -310,12 +315,13 @@ interface WeatherDay {
   `,
 })
 export class DestinationDetailComponent implements OnInit {
-  private route      = inject(ActivatedRoute);
-  private router     = inject(Router);
-  private destSvc    = inject(DestinationService);
-  private weatherSvc = inject(WeatherService);
-  private claudeSvc  = inject(ClaudeService);
-  private snack      = inject(MatSnackBar);
+  private route       = inject(ActivatedRoute);
+  private router      = inject(Router);
+  private destSvc     = inject(DestinationService);
+  private weatherSvc  = inject(WeatherService);
+  private claudeSvc   = inject(ClaudeService);
+  private snack       = inject(MatSnackBar);
+  private bottomSheet = inject(MatBottomSheet);
 
   loading        = signal(true);
   visitLogging   = signal(false);
@@ -424,6 +430,14 @@ export class DestinationDetailComponent implements OnInit {
     if (!d) return;
     if (!confirm(`Delete "${d.name}"? This cannot be undone.`)) return;
     this.destSvc.delete(d.id).subscribe(() => this.router.navigate(['/destinations']));
+  }
+
+  openAddToTrip(): void {
+    const d = this.dest();
+    if (!d) return;
+    this.bottomSheet.open(AddToTripSheetComponent, {
+      data: { entityType: 'destination', entityId: d.id, entityName: d.name },
+    });
   }
 
   onPhotosChanged(): void {
