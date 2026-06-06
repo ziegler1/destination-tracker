@@ -33,6 +33,27 @@ export class MapsService {
     });
   }
 
+  /** Load a driving route from an ordered list of address strings. */
+  loadDirectionsFromAddresses(
+    addresses: string[],
+  ): Observable<google.maps.DirectionsResult | null> {
+    return new Observable(obs => {
+      if (!this.ready() || addresses.length < 2) { obs.next(null); obs.complete(); return; }
+      new google.maps.DirectionsService().route(
+        {
+          origin:      addresses[0],
+          destination: addresses[addresses.length - 1],
+          waypoints:   addresses.slice(1, -1).map(addr => ({ location: addr, stopover: true })),
+          travelMode:  google.maps.TravelMode.DRIVING,
+        },
+        (result, status) => {
+          obs.next(status === google.maps.DirectionsStatus.OK ? result : null);
+          obs.complete();
+        },
+      );
+    });
+  }
+
   /** Geocode a free-text address using Google Geocoding API. */
   geocode(address: string): Observable<GmapsLatLng | null> {
     return new Observable(obs => {

@@ -239,75 +239,66 @@ router.post('/generate', asyncHandler(async (req, res) => {
 
   let userPrompt: string;
 
+  const originNote = `CRITICAL: The trip departs from this EXACT home address: "${origin}". Do NOT create any stop at or near the origin — the first stop in the array is the first overnight stop away from home. The origin address is only the departure point, never a destination stop.`;
+
   if (trip_type === 'based_at_destination') {
-    userPrompt = `Plan a "Based at Destination" road trip:
-Origin: ${origin}
-Base/Destination: ${destination} (the travelers will stay here ${base_nights} nights in their OWN accommodation — no lodging needed at the base)
-Start date: ${start_date}
-End date: ${end_date}
-Total budget: $${budget ?? 'flexible'}
-Max drive hours per day: ${drive_hours_per_day} hours
-Stop timing preference: ${stop_timing}
+    userPrompt = `Plan a "Based at Destination" road trip.
+${originNote}
+Base/Destination: ${destination} (travelers stay here ${base_nights} nights in their OWN accommodation — no lodging needed at the base)
+Start date: ${start_date} | End date: ${end_date}
+Budget: $${budget ?? 'flexible'} | Max drive: ${drive_hours_per_day}h/day | Stop timing: ${stop_timing}
 Include return leg home: ${include_return ? 'yes' : 'no'}
 Preferences: ${prefStr}
 
-IMPORTANT STRUCTURE — the stops array must follow this pattern:
-1. LEG 1 (driving to base): One or more overnight transit stops if the drive from origin to base exceeds ${drive_hours_per_day} hours. Mark each with stop_type: "transit". Include lodging + restaurants + POIs for each.
-2. BASE STAY: The base location itself. Mark with stop_type: "base". NO lodging_suggestions (set to []). Include 5-6 local restaurants and 4-5 local activities/POIs for the stay.
-3. LEG 2 (return, only if include_return is true): Overnight stops from base back to origin. Mark each with stop_type: "return_transit". Include lodging + restaurants + POIs.
+STOPS STRUCTURE:
+1. LEG 1 — transit stops driving from "${origin}" to base. Only include if the drive exceeds ${drive_hours_per_day} hours. stop_type: "transit". Include lodging + restaurants + POIs.
+2. BASE — the base city itself. stop_type: "base". lodging_suggestions: []. Include 5-6 restaurants and 4-5 POIs near the base.
+3. LEG 2 — ONLY if include_return is yes: return overnight stops from base back toward "${origin}". stop_type: "return_transit". Do NOT include a stop at the origin address itself.
 
-For transit stops: 2-3 lodging suggestions, 3-4 restaurants, 2-3 POIs.
-For the base stop: 0 lodging suggestions, 5-6 restaurants, 4-5 POIs/activities near the base.
-For return_transit stops: 2-3 lodging suggestions, 2-3 restaurants, 1-2 POIs.
-
-Return a JSON object with this exact shape:
+Return JSON:
 {
   "trip": ${tripShape},
   "stops": [ ${stopShape} ]
 }`;
 
   } else if (trip_type === 'round_trip') {
-    userPrompt = `Plan a ROUND TRIP road trip:
-Origin (depart from and return to): ${origin}
+    userPrompt = `Plan a ROUND TRIP road trip.
+${originNote}
+The return leg ends back at this EXACT address: "${origin}" — do NOT include a final stop at the origin.
 Destination: ${destination}
-Start date: ${start_date}
-End date: ${end_date}
-Total budget: $${budget ?? 'flexible'}
-Max drive hours per day: ${drive_hours_per_day} hours
+Start date: ${start_date} | End date: ${end_date}
+Budget: $${budget ?? 'flexible'} | Max drive: ${drive_hours_per_day}h/day
 Preferences: ${prefStr}
 
-Structure:
-1. OUTBOUND: overnight transit stops from origin to destination (stop_type: "transit"), then the destination stay itself (stop_type: "transit" — it is still a transit stop, just the main one).
-2. RETURN: overnight stops from destination back to origin (stop_type: "return_transit"). These can be different cities from the outbound route.
+STOPS STRUCTURE:
+1. OUTBOUND: transit stops from "${origin}" to destination, including the destination itself. stop_type: "transit".
+2. RETURN: stops from destination back toward "${origin}". stop_type: "return_transit". These may be different cities than the outbound. Do NOT include the origin as a stop.
 
-Include 2-3 lodging suggestions, 3-4 restaurants, 2-3 POIs per stop.
+Include 2-3 lodging, 3-4 restaurants, 2-3 POIs per stop.
 
-Return a JSON object:
+Return JSON:
 {
   "trip": ${tripShape},
   "stops": [ ${stopShape} ]
 }`;
 
   } else {
-    // one_way (default)
-    userPrompt = `Plan a one-way road trip:
-Origin: ${origin}
+    // one_way
+    userPrompt = `Plan a one-way road trip.
+${originNote}
 Destination: ${destination}
-Start date: ${start_date}
-End date: ${end_date}
-Total budget: $${budget ?? 'flexible'}
-Max drive hours per day: ${drive_hours_per_day} hours
+Start date: ${start_date} | End date: ${end_date}
+Budget: $${budget ?? 'flexible'} | Max drive: ${drive_hours_per_day}h/day
 Preferences: ${prefStr}
 
-Set stop_type: "transit" on all stops.
-Include 2-3 lodging suggestions, 3-4 restaurants, 2-3 POIs per stop.
+All stops: stop_type "transit". First stop is first overnight away from "${origin}". Last stop is the destination.
+Include 2-3 lodging, 3-4 restaurants, 2-3 POIs per stop.
 
-Return a JSON object:
+Return JSON:
 {
   "trip": ${tripShape},
   "stops": [ ${stopShape} ]
-}
-Include 2–3 lodging suggestions, 3–4 restaurant suggestions, and 2–3 POI suggestions per stop.`;
+}`;
   }
 
   const claudeMsg = await anthropic.messages.create({
