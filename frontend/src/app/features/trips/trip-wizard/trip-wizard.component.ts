@@ -13,6 +13,7 @@ import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { MatSliderModule } from '@angular/material/slider';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -21,7 +22,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { TripWizardService } from '../../../core/services/trip-wizard.service';
 import { SettingsService } from '../../../core/services/settings.service';
 import {
-  WizardPlan, WizardGenerateRequest,
+  WizardPlan, WizardGenerateRequest, TripType,
   WizardLodgingSuggestion, WizardRestaurantSuggestion, WizardPoiSuggestion,
 } from '../../../types/schema.types';
 
@@ -37,6 +38,19 @@ const PROGRESS_MSGS = [
   'Almost ready…',
 ];
 
+const TRIP_TYPES: { value: TripType; icon: string; name: string; desc: string }[] = [
+  { value: 'one_way',            icon: '➡️',  name: 'One Way',              desc: 'Drive from origin to destination with overnight stops.' },
+  { value: 'round_trip',         icon: '🔄',  name: 'Round Trip',           desc: 'Drive there and plan a return route home.' },
+  { value: 'based_at_destination', icon: '🏖️', name: 'Based at Destination', desc: 'Stay at your destination in your own place; explore locally.' },
+];
+
+const STOP_TIMINGS = [
+  { value: 'flexible',       label: 'Flexible — no preference' },
+  { value: 'morning_depart', label: 'Early start, arrive by afternoon' },
+  { value: 'drive_through',  label: 'Drive most of the day, brief stops' },
+  { value: 'evening_arrival', label: 'Depart mid-morning, arrive evening' },
+];
+
 @Component({
   selector: 'app-trip-wizard',
   standalone: true,
@@ -45,7 +59,7 @@ const PROGRESS_MSGS = [
     RouterLink, ReactiveFormsModule, DatePipe, CurrencyPipe, TitleCasePipe,
     MatCardModule, MatFormFieldModule, MatInputModule, MatSelectModule,
     MatDatepickerModule, MatButtonModule, MatIconModule, MatSlideToggleModule,
-    MatProgressSpinnerModule, MatDividerModule, MatCheckboxModule,
+    MatSliderModule, MatProgressSpinnerModule, MatDividerModule, MatCheckboxModule,
     MatExpansionModule, MatSnackBarModule,
   ],
   styles: [`
@@ -63,6 +77,22 @@ const PROGRESS_MSGS = [
     }
     .chip.sel { background:var(--wp-primary); color:#fff; border-color:var(--wp-primary); }
     .chip.sel-accent { background:var(--wp-accent); color:#000; border-color:var(--wp-accent); }
+
+    /* Trip type cards */
+    .trip-type-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:20px; }
+    .ttc {
+      padding:16px 12px; border-radius:10px; border:2px solid var(--wp-border);
+      cursor:pointer; transition:all .2s; text-align:center; background:var(--wp-surface);
+    }
+    .ttc:hover { border-color:var(--wp-primary-light); }
+    .ttc.sel { border-color:var(--wp-primary); background:color-mix(in srgb,var(--wp-primary) 8%,var(--wp-surface)); }
+    .ttc-icon { font-size:26px; display:block; margin-bottom:6px; }
+    .ttc-name { font-size:14px; font-weight:700; margin:0 0 4px; }
+    .ttc-desc { font-size:11px; color:var(--wp-text-secondary); line-height:1.4; margin:0; }
+
+    /* Drive hours slider */
+    .slider-row { display:flex; align-items:center; gap:12px; }
+    .slider-val { font-size:20px; font-weight:700; color:var(--wp-primary); min-width:36px; text-align:right; }
 
     /* Step 2 */
     .generating {
@@ -86,6 +116,19 @@ const PROGRESS_MSGS = [
     .stop-city   { font-size:17px; font-weight:700; }
     .stop-dates  { font-size:13px; color:var(--wp-text-secondary); }
     .gas-flag    { color:#e65100; font-size:13px; font-weight:600; display:flex; align-items:center; gap:4px; }
+    .stop-type-badge {
+      padding:2px 10px; border-radius:12px; font-size:11px; font-weight:700;
+      text-transform:uppercase; letter-spacing:.7px;
+    }
+    .badge-base   { background:#fff8e1; color:#f57f17; border:1px solid #ffe082; }
+    .badge-return { background:#e8f5e9; color:#2e7d32; border:1px solid #a5d6a7; }
+
+    .base-stay-banner {
+      padding:14px 18px; border-radius:8px; margin-bottom:16px;
+      background:color-mix(in srgb,var(--wp-accent) 10%,var(--wp-surface));
+      border-left:4px solid var(--wp-accent);
+      font-size:13px; color:var(--wp-text-secondary); line-height:1.5;
+    }
 
     .section-label { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.8px;
                      color:var(--wp-text-hint); margin:16px 0 10px; }
@@ -111,7 +154,6 @@ const PROGRESS_MSGS = [
       display:inline-block; padding:1px 6px; border-radius:6px;
       background:#4285f4; color:#fff; font-size:10px; font-weight:600; margin-left:4px;
     }
-    .card-actions { display:flex; gap:4px; padding:6px 10px; border-top:1px solid var(--wp-divider); }
 
     .pack-section { margin-bottom:16px; }
     .pack-cat-title { font-size:14px; font-weight:600; margin:0 0 6px; }
@@ -146,6 +188,22 @@ const PROGRESS_MSGS = [
 
         <mat-card style="padding:24px">
           <form [formGroup]="form" (ngSubmit)="generate()">
+
+            <!-- Trip Type selector -->
+            <p style="font-size:13px;font-weight:600;margin-bottom:10px;color:var(--wp-text-secondary)">
+              Trip type
+            </p>
+            <div class="trip-type-grid">
+              @for (tt of tripTypes; track tt.value) {
+                <div class="ttc" [class.sel]="form.value.trip_type === tt.value"
+                     (click)="form.patchValue({ trip_type: tt.value })">
+                  <span class="ttc-icon">{{ tt.icon }}</span>
+                  <p class="ttc-name">{{ tt.name }}</p>
+                  <p class="ttc-desc">{{ tt.desc }}</p>
+                </div>
+              }
+            </div>
+
             <div class="basics-grid">
 
               <mat-form-field appearance="outline" class="full">
@@ -186,7 +244,19 @@ const PROGRESS_MSGS = [
                 <mat-datepicker #dp2 />
               </mat-form-field>
 
-              <mat-form-field appearance="outline" class="full">
+              <!-- Based at Destination extra fields -->
+              @if (form.value.trip_type === 'based_at_destination') {
+                <mat-form-field appearance="outline">
+                  <mat-label>Nights at base</mat-label>
+                  <input matInput type="number" formControlName="base_nights" min="1" max="30" />
+                  <mat-hint>Nights you'll stay at destination</mat-hint>
+                </mat-form-field>
+                <div style="align-self:center;padding-bottom:8px">
+                  <mat-slide-toggle formControlName="include_return">Include return leg home</mat-slide-toggle>
+                </div>
+              }
+
+              <mat-form-field appearance="outline">
                 <mat-label>Total budget ($)</mat-label>
                 <input matInput type="number" formControlName="budget" />
               </mat-form-field>
@@ -201,7 +271,31 @@ const PROGRESS_MSGS = [
                 </mat-select>
               </mat-form-field>
 
-              <div style="align-self:center">
+              <!-- Drive hours per day -->
+              <div class="full" style="margin:8px 0 4px">
+                <p style="font-size:13px;font-weight:600;margin-bottom:4px;color:var(--wp-text-secondary)">
+                  Max drive hours per day
+                </p>
+                <div class="slider-row">
+                  <span style="font-size:12px;color:var(--wp-text-hint)">2h</span>
+                  <mat-slider style="flex:1" [min]="2" [max]="10" [step]="1" discrete>
+                    <input matSliderThumb formControlName="drive_hours_per_day" />
+                  </mat-slider>
+                  <span style="font-size:12px;color:var(--wp-text-hint)">10h</span>
+                  <span class="slider-val">{{ form.value.drive_hours_per_day }}h</span>
+                </div>
+              </div>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Stop timing preference</mat-label>
+                <mat-select formControlName="stop_timing">
+                  @for (st of stopTimings; track st.value) {
+                    <mat-option [value]="st.value">{{ st.label }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+
+              <div style="align-self:center;padding-bottom:8px">
                 <mat-slide-toggle formControlName="pet_friendly">Pet friendly</mat-slide-toggle>
               </div>
 
@@ -275,6 +369,11 @@ const PROGRESS_MSGS = [
             <mat-expansion-panel [expanded]="stop.stop_order === 1">
               <mat-expansion-panel-header>
                 <div class="stop-header">
+                  @if (stop.stop_type === 'base') {
+                    <span class="stop-type-badge badge-base">🏖️ Base Stay</span>
+                  } @else if (stop.stop_type === 'return_transit') {
+                    <span class="stop-type-badge badge-return">↩️ Return</span>
+                  }
                   <span class="stop-city">Stop {{ stop.stop_order }}: {{ stop.city }}, {{ stop.state_province }}</span>
                   <span class="stop-dates">{{ stop.arrive_date | date:'MMM d' }} → {{ stop.depart_date | date:'MMM d' }}</span>
                   @if (stop.drive_minutes_from_prev > 0) {
@@ -286,40 +385,47 @@ const PROGRESS_MSGS = [
                 </div>
               </mat-expansion-panel-header>
 
-              <!-- Lodging -->
-              <p class="section-label">🏨 Lodging — pick one</p>
-              <div class="suggestion-grid">
-                @for (s of stop.lodging_suggestions; track $index) {
-                  <div class="suggestion-card"
-                       [class.selected]="selectedLodging().get(stop.stop_order) === $index"
-                       (click)="selectLodging(stop.stop_order, $index)">
-                    @if (s.photo_url) {
-                      <img class="card-photo" [src]="s.photo_url" [alt]="s.name" (error)="onImgError($event)" />
-                    } @else {
-                      <div class="card-photo" style="display:flex;align-items:center;justify-content:center;font-size:36px">🏨</div>
-                    }
-                    <div class="card-body">
-                      <p class="card-name">
-                        {{ s.name }}
-                        @if (s.google_verified) { <span class="google-badge">G</span> }
-                      </p>
-                      <p class="card-meta">{{ s.area }} · {{ s.lodging_type | titlecase }}</p>
-                      <p class="card-meta">~{{ s.estimated_price_per_night | currency:'USD':'symbol':'1.0-0' }}/night</p>
-                      @if (s.google_rating) {
-                        <p class="card-rating">★ {{ s.google_rating }}</p>
-                      }
-                      <p class="card-why">{{ s.why_recommended }}</p>
-                    </div>
-                  </div>
-                }
-                <div class="suggestion-card" style="display:flex;align-items:center;justify-content:center;min-height:80px;cursor:pointer"
-                     [class.selected]="selectedLodging().get(stop.stop_order) === -1"
-                     (click)="selectLodging(stop.stop_order, -1)">
-                  <p style="font-size:13px;color:var(--wp-text-secondary);text-align:center;padding:12px">
-                    I'll add my own later
-                  </p>
+              @if (stop.stop_type === 'base') {
+                <div class="base-stay-banner">
+                  🏖️ <strong>Base Stay</strong> — You'll be staying in your own accommodation here.
+                  No lodging booking needed. Explore the area and enjoy local restaurants!
                 </div>
-              </div>
+              } @else {
+                <!-- Lodging — only for transit stops -->
+                <p class="section-label">🏨 Lodging — pick one</p>
+                <div class="suggestion-grid">
+                  @for (s of stop.lodging_suggestions; track $index) {
+                    <div class="suggestion-card"
+                         [class.selected]="selectedLodging().get(stop.stop_order) === $index"
+                         (click)="selectLodging(stop.stop_order, $index)">
+                      @if (s.photo_url) {
+                        <img class="card-photo" [src]="s.photo_url" [alt]="s.name" (error)="onImgError($event)" />
+                      } @else {
+                        <div class="card-photo" style="display:flex;align-items:center;justify-content:center;font-size:36px">🏨</div>
+                      }
+                      <div class="card-body">
+                        <p class="card-name">
+                          {{ s.name }}
+                          @if (s.google_verified) { <span class="google-badge">G</span> }
+                        </p>
+                        <p class="card-meta">{{ s.area }} · {{ s.lodging_type | titlecase }}</p>
+                        <p class="card-meta">~{{ s.estimated_price_per_night | currency:'USD':'symbol':'1.0-0' }}/night</p>
+                        @if (s.google_rating) {
+                          <p class="card-rating">★ {{ s.google_rating }}</p>
+                        }
+                        <p class="card-why">{{ s.why_recommended }}</p>
+                      </div>
+                    </div>
+                  }
+                  <div class="suggestion-card" style="display:flex;align-items:center;justify-content:center;min-height:80px;cursor:pointer"
+                       [class.selected]="selectedLodging().get(stop.stop_order) === -1"
+                       (click)="selectLodging(stop.stop_order, -1)">
+                    <p style="font-size:13px;color:var(--wp-text-secondary);text-align:center;padding:12px">
+                      I'll add my own later
+                    </p>
+                  </div>
+                </div>
+              }
 
               <!-- Restaurants -->
               <p class="section-label">🍽️ Restaurants — toggle on/off</p>
@@ -445,24 +551,24 @@ const PROGRESS_MSGS = [
   `,
 })
 export class TripWizardComponent implements OnInit, OnDestroy {
-  private wizardSvc  = inject(TripWizardService);
-  private snack      = inject(MatSnackBar);
-  private router     = inject(Router);
-  private fb         = inject(FormBuilder);
+  private wizardSvc   = inject(TripWizardService);
+  private snack       = inject(MatSnackBar);
+  private router      = inject(Router);
+  private fb          = inject(FormBuilder);
   private settingsSvc = inject(SettingsService);
 
   // ── Step state ──────────────────────────────────────────────────────
-  step       = signal(1);
-  plan       = signal<WizardPlan | null>(null);
+  step        = signal(1);
+  plan        = signal<WizardPlan | null>(null);
   savedTripId = signal<number | null>(null);
-  confirming = signal(false);
+  confirming  = signal(false);
   progressMsg = signal(PROGRESS_MSGS[0]);
 
   // ── Review selection state ──────────────────────────────────────────
-  selectedLodging    = signal(new Map<number, number>());   // stop_order → index (-1 = none)
-  approvedRests      = signal(new Map<number, Set<number>>());
-  approvedPois       = signal(new Map<number, Set<number>>());
-  excludedPackItems  = signal(new Map<string, Set<string>>()); // category → excluded items
+  selectedLodging   = signal(new Map<number, number>());
+  approvedRests     = signal(new Map<number, Set<number>>());
+  approvedPois      = signal(new Map<number, Set<number>>());
+  excludedPackItems = signal(new Map<string, Set<string>>());
 
   // ── Step 1 form ─────────────────────────────────────────────────────
   selectedCuisines  = signal<string[]>([]);
@@ -471,23 +577,31 @@ export class TripWizardComponent implements OnInit, OnDestroy {
   readonly cuisines     = CUISINES;
   readonly interests    = INTERESTS;
   readonly lodgingTypes = LODGING_TYPES;
+  readonly tripTypes    = TRIP_TYPES;
+  readonly stopTimings  = STOP_TIMINGS;
 
   form = this.fb.group({
-    name:         [''],
-    origin:       ['', Validators.required],
-    destination:  ['', Validators.required],
-    start_date:   [null as Date | null, Validators.required],
-    end_date:     [null as Date | null, Validators.required],
-    budget:       [null as number | null],
-    lodging_type: [''],
-    pet_friendly: [false],
+    name:               [''],
+    origin:             ['', Validators.required],
+    destination:        ['', Validators.required],
+    start_date:         [null as Date | null, Validators.required],
+    end_date:           [null as Date | null, Validators.required],
+    budget:             [null as number | null],
+    lodging_type:       [''],
+    pet_friendly:       [false],
+    trip_type:          ['one_way' as TripType],
+    drive_hours_per_day: [6],
+    stop_timing:        ['flexible'],
+    base_nights:        [4],
+    include_return:     [true],
   });
 
   ngOnInit() {
     this.settingsSvc.load().subscribe(s => {
-      if (s.home_address) {
-        this.form.patchValue({ origin: s.home_address });
-      }
+      const patch: Record<string, unknown> = {};
+      if (s.home_address) patch['origin'] = s.home_address;
+      if (s.drive_hours_per_day) patch['drive_hours_per_day'] = Number(s.drive_hours_per_day);
+      this.form.patchValue(patch);
     });
   }
 
@@ -535,11 +649,16 @@ export class TripWizardComponent implements OnInit, OnDestroy {
     const v = this.form.getRawValue();
 
     const payload: WizardGenerateRequest = {
-      origin:      v.origin!,
-      destination: v.destination!,
-      start_date:  (v.start_date as Date).toISOString().split('T')[0],
-      end_date:    (v.end_date   as Date).toISOString().split('T')[0],
-      budget:      v.budget ?? 0,
+      origin:             v.origin!,
+      destination:        v.destination!,
+      start_date:         (v.start_date as Date).toISOString().split('T')[0],
+      end_date:           (v.end_date   as Date).toISOString().split('T')[0],
+      budget:             v.budget ?? 0,
+      trip_type:          (v.trip_type as TripType) || 'one_way',
+      drive_hours_per_day: v.drive_hours_per_day ?? 6,
+      stop_timing:        v.stop_timing || 'flexible',
+      base_nights:        v.base_nights ?? 4,
+      include_return:     v.include_return ?? true,
       preferences: {
         lodging_type:        v.lodging_type || undefined,
         cuisine_preferences: this.selectedCuisines().length ? this.selectedCuisines() : undefined,
@@ -554,12 +673,7 @@ export class TripWizardComponent implements OnInit, OnDestroy {
     this.wizardSvc.generate(payload).subscribe({
       next: (result) => {
         this.stopProgress();
-        // Auto-name trip if user left it blank
-        if (!v.name && result.trip?.name) {
-          result.trip.name = result.trip.name;
-        } else if (v.name) {
-          result.trip.name = v.name;
-        }
+        if (v.name) { result.trip.name = v.name; }
         this.plan.set(result);
         this.initReviewState(result);
         this.step.set(3);
@@ -580,7 +694,9 @@ export class TripWizardComponent implements OnInit, OnDestroy {
     const poiMap     = new Map<number, Set<number>>();
 
     for (const stop of p.stops) {
-      lodgingMap.set(stop.stop_order, 0); // default: first lodging selected
+      if (stop.stop_type !== 'base') {
+        lodgingMap.set(stop.stop_order, 0);
+      }
       restMap.set(stop.stop_order, new Set(stop.restaurant_suggestions.map((_, i) => i)));
       poiMap.set(stop.stop_order, new Set(stop.poi_suggestions.map((_, i) => i)));
     }
@@ -588,7 +704,7 @@ export class TripWizardComponent implements OnInit, OnDestroy {
     this.selectedLodging.set(lodgingMap);
     this.approvedRests.set(restMap);
     this.approvedPois.set(poiMap);
-    this.excludedPackItems.set(new Map()); // nothing excluded by default
+    this.excludedPackItems.set(new Map());
   }
 
   // ── Review toggles ────────────────────────────────────────────────────
@@ -635,7 +751,6 @@ export class TripWizardComponent implements OnInit, OnDestroy {
     if (!p) return;
     this.confirming.set(true);
 
-    // Build the payload with approved flags applied
     const payload: WizardPlan = {
       ...p,
       stops: p.stops.map((stop) => ({

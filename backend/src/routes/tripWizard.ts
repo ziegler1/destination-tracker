@@ -133,6 +133,7 @@ interface PoiSuggestion {
 
 interface WizardStop {
   stop_order: number;
+  stop_type?: 'transit' | 'base' | 'return_transit';
   city: string;
   state_province: string;
   country: string;
@@ -168,12 +169,25 @@ interface WizardPlan {
 // ── POST /api/trips/wizard/generate ─────────────────────────────────────────
 
 router.post('/generate', asyncHandler(async (req, res) => {
-  const { origin, destination, start_date, end_date, budget, preferences = {} } = req.body as {
+  const {
+    origin, destination, start_date, end_date, budget,
+    trip_type = 'one_way',
+    drive_hours_per_day = 6,
+    stop_timing = 'flexible',
+    base_nights = 4,
+    include_return = true,
+    preferences = {},
+  } = req.body as {
     origin: string;
     destination: string;
     start_date: string;
     end_date: string;
     budget: number;
+    trip_type?: 'round_trip' | 'one_way' | 'based_at_destination';
+    drive_hours_per_day?: number;
+    stop_timing?: string;
+    base_nights?: number;
+    include_return?: boolean;
     preferences?: {
       lodging_type?: string;
       cuisine_preferences?: string[];
@@ -187,35 +201,11 @@ router.post('/generate', asyncHandler(async (req, res) => {
     return;
   }
 
-  // ── STEP 1: Claude plans the route ────────────────────────────────────────
-  const userPrompt = `Plan a road trip with these details:
-Origin: ${origin}
-Destination: ${destination}
-Start date: ${start_date}
-End date: ${end_date}
-Total budget: $${budget ?? 'flexible'}
-Preferences:
-  - Lodging type: ${preferences.lodging_type ?? 'any'}
-  - Cuisine: ${preferences.cuisine_preferences?.join(', ') ?? 'any'}
-  - Pet friendly: ${preferences.pet_friendly ? 'yes' : 'no'}
-  - Interests: ${preferences.interests?.join(', ') ?? 'general sightseeing'}
+  const prefStr = `Lodging type: ${preferences.lodging_type ?? 'any'} | Cuisine: ${preferences.cuisine_preferences?.join(', ') ?? 'any'} | Pet friendly: ${preferences.pet_friendly ? 'yes' : 'no'} | Interests: ${preferences.interests?.join(', ') ?? 'general sightseeing'}`;
 
-Return a JSON object with this exact shape:
-{
-  "trip": {
-    "name": "<catchy trip name>",
-    "origin": "${origin}",
-    "destination": "${destination}",
-    "start_date": "${start_date}",
-    "end_date": "${end_date}",
-    "budget": ${budget ?? 0},
-    "estimated_costs": { "lodging": 0, "food": 0, "fuel": 0, "activities": 0, "total": 0 },
-    "travel_notes": "<best aspects of this route in this month>",
-    "packing_suggestions": [{ "category": "string", "items": ["string"] }]
-  },
-  "stops": [
-    {
+  const stopShape = `{
       "stop_order": 1,
+      "stop_type": "transit",
       "city": "string",
       "state_province": "string",
       "country": "USA",
@@ -233,10 +223,92 @@ Return a JSON object with this exact shape:
       "poi_suggestions": [
         { "name": "string", "poi_type": "historic_site", "why_recommended": "string" }
       ]
-    }
-  ]
+    }`;
+
+  const tripShape = `{
+    "name": "<catchy trip name>",
+    "origin": "${origin}",
+    "destination": "${destination}",
+    "start_date": "${start_date}",
+    "end_date": "${end_date}",
+    "budget": ${budget ?? 0},
+    "estimated_costs": { "lodging": 0, "food": 0, "fuel": 0, "activities": 0, "total": 0 },
+    "travel_notes": "<best aspects of this route>",
+    "packing_suggestions": [{ "category": "string", "items": ["string"] }]
+  }`;
+
+  let userPrompt: string;
+
+  if (trip_type === 'based_at_destination') {
+    userPrompt = `Plan a "Based at Destination" road trip:
+Origin: ${origin}
+Base/Destination: ${destination} (the travelers will stay here ${base_nights} nights in their OWN accommodation — no lodging needed at the base)
+Start date: ${start_date}
+End date: ${end_date}
+Total budget: $${budget ?? 'flexible'}
+Max drive hours per day: ${drive_hours_per_day} hours
+Stop timing preference: ${stop_timing}
+Include return leg home: ${include_return ? 'yes' : 'no'}
+Preferences: ${prefStr}
+
+IMPORTANT STRUCTURE — the stops array must follow this pattern:
+1. LEG 1 (driving to base): One or more overnight transit stops if the drive from origin to base exceeds ${drive_hours_per_day} hours. Mark each with stop_type: "transit". Include lodging + restaurants + POIs for each.
+2. BASE STAY: The base location itself. Mark with stop_type: "base". NO lodging_suggestions (set to []). Include 5-6 local restaurants and 4-5 local activities/POIs for the stay.
+3. LEG 2 (return, only if include_return is true): Overnight stops from base back to origin. Mark each with stop_type: "return_transit". Include lodging + restaurants + POIs.
+
+For transit stops: 2-3 lodging suggestions, 3-4 restaurants, 2-3 POIs.
+For the base stop: 0 lodging suggestions, 5-6 restaurants, 4-5 POIs/activities near the base.
+For return_transit stops: 2-3 lodging suggestions, 2-3 restaurants, 1-2 POIs.
+
+Return a JSON object with this exact shape:
+{
+  "trip": ${tripShape},
+  "stops": [ ${stopShape} ]
+}`;
+
+  } else if (trip_type === 'round_trip') {
+    userPrompt = `Plan a ROUND TRIP road trip:
+Origin (depart from and return to): ${origin}
+Destination: ${destination}
+Start date: ${start_date}
+End date: ${end_date}
+Total budget: $${budget ?? 'flexible'}
+Max drive hours per day: ${drive_hours_per_day} hours
+Preferences: ${prefStr}
+
+Structure:
+1. OUTBOUND: overnight transit stops from origin to destination (stop_type: "transit"), then the destination stay itself (stop_type: "transit" — it is still a transit stop, just the main one).
+2. RETURN: overnight stops from destination back to origin (stop_type: "return_transit"). These can be different cities from the outbound route.
+
+Include 2-3 lodging suggestions, 3-4 restaurants, 2-3 POIs per stop.
+
+Return a JSON object:
+{
+  "trip": ${tripShape},
+  "stops": [ ${stopShape} ]
+}`;
+
+  } else {
+    // one_way (default)
+    userPrompt = `Plan a one-way road trip:
+Origin: ${origin}
+Destination: ${destination}
+Start date: ${start_date}
+End date: ${end_date}
+Total budget: $${budget ?? 'flexible'}
+Max drive hours per day: ${drive_hours_per_day} hours
+Preferences: ${prefStr}
+
+Set stop_type: "transit" on all stops.
+Include 2-3 lodging suggestions, 3-4 restaurants, 2-3 POIs per stop.
+
+Return a JSON object:
+{
+  "trip": ${tripShape},
+  "stops": [ ${stopShape} ]
 }
 Include 2–3 lodging suggestions, 3–4 restaurant suggestions, and 2–3 POI suggestions per stop.`;
+  }
 
   const claudeMsg = await anthropic.messages.create({
     model: MODEL,

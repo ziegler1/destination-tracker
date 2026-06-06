@@ -295,8 +295,11 @@ export interface WizardPoiSuggestion {
   approved?:        boolean;
 }
 
+export type WizardStopType = 'transit' | 'base' | 'return_transit';
+
 export interface WizardStop {
   stop_order:              number;
+  stop_type?:              WizardStopType;
   city:                    string;
   state_province:          string;
   country:                 string;
@@ -333,12 +336,19 @@ export interface WizardPlan {
   stops: WizardStop[];
 }
 
+export type TripType = 'round_trip' | 'one_way' | 'based_at_destination';
+
 export interface WizardGenerateRequest {
-  origin:      string;
-  destination: string;
-  start_date:  string;
-  end_date:    string;
-  budget:      number;
+  origin:             string;
+  destination:        string;
+  start_date:         string;
+  end_date:           string;
+  budget:             number;
+  trip_type?:         TripType;
+  drive_hours_per_day?: number;
+  stop_timing?:       string;
+  base_nights?:       number;
+  include_return?:    boolean;
   preferences: {
     lodging_type?:        string;
     cuisine_preferences?: string[];
