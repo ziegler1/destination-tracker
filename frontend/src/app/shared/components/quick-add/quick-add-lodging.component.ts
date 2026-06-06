@@ -1,6 +1,7 @@
 import {
   Component, ChangeDetectionStrategy, inject, signal,
 } from '@angular/core';
+import { Router } from '@angular/router';
 import { MatBottomSheetRef } from '@angular/material/bottom-sheet';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -111,10 +112,11 @@ import {
   `,
 })
 export class QuickAddLodgingComponent {
-  private ref   = inject(MatBottomSheetRef<QuickAddLodgingComponent>);
-  private svc   = inject(LodgingService);
-  private snack = inject(MatSnackBar);
-  private fb    = inject(FormBuilder);
+  private ref    = inject(MatBottomSheetRef<QuickAddLodgingComponent>);
+  private svc    = inject(LodgingService);
+  private snack  = inject(MatSnackBar);
+  private fb     = inject(FormBuilder);
+  private router = inject(Router);
 
   saving = signal(false);
 
@@ -170,7 +172,7 @@ export class QuickAddLodgingComponent {
       pet_friendly:    v.pet_friendly,
       highlights:      v.highlights      || null,
     }).subscribe({
-      next:  () => { this.snack.open('Lodging saved ✓', undefined, { duration: 2500 }); this.ref.dismiss(true); },
+      next:  (l) => { this.ref.dismiss(); this.router.navigate(['/lodging', l.id]); },
       error: () => { this.snack.open('Save failed', undefined, { duration: 3000 }); this.saving.set(false); },
     });
   }

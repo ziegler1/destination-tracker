@@ -1,6 +1,7 @@
 import {
   Component, ChangeDetectionStrategy, inject, signal,
 } from '@angular/core';
+import { Router } from '@angular/router';
 import { MatBottomSheetRef } from '@angular/material/bottom-sheet';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -94,10 +95,11 @@ import {
   `,
 })
 export class QuickAddDestinationComponent {
-  private ref   = inject(MatBottomSheetRef<QuickAddDestinationComponent>);
-  private svc   = inject(DestinationService);
-  private snack = inject(MatSnackBar);
-  private fb    = inject(FormBuilder);
+  private ref    = inject(MatBottomSheetRef<QuickAddDestinationComponent>);
+  private svc    = inject(DestinationService);
+  private snack  = inject(MatSnackBar);
+  private fb     = inject(FormBuilder);
+  private router = inject(Router);
 
   saving = signal(false);
 
@@ -146,7 +148,7 @@ export class QuickAddDestinationComponent {
       dto['rating'] = v.rating;
     }
     this.svc.create(dto).subscribe({
-      next:  () => { this.snack.open('Destination saved ✓', undefined, { duration: 2500 }); this.ref.dismiss(true); },
+      next:  (d) => { this.ref.dismiss(); this.router.navigate(['/destinations', d.id]); },
       error: () => { this.snack.open('Save failed', undefined, { duration: 3000 }); this.saving.set(false); },
     });
   }

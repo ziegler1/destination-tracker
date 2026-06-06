@@ -128,6 +128,9 @@ interface WeatherDay {
           <button mat-stroked-button [routerLink]="['/destinations', dest()!.id, 'edit']">
             <mat-icon>edit</mat-icon> Edit
           </button>
+          <button mat-stroked-button color="warn" (click)="confirmDelete()">
+            <mat-icon>delete</mat-icon>
+          </button>
         </div>
 
         <div class="layout">
@@ -392,6 +395,13 @@ export class DestinationDetailComponent implements OnInit {
     this.destSvc.update(d.id, { ...d, best_months: months }).subscribe((updated) => {
       this.dest.update((cur) => cur ? { ...cur, best_months: updated.best_months } : cur);
     });
+  }
+
+  confirmDelete(): void {
+    const d = this.dest();
+    if (!d) return;
+    if (!confirm(`Delete "${d.name}"? This cannot be undone.`)) return;
+    this.destSvc.delete(d.id).subscribe(() => this.router.navigate(['/destinations']));
   }
 
   onPhotosChanged(): void {
