@@ -306,13 +306,16 @@ const QUICK_ADD_ITEMS: QuickAddItem[] = [
         </div>
       }
 
-      <!-- Footer: theme toggle -->
+      <!-- Footer: settings + theme toggle -->
       <div class="sidebar-footer">
+        <a mat-icon-button [routerLink]="['/settings']" matTooltip="Settings">
+          <mat-icon>settings</mat-icon>
+        </a>
         <button mat-icon-button (click)="theme.toggle()"
                 [matTooltip]="theme.darkMode() ? 'Switch to light' : 'Switch to dark'">
           <mat-icon>{{ theme.darkMode() ? 'light_mode' : 'dark_mode' }}</mat-icon>
         </button>
-        <span class="footer-label">{{ theme.darkMode() ? 'Light mode' : 'Dark mode' }}</span>
+        <span class="footer-label" style="flex:1">{{ theme.darkMode() ? 'Light mode' : 'Dark mode' }}</span>
       </div>
     </aside>
 
@@ -378,6 +381,9 @@ const QUICK_ADD_ITEMS: QuickAddItem[] = [
           </a>
           <a class="more-item" routerLink="/lodging">
             <span style="font-size:24px">🏨</span>Lodging
+          </a>
+          <a class="more-item" routerLink="/settings">
+            <span style="font-size:24px">⚙️</span>Settings
           </a>
         </div>
       </div>
