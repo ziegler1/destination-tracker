@@ -178,14 +178,9 @@ const MAX_RECENT = 10;
         </div>
 
         <div class="search-body">
-
-          <!-- Loading -->
           @if (loading()) {
             <div class="loading-state">Searching…</div>
-          }
-
-          <!-- Recent searches (shown when no query) -->
-          @else if (!query && recentSearches().length > 0) {
+          } @else if (!query && recentSearches().length > 0) {
             <div class="recent-section">
               <div class="section-label">Recent Searches</div>
               <div class="recent-chips">
@@ -197,18 +192,12 @@ const MAX_RECENT = 10;
               </div>
               <button class="clear-recent" (click)="clearRecent()">Clear recent searches</button>
             </div>
-          }
-
-          <!-- No results -->
-          @else if (query.length >= 2 && hasResults() === false && !loading()) {
+          } @else if (query.length >= 2 && hasResults() === false && !loading()) {
             <div class="no-results">
               <div class="no-results-icon">🔍</div>
               No results for "{{ query }}"
             </div>
-          }
-
-          <!-- Results -->
-          @else if (hasResults()) {
+          } @else if (hasResults()) {
             @if (results().trips.length > 0) {
               <div class="results-group">
                 <div class="group-header"><span>✈️</span> Trips</div>
@@ -300,10 +289,7 @@ const MAX_RECENT = 10;
                 }
               </div>
             }
-          }
-
-          <!-- Hint when no query and no recents -->
-          @else if (!query) {
+          } @else if (!query) {
             <div class="no-results">
               <div class="no-results-icon">🔍</div>
               Start typing to search everything
