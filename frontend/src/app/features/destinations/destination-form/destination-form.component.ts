@@ -17,6 +17,7 @@ import { COMMA, ENTER } from '@angular/cdk/keycodes';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { DestinationService } from '../../../core/services/destination.service';
 import { GeocodingService } from '../../../core/services/geocoding.service';
+import { PlacesAutocompleteComponent, PlaceSelectedEvent } from '../../../shared/components/places-autocomplete/places-autocomplete.component';
 
 const MONTHS = [
   'January','February','March','April','May','June',
@@ -28,7 +29,7 @@ const MONTHS = [
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    RouterLink, ReactiveFormsModule,
+    RouterLink, ReactiveFormsModule, PlacesAutocompleteComponent,
     MatCardModule, MatFormFieldModule, MatInputModule, MatSelectModule,
     MatChipsModule, MatAutocompleteModule, MatIconModule, MatButtonModule,
     MatProgressSpinnerModule, MatDatepickerModule, MatSnackBarModule,
@@ -56,6 +57,14 @@ const MONTHS = [
       <mat-card class="form-card">
         <mat-card-content>
           <h2 class="form-title">{{ isEdit() ? 'Edit' : 'Add' }} Destination</h2>
+
+          <!-- Places Autocomplete — fills name/city/state/country/lat/lng automatically -->
+          <app-places-autocomplete
+            placeholder="Search for a destination city or place…"
+            hint="Select a result to auto-fill all location fields"
+            [types]="['(cities)', 'natural_feature', 'establishment']"
+            (placeSelected)="onPlaceSelected($event)"
+            style="display:block;margin-bottom:8px" />
 
           <form [formGroup]="form" (ngSubmit)="save()">
 
@@ -269,6 +278,19 @@ export class DestinationFormComponent implements OnInit {
   }
 
   setRating(n: number): void { this.form.patchValue({ rating: n }); }
+
+  /** Called when the Places Autocomplete emits a selection — auto-fills all location fields. */
+  onPlaceSelected(place: PlaceSelectedEvent): void {
+    this.form.patchValue({
+      name:           place.name || place.city,
+      city:           place.city,
+      state_province: place.state_province,
+      country:        place.country,
+      latitude:       place.lat,
+      longitude:      place.lng,
+    });
+    this.snack.open(`Location set: ${place.city}, ${place.state_province}`, 'OK', { duration: 2500 });
+  }
 
   lookupCoords(): void {
     const { city, state_province, country, description } = this.form.getRawValue();

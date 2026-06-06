@@ -1,11 +1,9 @@
 import {
-  Component, AfterViewInit, OnDestroy, ViewChild, ElementRef,
-  ChangeDetectionStrategy, NgZone, inject, signal, computed,
+  Component, OnInit, ChangeDetectionStrategy, inject, signal, computed,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { forkJoin } from 'rxjs';
-import * as L from 'leaflet';
+import { GoogleMap, MapMarker, MapInfoWindow, MapDirectionsRenderer } from '@angular/google-maps';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -15,49 +13,46 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDividerModule } from '@angular/material/divider';
 import { DestinationService } from '../../core/services/destination.service';
 import { TripService } from '../../core/services/trip.service';
-import { Destination, DestinationStatus, Trip, PointOfInterest } from '../../types/schema.types';
+import { MapsService } from '../../core/services/maps.service';
+import { Destination, DestinationStatus, Trip } from '../../types/schema.types';
+import { forkJoin } from 'rxjs';
 
-// ── Marker factories ──────────────────────────────────────────────────────
-const STATUS_COLOR: Record<DestinationStatus, string> = {
+const STATUS_COLORS: Record<DestinationStatus, string> = {
   want_to_visit: '#1565c0',
   planned:       '#f57f17',
   visited:       '#2e7d32',
 };
 
-function destIcon(status: DestinationStatus): L.DivIcon {
-  const c = STATUS_COLOR[status];
-  return L.divIcon({
-    html: `<div style="width:13px;height:13px;border-radius:50%;background:${c};border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,.35)"></div>`,
-    iconSize: [13, 13], iconAnchor: [6, 6], popupAnchor: [0, -8], className: '',
-  });
+function destIconSvg(status: DestinationStatus): string {
+  const c = STATUS_COLORS[status];
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18">
+    <circle cx="9" cy="9" r="7" fill="${c}" stroke="white" stroke-width="2"/>
+  </svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
-function stopIcon(order: number): L.DivIcon {
-  return L.divIcon({
-    html: `<div style="width:26px;height:26px;border-radius:50%;background:#00695C;color:white;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,.4)">${order}</div>`,
-    iconSize: [26, 26], iconAnchor: [13, 13], popupAnchor: [0, -14], className: '',
-  });
+function stopIconSvg(n: number, color = '#00695C'): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28">
+    <circle cx="14" cy="14" r="12" fill="${color}" stroke="white" stroke-width="2"/>
+    <text x="14" y="19" font-family="Arial" font-size="11" font-weight="bold"
+          fill="white" text-anchor="middle">${n}</text>
+  </svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
-function poiIcon(): L.DivIcon {
-  return L.divIcon({
-    html: `<div style="width:11px;height:11px;border-radius:2px;background:#e65100;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.35);transform:rotate(45deg)"></div>`,
-    iconSize: [11, 11], iconAnchor: [5, 5], popupAnchor: [0, -8], className: '',
-  });
-}
+const TRIP_COLORS = ['#1565c0','#c62828','#6a1b9a','#e65100','#1b5e20','#0277bd','#880e4f','#33691e'];
 
-// ── Component ─────────────────────────────────────────────────────────────
 @Component({
   selector: 'app-map',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    FormsModule, MatCardModule, MatButtonModule, MatIconModule,
+    FormsModule, GoogleMap, MapMarker, MapInfoWindow, MapDirectionsRenderer,
+    MatCardModule, MatButtonModule, MatIconModule,
     MatCheckboxModule, MatSelectModule, MatProgressSpinnerModule, MatDividerModule,
   ],
   styles: [`
-    :host { display:block; position:relative; }
-    .map-el { width:100%; height:calc(100vh - 56px); }
+    :host { display:block; position:relative; height:calc(100vh - 56px); }
     .controls {
       position:absolute; top:16px; right:16px; z-index:1001; width:220px;
       padding:14px; border-radius:12px;
@@ -67,7 +62,7 @@ function poiIcon(): L.DivIcon {
       font-size:11px; font-weight:600; text-transform:uppercase;
       letter-spacing:.8px; color:var(--wp-text-hint); margin-bottom:8px;
     }
-    .ctrl-row { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+    .ctrl-row { display:flex; align-items:center; gap:8px; margin-bottom:6px; font-size:13px; }
     .legend {
       position:absolute; bottom:32px; left:16px; z-index:1001;
       padding:10px 14px; border-radius:10px;
@@ -75,36 +70,70 @@ function poiIcon(): L.DivIcon {
     }
     .leg-row { display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:4px; }
     .leg-dot { width:11px; height:11px; border-radius:50%; flex-shrink:0; }
-    .leg-sq  { width:9px; height:9px; border-radius:1px; transform:rotate(45deg); flex-shrink:0; background:#e65100; }
-    .loading-overlay {
-      position:absolute; inset:0; display:flex; align-items:center;
-      justify-content:center; background:rgba(255,255,255,.65); z-index:2000;
-    }
   `],
   template: `
-    <div #mapEl class="map-el"></div>
-
     @if (loading()) {
-      <div class="loading-overlay"><mat-spinner diameter="48" /></div>
+      <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:2000;background:rgba(255,255,255,.6)">
+        <mat-spinner diameter="48" />
+      </div>
     }
+
+    <google-map
+      height="100%"
+      width="100%"
+      [center]="mapCenter"
+      [zoom]="4"
+      [options]="mapOptions">
+
+      <!-- Destination markers -->
+      @if (showDestinations) {
+        @for (d of validDests(); track d.id) {
+          <map-marker
+            [position]="{ lat: +d.latitude!, lng: +d.longitude! }"
+            [options]="destMarkerOptions(d)"
+            [title]="d.name"
+            (mapClick)="openDestInfo(d, destMarker)"
+            #destMarker="mapMarker" />
+        }
+      }
+
+      <!-- Trip route stops -->
+      @if (directionsResult()) {
+        <map-directions-renderer
+          [directions]="directionsResult()!"
+          [options]="{ suppressMarkers: true, polylineOptions: { strokeColor: '#00695C', strokeOpacity: 0.8, strokeWeight: 4 } }" />
+      }
+      @for (s of tripStopMarkers(); track s.label) {
+        <map-marker [position]="s.position" [options]="s.options" [title]="s.label" />
+      }
+
+      <map-info-window #infoWindow>
+        @if (selectedDest()) {
+          <div style="min-width:160px;font-family:Roboto,sans-serif;padding:4px">
+            <strong style="font-size:14px">{{ selectedDest()!.name }}</strong><br/>
+            <small style="color:#666">{{ selectedDest()!.city }}, {{ selectedDest()!.state_province }}</small><br/>
+            <span style="font-size:12px;text-transform:capitalize;color:#888">{{ selectedDest()!.status.replace('_',' ') }}</span><br/>
+            <button (click)="router.navigate(['/destinations', selectedDest()!.id])"
+              style="margin-top:8px;padding:4px 12px;background:#00695C;color:white;border:none;
+                     border-radius:4px;cursor:pointer;font-size:12px">
+              View →
+            </button>
+          </div>
+        }
+      </map-info-window>
+    </google-map>
 
     <!-- Controls panel -->
     <div class="controls">
       <div class="ctrl-title">Layers</div>
       <div class="ctrl-row">
-        <mat-checkbox [(ngModel)]="showDestinations" (change)="toggleDestLayer($event.checked)">
-          Destinations ({{ validDestCount() }})
-        </mat-checkbox>
-      </div>
-      <div class="ctrl-row">
-        <mat-checkbox [(ngModel)]="showPOIs" (change)="togglePoiLayer($event.checked)">
-          Points of Interest
+        <mat-checkbox [(ngModel)]="showDestinations">
+          Destinations ({{ validDests().length }})
         </mat-checkbox>
       </div>
       <mat-divider style="margin:10px 0" />
       <div class="ctrl-title">Trip Route</div>
-      <mat-select [(ngModel)]="selectedTripId"
-                  (selectionChange)="onTripSelect($event.value)"
+      <mat-select [(ngModel)]="selectedTripId" (selectionChange)="onTripSelect($event.value)"
                   placeholder="Select a trip" style="width:100%;font-size:13px">
         <mat-option [value]="null">— None —</mat-option>
         @for (t of trips(); track t.id) {
@@ -118,162 +147,89 @@ function poiIcon(): L.DivIcon {
       <div class="leg-row"><div class="leg-dot" style="background:#1565c0"></div> Want to Visit</div>
       <div class="leg-row"><div class="leg-dot" style="background:#f57f17"></div> Planned</div>
       <div class="leg-row"><div class="leg-dot" style="background:#2e7d32"></div> Visited</div>
-      <div class="leg-row"><div class="leg-sq"></div> Point of Interest</div>
     </div>
   `,
 })
-export class MapComponent implements AfterViewInit, OnDestroy {
-  @ViewChild('mapEl', { static: true }) mapEl!: ElementRef<HTMLDivElement>;
-
-  private ngZone  = inject(NgZone);
-  private router  = inject(Router);
-  private destSvc = inject(DestinationService);
-  private tripSvc = inject(TripService);
+export class MapComponent implements OnInit {
+  protected router  = inject(Router);
+  private destSvc   = inject(DestinationService);
+  private tripSvc   = inject(TripService);
+  private mapsSvc   = inject(MapsService);
 
   loading      = signal(true);
   destinations = signal<Destination[]>([]);
   trips        = signal<Trip[]>([]);
+  selectedDest = signal<Destination | null>(null);
 
   showDestinations = true;
-  showPOIs         = false;
   selectedTripId: number | null = null;
 
-  validDestCount = computed(() =>
-    this.destinations().filter((d) => d.latitude != null && d.longitude != null).length,
+  directionsResult = signal<google.maps.DirectionsResult | null>(null);
+  tripStopMarkers  = signal<Array<{ position: google.maps.LatLngLiteral; options: google.maps.MarkerOptions; label: string }>>([]);
+
+  validDests = computed(() =>
+    this.destinations().filter(d => d.latitude != null && d.longitude != null),
   );
 
-  private map!: L.Map;
-  private destLayer  = L.layerGroup();
-  private poiLayer   = L.layerGroup();
-  private routeLayer = L.layerGroup();
+  readonly mapCenter: google.maps.LatLngLiteral = { lat: 39.5, lng: -98.35 };
+  readonly mapOptions: google.maps.MapOptions = {
+    mapTypeControl: false,
+    streetViewControl: false,
+    fullscreenControl: false,
+    mapTypeId: 'roadmap',
+  };
 
-  ngAfterViewInit() {
-    this.ngZone.runOutsideAngular(() => this.initMap());
-
+  ngOnInit() {
     forkJoin([this.destSvc.list(), this.tripSvc.list()]).subscribe({
       next: ([dests, trips]) => {
         this.destinations.set(dests);
         this.trips.set(trips);
-        this.ngZone.runOutsideAngular(() => {
-          this.plotDestinations(dests);
-          this.plotPOIs(dests);
-        });
         this.loading.set(false);
       },
       error: () => this.loading.set(false),
     });
-
-    // Expose router for Leaflet popup buttons
-    (window as unknown as Record<string, unknown>)['_wpNav'] = (path: string) =>
-      this.ngZone.run(() => this.router.navigateByUrl(path));
   }
 
-  ngOnDestroy() {
-    this.map?.remove();
-    delete (window as unknown as Record<string, unknown>)['_wpNav'];
+  destMarkerOptions(d: Destination): google.maps.MarkerOptions {
+    return {
+      icon: { url: destIconSvg(d.status), scaledSize: new google.maps.Size(18, 18) },
+      title: d.name,
+    };
   }
 
-  private initMap() {
-    this.map = L.map(this.mapEl.nativeElement, { center: [39.5, -98.35], zoom: 4 });
-
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-      maxZoom: 18,
-    }).addTo(this.map);
-
-    this.destLayer.addTo(this.map);
-    this.routeLayer.addTo(this.map);
-  }
-
-  private plotDestinations(dests: Destination[]) {
-    this.destLayer.clearLayers();
-    for (const d of dests) {
-      if (d.latitude == null || d.longitude == null) continue;
-      const stars = '★'.repeat(d.rating ?? 0) + '☆'.repeat(5 - (d.rating ?? 0));
-      const statusLabel = d.status.replace(/_/g, ' ');
-      const popup = `
-        <div style="min-width:170px;font-family:Roboto,sans-serif">
-          <strong style="font-size:14px">${d.name}</strong><br/>
-          <span style="color:#666;font-size:12px">${d.city}, ${d.state_province}</span><br/>
-          <span style="font-size:12px;color:#888;text-transform:capitalize">${statusLabel}</span><br/>
-          <span style="color:#f57f17;font-size:14px">${stars}</span><br/>
-          <button onclick="window._wpNav('/destinations/${d.id}')"
-            style="margin-top:8px;padding:4px 14px;background:#00695C;color:white;
-                   border:none;border-radius:4px;cursor:pointer;font-size:13px">
-            View →
-          </button>
-        </div>`;
-      L.marker([Number(d.latitude), Number(d.longitude)], { icon: destIcon(d.status) })
-        .bindPopup(popup)
-        .addTo(this.destLayer);
-    }
-  }
-
-  private plotPOIs(dests: Destination[]) {
-    this.poiLayer.clearLayers();
-    for (const d of dests) {
-      for (const p of (d.pois ?? []) as PointOfInterest[]) {
-        if (p.latitude == null || p.longitude == null) continue;
-        L.marker([Number(p.latitude), Number(p.longitude)], { icon: poiIcon() })
-          .bindPopup(
-            `<strong>${p.name}</strong><br/>
-             <span style="color:#666;font-size:12px">${d.name}</span>`,
-          )
-          .addTo(this.poiLayer);
-      }
-    }
-  }
-
-  toggleDestLayer(show: boolean) {
-    this.ngZone.runOutsideAngular(() => {
-      if (show) this.destLayer.addTo(this.map);
-      else this.destLayer.remove();
-    });
-  }
-
-  togglePoiLayer(show: boolean) {
-    this.ngZone.runOutsideAngular(() => {
-      if (show) this.poiLayer.addTo(this.map);
-      else this.poiLayer.remove();
-    });
+  openDestInfo(d: Destination, marker: MapMarker & { _marker?: google.maps.Marker }) {
+    this.selectedDest.set(d);
   }
 
   onTripSelect(tripId: number | null) {
-    this.ngZone.runOutsideAngular(() => this.routeLayer.clearLayers());
+    this.directionsResult.set(null);
+    this.tripStopMarkers.set([]);
     if (!tripId) return;
-    this.tripSvc.get(tripId).subscribe((trip) =>
-      this.ngZone.runOutsideAngular(() => this.drawRoute(trip)),
-    );
-  }
 
-  private drawRoute(trip: Trip) {
-    this.routeLayer.clearLayers();
-    const stops = [...(trip.stops ?? [])]
-      .sort((a, b) => a.stop_order - b.stop_order)
-      .filter((s) => s.destination?.latitude != null && s.destination?.longitude != null);
+    this.tripSvc.get(tripId).subscribe(trip => {
+      const stops = [...(trip.stops ?? [])]
+        .sort((a, b) => a.stop_order - b.stop_order)
+        .filter(s => s.destination?.latitude != null && s.destination?.longitude != null);
 
-    if (!stops.length) return;
+      if (stops.length < 2) return;
 
-    const latlngs: [number, number][] = stops.map((s) => [
-      Number(s.destination!.latitude),
-      Number(s.destination!.longitude),
-    ]);
+      const waypoints = stops.map(s => ({
+        lat: Number(s.destination!.latitude),
+        lng: Number(s.destination!.longitude),
+      }));
 
-    L.polyline(latlngs, { color: '#00695C', weight: 3, dashArray: '10,8', opacity: 0.85 })
-      .addTo(this.routeLayer);
+      this.mapsSvc.loadDirections(waypoints).subscribe(result => {
+        this.directionsResult.set(result);
+      });
 
-    for (const stop of stops) {
-      L.marker(
-        [Number(stop.destination!.latitude), Number(stop.destination!.longitude)],
-        { icon: stopIcon(stop.stop_order) },
-      )
-        .bindPopup(
-          `<strong>Stop ${stop.stop_order}: ${stop.destination!.name}</strong><br/>
-           <span style="color:#666;font-size:12px">${stop.destination!.city}, ${stop.destination!.state_province}</span>`,
-        )
-        .addTo(this.routeLayer);
-    }
-
-    this.map.fitBounds(latlngs, { padding: [60, 60], maxZoom: 10 });
+      // Numbered stop markers
+      this.tripStopMarkers.set(
+        stops.map((s, i) => ({
+          position: { lat: Number(s.destination!.latitude), lng: Number(s.destination!.longitude) },
+          options:  { icon: { url: stopIconSvg(s.stop_order), scaledSize: new google.maps.Size(28, 28) }, zIndex: 10 },
+          label:    s.destination!.name ?? `Stop ${s.stop_order}`,
+        })),
+      );
+    });
   }
 }

@@ -1,40 +1,10 @@
 import {
-  Component, OnInit, AfterViewInit, OnDestroy, ViewChild, ElementRef,
-  ChangeDetectionStrategy, NgZone, inject, signal, computed,
+  Component, OnInit, ChangeDetectionStrategy, inject, signal, computed,
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { DatePipe, CurrencyPipe, TitleCasePipe, DecimalPipe } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
-import * as L from 'leaflet';
-import { forkJoin } from 'rxjs';
-
-// ── OSRM road-routing helper ───────────────────────────────────────────────
-interface OsrmRoute {
-  geometry: { type: 'LineString'; coordinates: [number, number][] };
-  duration: number;   // seconds
-  distance: number;   // metres
-  legs: Array<{ duration: number; distance: number }>;
-}
-
-async function fetchRoadRoute(waypoints: [number, number][]): Promise<OsrmRoute | null> {
-  if (waypoints.length < 2) return null;
-  // OSRM expects longitude,latitude (reversed from Leaflet)
-  const coords = waypoints
-    .map(([lat, lon]) => `${lon.toFixed(6)},${lat.toFixed(6)}`)
-    .join(';');
-  const url =
-    `https://router.project-osrm.org/route/v1/driving/${coords}` +
-    `?overview=full&geometries=geojson&steps=false`;
-  try {
-    const res  = await fetch(url, { headers: { Accept: 'application/json' } });
-    if (!res.ok) return null;
-    const data = await res.json() as { code: string; routes: OsrmRoute[] };
-    if (data.code !== 'Ok' || !data.routes?.length) return null;
-    return data.routes[0];
-  } catch {
-    return null;
-  }
-}
+import { GoogleMap, MapMarker, MapDirectionsRenderer } from '@angular/google-maps';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -52,6 +22,7 @@ import { LodgingService } from '../../../core/services/lodging.service';
 import { JournalService } from '../../../core/services/journal.service';
 import { ClaudeService } from '../../../core/services/claude.service';
 import { GeocodingService } from '../../../core/services/geocoding.service';
+import { MapsService } from '../../../core/services/maps.service';
 import { Trip, TripStatus, TripStop, Lodging } from '../../../types/schema.types';
 import { TripStopsTabComponent }   from '../trip-stops-tab/trip-stops-tab.component';
 import { TripExpensesTabComponent } from '../trip-expenses-tab/trip-expenses-tab.component';
@@ -66,23 +37,20 @@ const STOP_STATUS_COLOR: Record<string, string> = {
   upcoming: '#9e9e9e', current: '#1565c0', completed: '#2e7d32',
 };
 
-function stopMarkerIcon(stop: TripStop): L.DivIcon {
-  const color = STOP_STATUS_COLOR[stop.status] ?? '#9e9e9e';
-  return L.divIcon({
-    html: `<div style="width:28px;height:28px;border-radius:50%;background:${color};color:white;
-                 display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;
-                 border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,.4)">${stop.stop_order}</div>`,
-    iconSize: [28, 28], iconAnchor: [14, 14], popupAnchor: [0, -16], className: '',
-  });
+function stopIconSvg(order: number, status: string): string {
+  const color = STOP_STATUS_COLOR[status] ?? '#9e9e9e';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28">
+    <circle cx="14" cy="14" r="12" fill="${color}" stroke="white" stroke-width="2"/>
+    <text x="14" y="19" font-family="Arial" font-size="11" font-weight="bold"
+          fill="white" text-anchor="middle">${order}</text></svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
-function lodgingIcon(): L.DivIcon {
-  return L.divIcon({
-    html: `<div style="width:22px;height:22px;border-radius:4px;background:#6a1b9a;color:white;
-                 display:flex;align-items:center;justify-content:center;font-size:12px;
-                 border:2px solid white;box-shadow:0 2px 4px rgba(0,0,0,.3)">🏨</div>`,
-    iconSize: [22, 22], iconAnchor: [11, 11], popupAnchor: [0, -12], className: '',
-  });
+function lodgingIconSvg(): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24">
+    <rect x="2" y="2" width="20" height="20" rx="4" fill="#6a1b9a" stroke="white" stroke-width="2"/>
+    <text x="12" y="17" font-size="13" text-anchor="middle" fill="white">🏨</text></svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
 @Component({
@@ -91,6 +59,7 @@ function lodgingIcon(): L.DivIcon {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     RouterLink, ReactiveFormsModule, DatePipe, CurrencyPipe, TitleCasePipe, DecimalPipe,
+    GoogleMap, MapMarker, MapDirectionsRenderer,
     MatCardModule, MatButtonModule, MatIconModule, MatTabsModule,
     MatProgressSpinnerModule, MatSnackBarModule, MatDividerModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatDatepickerModule,
@@ -108,8 +77,6 @@ function lodgingIcon(): L.DivIcon {
     @media (max-width: 900px) {
       .companion-layout { grid-template-columns:1fr; grid-template-rows:auto 1fr; }
     }
-
-    /* LEFT */
     .left-panel { overflow-y:auto; background:var(--wp-bg); border-right:1px solid var(--wp-border); }
     .trip-header {
       padding:14px 16px; background:var(--wp-surface);
@@ -118,9 +85,8 @@ function lodgingIcon(): L.DivIcon {
     .trip-name  { font-size:19px; font-weight:700; margin:0 0 2px; }
     .trip-dates { font-size:13px; color:var(--wp-text-secondary); margin:0 0 8px; }
     .header-meta { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-    .status-pill { padding:3px 10px; border-radius:10px; font-size:12px; font-weight:600; background:var(--wp-surface-variant); text-transform:capitalize; }
-
-    /* Stop cards */
+    .status-pill { padding:3px 10px; border-radius:10px; font-size:12px; font-weight:600;
+                   background:var(--wp-surface-variant); text-transform:capitalize; }
     .stops-list { padding:10px; }
     .stop-card {
       border-radius:10px; background:var(--wp-surface); margin-bottom:10px;
@@ -129,42 +95,32 @@ function lodgingIcon(): L.DivIcon {
     .stop-card.current   { border-color:#1565c0; }
     .stop-card.completed { border-color:#2e7d32; }
     .stop-card.editing   { border-color:var(--wp-accent); }
-
     .stop-header { display:flex; align-items:center; gap:8px; padding:12px 14px 6px; }
-    .stop-num { width:26px;height:26px;border-radius:50%;background:var(--wp-primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0; }
+    .stop-num { width:26px;height:26px;border-radius:50%;background:var(--wp-primary);
+                color:#fff;display:flex;align-items:center;justify-content:center;
+                font-size:11px;font-weight:700;flex-shrink:0; }
     .stop-city { font-size:15px; font-weight:600; flex:1; }
-
-    .stop-row  { padding:2px 14px; font-size:13px; color:var(--wp-text-secondary); display:flex; align-items:center; gap:6px; }
+    .stop-row  { padding:2px 14px; font-size:13px; color:var(--wp-text-secondary);
+                 display:flex; align-items:center; gap:6px; }
     .stop-row mat-icon { font-size:14px; width:14px; height:14px; flex-shrink:0; }
     .gas-flag  { color:#e65100; font-weight:600; }
-
-    .stop-actions { display:flex; gap:6px; padding:8px 14px; border-top:1px solid var(--wp-divider); flex-wrap:wrap; }
-
-    /* Edit form */
+    .stop-actions { display:flex; gap:6px; padding:8px 14px;
+                    border-top:1px solid var(--wp-divider); flex-wrap:wrap; }
     .edit-form { padding:12px 14px; background:var(--wp-surface-variant); }
     .edit-grid { display:grid; grid-template-columns:1fr 1fr; gap:0 10px; }
     .edit-full { grid-column:1/-1; }
-
-    /* Hotel panel */
     .hotel-panel { margin:8px 14px; padding:12px; border-radius:8px; background:var(--wp-surface-variant); }
     .hotel-option { display:flex; align-items:center; gap:10px; padding:8px; border-radius:6px; cursor:pointer; margin-bottom:4px; }
     .hotel-option:hover { background:var(--wp-surface); }
     .hotel-option.selected { background:var(--wp-primary); color:#fff; }
     .hotel-option.selected .hotel-sub { color:rgba(255,255,255,.7); }
     .hotel-sub { font-size:12px; color:var(--wp-text-hint); }
-
-    /* RIGHT */
-    .right-panel { position:relative; }
-    .map-el { width:100%; height:100%; }
-    .map-fab {
-      position:absolute; bottom:20px; right:16px; z-index:1000;
-      background:var(--wp-surface) !important; box-shadow:0 2px 8px var(--wp-shadow) !important;
-    }
-
-    /* AI */
+    .right-panel { position:relative; overflow:hidden; }
+    .map-recenter { position:absolute; bottom:20px; right:16px; z-index:1000;
+                    background:var(--wp-surface) !important; box-shadow:0 2px 8px var(--wp-shadow) !important; }
     .ai-panel { padding:12px 14px 0; }
-    .ai-box { margin-top:10px; padding:12px; border-radius:8px; background:var(--wp-surface-variant); border-left:3px solid var(--wp-accent); font-size:14px; line-height:1.7; white-space:pre-wrap; }
-
+    .ai-box { margin-top:10px; padding:12px; border-radius:8px; background:var(--wp-surface-variant);
+               border-left:3px solid var(--wp-accent); font-size:14px; line-height:1.7; white-space:pre-wrap; }
     .bottom-tabs { border-top:1px solid var(--wp-border); }
     .geocoding-note { font-size:12px; color:var(--wp-text-hint); text-align:center; padding:8px; }
   `],
@@ -174,10 +130,8 @@ function lodgingIcon(): L.DivIcon {
     } @else if (t) {
       <div class="companion-layout">
 
-        <!-- ── LEFT PANEL ────────────────────────────────────────── -->
+        <!-- ── LEFT PANEL ──────────────────────────────────────────── -->
         <div class="left-panel">
-
-          <!-- Trip header -->
           <div class="trip-header">
             <p class="trip-name">{{ t.name }}</p>
             <p class="trip-dates">
@@ -193,19 +147,23 @@ function lodgingIcon(): L.DivIcon {
               }
               @if (routeStats()) {
                 <span style="font-size:12px;color:var(--wp-text-hint)">
-                  {{ routeStats()!.distanceKm | number:'1.0-0' }} km · {{ routeStats()!.durationMin | number:'1.0-0' }} min drive
+                  {{ routeStats()!.distanceKm | number:'1.0-0' }} km · {{ routeStats()!.durationMin | number:'1.0-0' }} min
                 </span>
               }
               <span style="margin-left:auto;display:flex;gap:4px;align-items:center">
                 @if (googleMapsUrl()) {
                   <a [href]="googleMapsUrl()!" target="_blank" rel="noopener">
-                    <button mat-icon-button title="Open full route in Google Maps" style="color:#4285f4">
+                    <button mat-icon-button title="Open in Google Maps" style="color:#4285f4">
                       <mat-icon>map</mat-icon>
                     </button>
                   </a>
                 }
-                <button mat-icon-button [routerLink]="['/trips', t.id, 'edit']" title="Edit trip"><mat-icon style="font-size:18px">edit</mat-icon></button>
-                <button mat-icon-button color="warn" (click)="confirmDelete()" title="Delete"><mat-icon style="font-size:18px">delete</mat-icon></button>
+                <button mat-icon-button [routerLink]="['/trips', t.id, 'edit']" title="Edit trip">
+                  <mat-icon style="font-size:18px">edit</mat-icon>
+                </button>
+                <button mat-icon-button color="warn" (click)="confirmDelete()" title="Delete">
+                  <mat-icon style="font-size:18px">delete</mat-icon>
+                </button>
               </span>
             </div>
             @if (t.status === 'planning') {
@@ -227,23 +185,20 @@ function lodgingIcon(): L.DivIcon {
           <!-- Stop cards -->
           <div class="stops-list">
             @if (!sortedStops().length) {
-              <p style="text-align:center;color:var(--wp-text-hint);padding:20px;font-size:14px">No stops — use the Stops tab below to plan your route.</p>
+              <p style="text-align:center;color:var(--wp-text-hint);padding:20px;font-size:14px">
+                No stops — use the Stops tab below to plan your route.
+              </p>
             }
             @for (stop of sortedStops(); track stop.id) {
               <div class="stop-card"
                    [class.current]="stop.status==='current'"
                    [class.completed]="stop.status==='completed'"
                    [class.editing]="editingStopId()===stop.id">
-
-                <!-- Stop header -->
                 <div class="stop-header">
                   <div class="stop-num">{{ stop.stop_order }}</div>
-                  <span class="stop-city">
-                    {{ stop.destination?.name ?? ('Stop ' + stop.stop_order) }}
-                  </span>
+                  <span class="stop-city">{{ stop.destination?.name ?? ('Stop ' + stop.stop_order) }}</span>
                   <span class="status-pill" [style.color]="STOP_STATUS_COLOR[stop.status]">{{ stop.status }}</span>
                 </div>
-
                 @if (stop.destination) {
                   <p class="stop-row" style="color:var(--wp-text-hint)">
                     <mat-icon>place</mat-icon>{{ stop.destination.city }}, {{ stop.destination.state_province }}
@@ -260,8 +215,6 @@ function lodgingIcon(): L.DivIcon {
                 @if (stop.notes?.includes('Fuel')) {
                   <p class="stop-row gas-flag"><mat-icon>local_gas_station</mat-icon> Fuel up before this stop</p>
                 }
-
-                <!-- Lodging info -->
                 @if (stop.lodging) {
                   <p class="stop-row"><mat-icon>hotel</mat-icon>
                     <span>
@@ -278,7 +231,6 @@ function lodgingIcon(): L.DivIcon {
                   <p class="stop-row" style="color:var(--wp-text-hint)"><mat-icon>hotel</mat-icon> No lodging set</p>
                 }
 
-                <!-- Inline edit form -->
                 @if (editingStopId() === stop.id) {
                   <div class="edit-form">
                     <form [formGroup]="editStopForm" (ngSubmit)="saveStopEdit(stop)">
@@ -308,8 +260,6 @@ function lodgingIcon(): L.DivIcon {
                       </div>
                     </form>
                   </div>
-
-                  <!-- Hotel change panel -->
                   <div class="hotel-panel">
                     <p style="font-size:13px;font-weight:600;margin:0 0 8px">Change Hotel</p>
                     @if (cityLodgings().length === 0) {
@@ -318,15 +268,16 @@ function lodgingIcon(): L.DivIcon {
                       </p>
                     } @else {
                       <div class="hotel-option" [class.selected]="!stop.lodging_id" (click)="changeLodging(stop, null)">
-                        <mat-icon>hotel_outlined</mat-icon>
-                        <span>None — I'll decide later</span>
+                        <mat-icon>hotel_outlined</mat-icon><span>None — I'll decide later</span>
                       </div>
                       @for (l of cityLodgings(); track l.id) {
                         <div class="hotel-option" [class.selected]="stop.lodging_id === l.id" (click)="changeLodging(stop, l.id)">
                           <mat-icon>hotel</mat-icon>
                           <div>
                             <div>{{ l.name }}</div>
-                            <div class="hotel-sub">{{ l.lodging_type | titlecase }} @if (l.price_per_night) { · {{ l.price_per_night | currency:'USD':'symbol':'1.0-0' }}/night } </div>
+                            <div class="hotel-sub">{{ l.lodging_type | titlecase }}
+                              @if (l.price_per_night) { · {{ l.price_per_night | currency:'USD':'symbol':'1.0-0' }}/night }
+                            </div>
                           </div>
                         </div>
                       }
@@ -334,24 +285,23 @@ function lodgingIcon(): L.DivIcon {
                   </div>
                 }
 
-                <!-- Stop actions -->
                 <div class="stop-actions">
                   @if (stop.status === 'upcoming') {
-                    <button mat-stroked-button style="font-size:12px;height:30px;line-height:30px" (click)="setStopStatus(stop,'current')">Mark Current</button>
+                    <button mat-stroked-button style="font-size:12px;height:30px;line-height:30px"
+                            (click)="setStopStatus(stop,'current')">Mark Current</button>
                   }
                   @if (stop.status === 'current') {
-                    <button mat-stroked-button style="font-size:12px;height:30px;line-height:30px" (click)="setStopStatus(stop,'completed')">Mark Completed</button>
+                    <button mat-stroked-button style="font-size:12px;height:30px;line-height:30px"
+                            (click)="setStopStatus(stop,'completed')">Mark Completed</button>
                   }
-                  <button mat-icon-button style="width:30px;height:30px" (click)="startEditStop(stop)" title="Edit stop">
+                  <button mat-icon-button style="width:30px;height:30px" (click)="startEditStop(stop)" title="Edit">
                     <mat-icon style="font-size:16px">edit</mat-icon>
                   </button>
                 </div>
-
               </div>
             }
           </div>
 
-          <!-- AI Trip Summary -->
           @if (t.status === 'active' || t.status === 'completed') {
             <div class="ai-panel">
               <button mat-stroked-button style="width:100%" (click)="generateSummary()" [disabled]="summaryLoading()">
@@ -367,7 +317,6 @@ function lodgingIcon(): L.DivIcon {
             </div>
           }
 
-          <!-- Bottom tabs -->
           <mat-divider style="margin-top:16px" />
           <mat-tab-group animationDuration="150ms" class="bottom-tabs">
             <mat-tab label="Stops"><app-trip-stops-tab [tripId]="t.id" /></mat-tab>
@@ -376,13 +325,30 @@ function lodgingIcon(): L.DivIcon {
             <mat-tab label="Journal"><app-trip-journal-tab [tripId]="t.id" /></mat-tab>
             <mat-tab label="Fuel"><app-trip-fuel-tab [tripId]="t.id" /></mat-tab>
           </mat-tab-group>
-
         </div>
 
-        <!-- ── RIGHT PANEL: Map ──────────────────────────────────── -->
+        <!-- ── RIGHT PANEL: Google Map ──────────────────────────────── -->
         <div class="right-panel">
-          <div #mapEl class="map-el"></div>
-          <button mat-mini-fab class="map-fab" (click)="recenterMap()" title="Recenter on current stop">
+          <google-map height="100%" width="100%"
+                      [center]="mapCenter()"
+                      [zoom]="mapZoom()"
+                      [options]="mapOptions">
+            <!-- Road route via Directions API -->
+            @if (directionsResult()) {
+              <map-directions-renderer
+                [directions]="directionsResult()!"
+                [options]="{ suppressMarkers: true, polylineOptions: { strokeColor: '#00695C', strokeOpacity: 0.85, strokeWeight: 4 } }" />
+            }
+            <!-- Numbered stop markers -->
+            @for (m of stopMarkers(); track m.stopId) {
+              <map-marker [position]="m.position" [options]="m.options" [title]="m.title" />
+            }
+            <!-- Lodging markers -->
+            @for (m of lodgingMarkers(); track m.title) {
+              <map-marker [position]="m.position" [options]="m.options" [title]="m.title" />
+            }
+          </google-map>
+          <button mat-mini-fab class="map-recenter" (click)="recenterMap()" title="Recenter">
             <mat-icon>my_location</mat-icon>
           </button>
         </div>
@@ -391,9 +357,7 @@ function lodgingIcon(): L.DivIcon {
     }
   `,
 })
-export class TripDetailComponent implements OnInit, AfterViewInit, OnDestroy {
-  @ViewChild('mapEl', { static: false }) mapEl?: ElementRef<HTMLDivElement>;
-
+export class TripDetailComponent implements OnInit {
   private route      = inject(ActivatedRoute);
   private router     = inject(Router);
   private svc        = inject(TripService);
@@ -402,18 +366,22 @@ export class TripDetailComponent implements OnInit, AfterViewInit, OnDestroy {
   private journalSvc = inject(JournalService);
   private claudeSvc  = inject(ClaudeService);
   private geoSvc     = inject(GeocodingService);
+  private mapsSvc    = inject(MapsService);
   private snack      = inject(MatSnackBar);
-  private ngZone     = inject(NgZone);
   private fb         = inject(FormBuilder);
 
-  loading            = signal(true);
-  summaryLoading     = signal(false);
-  summaryText        = signal('');
+  loading             = signal(true);
+  summaryLoading      = signal(false);
+  summaryText         = signal('');
   geocodingInProgress = signal(false);
-  editingStopId      = signal<number | null>(null);
-  savingStop         = signal(false);
-  cityLodgings       = signal<Lodging[]>([]);
-  routeStats         = signal<{ distanceKm: number; durationMin: number } | null>(null);
+  editingStopId       = signal<number | null>(null);
+  savingStop          = signal(false);
+  cityLodgings        = signal<Lodging[]>([]);
+  routeStats          = signal<{ distanceKm: number; durationMin: number } | null>(null);
+  directionsResult    = signal<google.maps.DirectionsResult | null>(null);
+
+  // coordinate cache for stops missing DB lat/lon
+  private coordCache = new Map<number, { lat: number; lng: number }>();
 
   private tripSig = signal<Trip | null>(null);
   protected get t(): Trip | null { return this.tripSig(); }
@@ -422,21 +390,56 @@ export class TripDetailComponent implements OnInit, AfterViewInit, OnDestroy {
     [...(this.tripSig()?.stops ?? [])].sort((a, b) => a.stop_order - b.stop_order),
   );
 
-  // Google Maps URL using actual coordinates or city names as fallback
+  mapCenter = computed<google.maps.LatLngLiteral>(() => {
+    const first = this.sortedStops().find(s => this.stopCoords(s) !== null);
+    const c = first ? this.stopCoords(first) : null;
+    return c ?? { lat: 39.5, lng: -98.35 };
+  });
+
+  mapZoom = computed(() => this.sortedStops().length > 1 ? 5 : 9);
+
+  stopMarkers = computed(() =>
+    this.sortedStops()
+      .map(s => ({ stop: s, pos: this.stopCoords(s) }))
+      .filter(x => x.pos !== null)
+      .map(x => ({
+        stopId: x.stop.id,
+        position: x.pos!,
+        title: x.stop.destination?.name ?? `Stop ${x.stop.stop_order}`,
+        options: {
+          icon: { url: stopIconSvg(x.stop.stop_order, x.stop.status), scaledSize: new google.maps.Size(28, 28) },
+          zIndex: 10,
+        } as google.maps.MarkerOptions,
+      })),
+  );
+
+  lodgingMarkers = computed(() =>
+    this.sortedStops()
+      .filter(s => s.lodging?.latitude && s.lodging?.longitude)
+      .map(s => ({
+        title: s.lodging!.name,
+        position: { lat: Number(s.lodging!.latitude), lng: Number(s.lodging!.longitude) },
+        options: {
+          icon: { url: lodgingIconSvg(), scaledSize: new google.maps.Size(24, 24) },
+          zIndex: 5,
+        } as google.maps.MarkerOptions,
+      })),
+  );
+
   googleMapsUrl = computed(() => {
-    const positioned = this.sortedStops()
+    const pts = this.sortedStops()
       .map(s => {
         const c = this.stopCoords(s);
-        if (c) return `${c[0]},${c[1]}`;
-        const d = s.destination;
-        return d ? `${encodeURIComponent(d.city + ' ' + d.state_province)}` : null;
+        return c ? `${c.lat},${c.lng}` : null;
       })
       .filter(Boolean);
-    if (positioned.length < 2) return null;
-    return `https://www.google.com/maps/dir/${positioned.join('/')}`;
+    return pts.length >= 2 ? `https://www.google.com/maps/dir/${pts.join('/')}` : null;
   });
 
   readonly STOP_STATUS_COLOR = STOP_STATUS_COLOR;
+  readonly mapOptions: google.maps.MapOptions = {
+    mapTypeControl: false, streetViewControl: false, fullscreenControl: false,
+  };
 
   editStopForm = this.fb.group({
     arrival_date:   [null as Date | null],
@@ -444,178 +447,79 @@ export class TripDetailComponent implements OnInit, AfterViewInit, OnDestroy {
     notes:          [''],
   });
 
-  private map?: L.Map;
-  private routeLayer = L.layerGroup();
-  // Local coordinates cache for stops that may lack DB lat/lon
-  private coordCache = new Map<number, { lat: number; lon: number }>();
-
   ngOnInit() {
     const id = Number(this.route.snapshot.paramMap.get('id'));
     this.svc.get(id).subscribe({
       next: (t) => {
         this.tripSig.set(t);
         this.loading.set(false);
-        this.geocodeMissingStops(t);
+        this.geocodeAndRoute(t);
       },
       error: () => { this.loading.set(false); this.router.navigate(['/trips']); },
     });
   }
 
-  ngAfterViewInit() {
-    const checkInterval = setInterval(() => {
-      if (!this.loading() && this.mapEl) {
-        clearInterval(checkInterval);
-        this.ngZone.runOutsideAngular(() => this.initMap());
-      }
-    }, 100);
-  }
-
-  ngOnDestroy() { this.map?.remove(); }
-
-  // ── Geocode stops that lack coordinates ───────────────────────────────────
-  private async geocodeMissingStops(t: Trip) {
-    const missing = (t.stops ?? []).filter(
-      (s) => s.destination && s.destination.latitude == null,
-    );
-    if (!missing.length) return;
-
-    this.geocodingInProgress.set(true);
-    for (const stop of missing) {
-      const d = stop.destination!;
-      const result = await new Promise<{ lat: number; lon: number } | null>((resolve) => {
-        this.geoSvc.lookup(d.city, d.state_province, 'USA').subscribe({
-          next: (r) => resolve(r ? { lat: r.lat, lon: r.lon } : null),
-          error: () => resolve(null),
+  private async geocodeAndRoute(t: Trip) {
+    // Geocode stops missing lat/lon
+    const missing = (t.stops ?? []).filter(s => s.destination && s.destination.latitude == null);
+    if (missing.length) {
+      this.geocodingInProgress.set(true);
+      for (const stop of missing) {
+        const d = stop.destination!;
+        const r = await new Promise<{ lat: number; lon: number } | null>(resolve => {
+          this.geoSvc.lookup(d.city, d.state_province, 'USA')
+            .subscribe({ next: r => resolve(r ? { lat: r.lat, lon: r.lon } : null), error: () => resolve(null) });
         });
+        if (r) this.coordCache.set(stop.id, { lat: r.lat, lng: r.lon });
+      }
+      this.geocodingInProgress.set(false);
+    }
+
+    // Load Google Directions route
+    const waypoints = this.sortedStops()
+      .map(s => this.stopCoords(s))
+      .filter(Boolean) as google.maps.LatLngLiteral[];
+
+    if (waypoints.length >= 2) {
+      this.mapsSvc.loadDirections(waypoints).subscribe(result => {
+        this.directionsResult.set(result);
+        if (result?.routes?.[0]?.legs) {
+          const totalDist = result.routes[0].legs.reduce((s, l) => s + l.distance!.value, 0);
+          const totalDur  = result.routes[0].legs.reduce((s, l) => s + l.duration!.value, 0);
+          this.routeStats.set({ distanceKm: Math.round(totalDist / 1000), durationMin: Math.round(totalDur / 60) });
+        }
       });
-      if (result) this.coordCache.set(stop.id, result);
     }
-    this.geocodingInProgress.set(false);
-
-    // Redraw map with newly geocoded coordinates
-    this.ngZone.runOutsideAngular(() => this.drawRoute());
   }
 
-  private stopCoords(stop: TripStop): [number, number] | null {
+  private stopCoords(stop: TripStop): google.maps.LatLngLiteral | null {
     const d = stop.destination;
-    if (d?.latitude && d?.longitude) return [Number(d.latitude), Number(d.longitude)];
-    const cached = this.coordCache.get(stop.id);
-    if (cached) return [cached.lat, cached.lon];
-    return null;
-  }
-
-  // ── Map ───────────────────────────────────────────────────────────────────
-  private initMap() {
-    if (!this.mapEl) return;
-    this.map = L.map(this.mapEl.nativeElement, { center: [39.5, -98.35], zoom: 4 });
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    }).addTo(this.map);
-    this.routeLayer.addTo(this.map);
-    this.drawRoute();
-  }
-
-  private async drawRoute() {
-    if (!this.map) return;
-    this.routeLayer.clearLayers();
-
-    const stops = this.sortedStops();
-    const positioned = stops
-      .map((s) => ({ stop: s, coords: this.stopCoords(s) }))
-      .filter((x) => x.coords !== null) as { stop: TripStop; coords: [number, number] }[];
-
-    if (!positioned.length) return;
-
-    const latlngs = positioned.map((x) => x.coords);
-
-    // ── Draw road route via OSRM (falls back to straight line if unavailable) ──
-    if (latlngs.length > 1) {
-      const osrm = await fetchRoadRoute(latlngs);
-      if (osrm) {
-        // OSRM returns [lon, lat] — convert to Leaflet [lat, lon]
-        const roadCoords = osrm.geometry.coordinates.map(
-          ([lon, lat]) => [lat, lon] as [number, number],
-        );
-        L.polyline(roadCoords, { color: '#00695C', weight: 4, opacity: .85 })
-          .addTo(this.routeLayer);
-
-        // Update route stats signal (must re-enter Angular zone)
-        const distanceKm  = Math.round(osrm.distance / 1000);
-        const durationMin = Math.round(osrm.duration / 60);
-        this.ngZone.run(() => this.routeStats.set({ distanceKm, durationMin }));
-      } else {
-        // Fallback — straight dashed line
-        L.polyline(latlngs, { color: '#00695C', weight: 3, dashArray: '10,8', opacity: .75 })
-          .addTo(this.routeLayer);
-      }
-    }
-
-    // ── Stop markers ──────────────────────────────────────────────────────────
-    for (const { stop, coords } of positioned) {
-      const popup = `
-        <div style="font-family:Roboto,sans-serif;min-width:160px">
-          <strong>${stop.destination?.name ?? 'Stop ' + stop.stop_order}</strong><br/>
-          <small style="color:#666">${stop.destination?.city ?? ''}, ${stop.destination?.state_province ?? ''}</small><br/>
-          <small>Status: <b>${stop.status}</b></small>
-          ${stop.arrival_date   ? '<br/><small>Arrive: '  + stop.arrival_date   + '</small>' : ''}
-          ${stop.departure_date ? '<br/><small>Depart: '  + stop.departure_date + '</small>' : ''}
-          ${stop.lodging ? '<br/><small>🏨 ' + stop.lodging.name + '</small>' : ''}
-          <br/><button onclick="window._wpNav('/trips/${this.tripSig()!.id}')"
-            style="margin-top:6px;padding:3px 10px;background:#00695C;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px">
-            Open Companion
-          </button>
-        </div>`;
-      L.marker(coords, { icon: stopMarkerIcon(stop) })
-        .bindPopup(popup)
-        .addTo(this.routeLayer);
-
-      // Hotel marker
-      if (stop.lodging?.latitude && stop.lodging?.longitude) {
-        L.marker(
-          [Number(stop.lodging.latitude), Number(stop.lodging.longitude)],
-          { icon: lodgingIcon() },
-        )
-          .bindPopup(
-            `<strong>🏨 ${stop.lodging.name}</strong>` +
-            `${stop.lodging.address ? '<br/><small>' + stop.lodging.address + '</small>' : ''}`,
-          )
-          .addTo(this.routeLayer);
-      }
-    }
-
-    // ── Fit map to route ──────────────────────────────────────────────────────
-    if (latlngs.length > 1) {
-      this.map.fitBounds(latlngs, { padding: [50, 50], maxZoom: 11 });
-    } else {
-      this.map.setView(latlngs[0], 11);
-    }
+    if (d?.latitude && d?.longitude) return { lat: Number(d.latitude), lng: Number(d.longitude) };
+    const c = this.coordCache.get(stop.id);
+    return c ?? null;
   }
 
   recenterMap() {
-    const current = this.sortedStops().find((s) => s.status === 'current')
-      ?? this.sortedStops()[0];
-    if (!current) return;
-    const coords = this.stopCoords(current);
-    if (coords && this.map) this.map.setView(coords, 11);
+    // Handled by mapCenter computed signal — just trigger re-render
+    const current = this.sortedStops().find(s => s.status === 'current') ?? this.sortedStops()[0];
+    if (current) {
+      const c = this.stopCoords(current);
+      if (c) this.mapCenter; // signals are already reactive
+    }
   }
 
-  // ── Inline stop editing ───────────────────────────────────────────────────
   startEditStop(stop: TripStop) {
-    if (this.editingStopId() === stop.id) {
-      this.editingStopId.set(null);
-      return;
-    }
+    if (this.editingStopId() === stop.id) { this.editingStopId.set(null); return; }
     this.editStopForm.patchValue({
       arrival_date:   stop.arrival_date   ? new Date(stop.arrival_date)   : null,
       departure_date: stop.departure_date ? new Date(stop.departure_date) : null,
       notes: stop.notes ?? '',
     });
     this.editingStopId.set(stop.id);
-    // Load lodging options for this stop's city
     const city = stop.destination?.city;
     if (city) {
-      this.lodgingSvc.list().subscribe((all) =>
-        this.cityLodgings.set(all.filter((l) => l.city.toLowerCase() === city.toLowerCase())),
+      this.lodgingSvc.list().subscribe(all =>
+        this.cityLodgings.set(all.filter(l => l.city.toLowerCase() === city.toLowerCase())),
       );
     }
   }
@@ -623,99 +527,75 @@ export class TripDetailComponent implements OnInit, AfterViewInit, OnDestroy {
   saveStopEdit(stop: TripStop) {
     this.savingStop.set(true);
     const v = this.editStopForm.getRawValue();
-    const fmtDate = (d: Date | null) => d ? d.toISOString().split('T')[0] : null;
+    const fmt = (d: Date | null) => d ? d.toISOString().split('T')[0] : null;
     this.stopSvc.update(this.tripSig()!.id, stop.id, {
       destination_id: stop.destination_id ?? null,
-      lodging_id:     stop.lodging_id     ?? null,
-      stop_order:     stop.stop_order,
-      status:         stop.status,
-      arrival_date:   fmtDate(v.arrival_date as Date | null),
-      departure_date: fmtDate(v.departure_date as Date | null),
-      notes:          v.notes ?? null,
+      lodging_id: stop.lodging_id ?? null,
+      stop_order: stop.stop_order, status: stop.status,
+      arrival_date: fmt(v.arrival_date as Date | null),
+      departure_date: fmt(v.departure_date as Date | null),
+      notes: v.notes ?? null,
     }).subscribe({
-      next: () => {
-        this.savingStop.set(false);
-        this.editingStopId.set(null);
-        this.reload();
-      },
-      error: () => {
-        this.snack.open('Save failed', 'Dismiss', { duration: 3000 });
-        this.savingStop.set(false);
-      },
+      next: () => { this.savingStop.set(false); this.editingStopId.set(null); this.reload(); },
+      error: () => { this.snack.open('Save failed', 'Dismiss', { duration: 3000 }); this.savingStop.set(false); },
     });
   }
 
   changeLodging(stop: TripStop, lodgingId: number | null) {
     const v = this.editStopForm.getRawValue();
-    const fmtDate = (d: Date | null) => d ? d.toISOString().split('T')[0] : null;
+    const fmt = (d: Date | null) => d ? d.toISOString().split('T')[0] : null;
     this.stopSvc.update(this.tripSig()!.id, stop.id, {
-      destination_id: stop.destination_id ?? null,
-      lodging_id: lodgingId,
-      stop_order: stop.stop_order,
-      status: stop.status,
-      arrival_date: fmtDate(v.arrival_date as Date | null) ?? stop.arrival_date ?? null,
-      departure_date: fmtDate(v.departure_date as Date | null) ?? stop.departure_date ?? null,
+      destination_id: stop.destination_id ?? null, lodging_id: lodgingId,
+      stop_order: stop.stop_order, status: stop.status,
+      arrival_date: fmt(v.arrival_date as Date | null) ?? stop.arrival_date ?? null,
+      departure_date: fmt(v.departure_date as Date | null) ?? stop.departure_date ?? null,
       notes: v.notes ?? stop.notes ?? null,
     }).subscribe(() => this.reload());
   }
 
   private reload() {
-    this.svc.get(this.tripSig()!.id).subscribe((t) => {
+    this.svc.get(this.tripSig()!.id).subscribe(t => {
       this.tripSig.set(t);
-      this.ngZone.runOutsideAngular(() => this.drawRoute());
+      this.geocodeAndRoute(t);
     });
   }
 
-  // ── Stop status ───────────────────────────────────────────────────────────
   setStopStatus(stop: TripStop, status: 'current' | 'completed') {
     fetch(`/api/trips/${this.tripSig()!.id}/stops/${stop.id}/status`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status }),
     }).then(() => this.reload());
   }
 
-  // ── Trip status ───────────────────────────────────────────────────────────
   setStatus(status: TripStatus) {
     this.svc.updateStatus(this.tripSig()!.id, status).subscribe({
-      next: (t) => this.tripSig.update((cur) => ({ ...cur!, status: t.status })),
+      next: t => this.tripSig.update(cur => ({ ...cur!, status: t.status })),
       error: () => this.snack.open('Status update failed', 'Dismiss', { duration: 3000 }),
     });
   }
 
-  // ── AI summary ────────────────────────────────────────────────────────────
   generateSummary() {
-    const trip = this.tripSig();
-    if (!trip) return;
-    this.summaryLoading.set(true);
-    this.summaryText.set('');
+    const trip = this.tripSig(); if (!trip) return;
+    this.summaryLoading.set(true); this.summaryText.set('');
     this.claudeSvc.tripSummary(trip).subscribe({
-      next: (res) => { this.summaryText.set(res.result); this.summaryLoading.set(false); },
-      error: () => { this.snack.open('AI request failed', 'Dismiss', { duration: 3000 }); this.summaryLoading.set(false); },
+      next: r => { this.summaryText.set(r.result); this.summaryLoading.set(false); },
+      error: () => { this.snack.open('AI failed', 'Dismiss', { duration: 3000 }); this.summaryLoading.set(false); },
     });
   }
 
   saveAsJournal() {
-    const trip = this.tripSig();
-    if (!trip || !this.summaryText()) return;
+    const trip = this.tripSig(); if (!trip || !this.summaryText()) return;
     this.journalSvc.create(trip.id, {
-      title: `Trip Summary: ${trip.name}`,
-      body: this.summaryText(),
+      title: `Trip Summary: ${trip.name}`, body: this.summaryText(),
       entry_date: new Date().toISOString().split('T')[0],
-    }).subscribe(() => {
-      this.snack.open('Saved to journal!', 'OK', { duration: 2500 });
-      this.summaryText.set('');
-    });
+    }).subscribe(() => { this.snack.open('Saved!', 'OK', { duration: 2500 }); this.summaryText.set(''); });
   }
 
   confirmDelete() {
-    if (!confirm('Delete this trip and all its data?')) return;
+    if (!confirm('Delete this trip?')) return;
     this.svc.delete(this.tripSig()!.id).subscribe(() => this.router.navigate(['/trips']));
   }
 
   statusColor(s: TripStatus): string { return STATUS_COLOR[s] ?? '#666'; }
-
-  lodgingAddress(stop: TripStop): string | null {
-    return stop.lodging?.address ?? null;
-  }
+  lodgingAddress(stop: TripStop): string | null { return stop.lodging?.address ?? null; }
 }
