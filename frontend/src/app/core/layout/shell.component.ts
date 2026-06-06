@@ -35,6 +35,8 @@ const SECONDARY_NAV: NavItem[] = [
   { icon: '🍽️', label: 'Restaurants',          path: '/restaurants' },
   { icon: '🏨',  label: 'Lodging',             path: '/lodging' },
   { icon: '🌟',  label: 'Special Interests',   path: '/special-interests' },
+  { icon: '✅',  label: 'Would Return',         path: '/would-return' },
+  { icon: '🚫',  label: 'Avoid List',          path: '/avoid-list' },
 ];
 
 const QUICK_ADD_ITEMS: QuickAddItem[] = [
@@ -387,6 +389,12 @@ const QUICK_ADD_ITEMS: QuickAddItem[] = [
           </a>
           <a class="more-item" routerLink="/special-interests">
             <span style="font-size:24px">🌟</span>Interests
+          </a>
+          <a class="more-item" routerLink="/would-return" (click)="showMore.set(false)">
+            <span style="font-size:24px">✅</span>Would Return
+          </a>
+          <a class="more-item" routerLink="/avoid-list" (click)="showMore.set(false)">
+            <span style="font-size:24px">🚫</span>Avoid List
           </a>
           <a class="more-item" routerLink="/settings">
             <span style="font-size:24px">⚙️</span>Settings

@@ -71,6 +71,11 @@ import { Restaurant } from '../../../types/schema.types';
             <p class="subtitle">{{ r.city }}, {{ r.state_province }} · {{ r.country }}</p>
           </div>
           <div class="actions">
+            <button mat-raised-button color="primary" (click)="logVisit(r.id)" [disabled]="visitLogging()">
+              <mat-icon>add_location_alt</mat-icon>
+              {{ visitLogging() ? 'Logged!' : 'Log a Visit' }}
+              @if ((r.visit_count ?? 0) > 0) { &nbsp;({{ r.visit_count }}x) }
+            </button>
             <button mat-stroked-button [routerLink]="['/restaurants', r.id, 'edit']">
               <mat-icon>edit</mat-icon> Edit
             </button>
@@ -186,10 +191,11 @@ export class RestaurantDetailComponent implements OnInit {
   private claudeSvc = inject(ClaudeService);
   private snack = inject(MatSnackBar);
 
-  loading = signal(true);
-  restaurant = signal<Restaurant | null>(null);
+  loading      = signal(true);
+  visitLogging = signal(false);
+  restaurant   = signal<Restaurant | null>(null);
   protected get r(): Restaurant | null { return this.restaurant(); }
-  aiLoading = signal(false);
+  aiLoading    = signal(false);
   aiDescription = signal('');
 
   ngOnInit() {
@@ -238,6 +244,18 @@ export class RestaurantDetailComponent implements OnInit {
     const r = this.restaurant();
     if (!r) return;
     this.svc.get(r.id).subscribe((updated) => this.restaurant.set(updated));
+  }
+
+  logVisit(id: number) {
+    this.visitLogging.set(true);
+    this.svc.logVisit(id).subscribe({
+      next: ({ visit_count }) => {
+        this.restaurant.update(r => r ? { ...r, visit_count } : r);
+        this.snack.open('Visit logged!', 'OK', { duration: 2000 });
+        setTimeout(() => this.visitLogging.set(false), 1500);
+      },
+      error: () => { this.snack.open('Failed to log visit', 'Dismiss', { duration: 3000 }); this.visitLogging.set(false); },
+    });
   }
 
   confirmDelete(id: number) {

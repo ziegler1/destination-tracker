@@ -201,7 +201,9 @@ router.post('/generate', asyncHandler(async (req, res) => {
     return;
   }
 
-  const prefStr = `Lodging type: ${preferences.lodging_type ?? 'any'} | Cuisine: ${preferences.cuisine_preferences?.join(', ') ?? 'any'} | Pet friendly: ${preferences.pet_friendly ? 'yes' : 'no'} | Interests: ${preferences.interests?.join(', ') ?? 'general sightseeing'}`;
+  const minRating = (preferences as any).min_rating ?? 0;
+  const ratingNote = minRating > 0 ? `Minimum Google rating: ${minRating} stars (only suggest places rated ${minRating}+ on Google)` : 'No minimum rating requirement';
+  const prefStr = `Lodging type: ${preferences.lodging_type ?? 'any'} | Cuisine: ${preferences.cuisine_preferences?.join(', ') ?? 'any'} | Pet friendly: ${preferences.pet_friendly ? 'yes' : 'no'} | Interests: ${preferences.interests?.join(', ') ?? 'general sightseeing'} | ${ratingNote}`;
 
   const stopShape = `{
       "stop_order": 1,
@@ -368,7 +370,13 @@ Return JSON:
     }),
   );
 
-  // ── STEP 3: Return enriched plan (nothing saved yet) ──────────────────────
+  // ── STEP 3: Filter by min_rating then return enriched plan ───────────────
+  if (minRating > 0) {
+    for (const stop of plan.stops) {
+      stop.lodging_suggestions    = stop.lodging_suggestions.filter(s => !s.google_verified || (s.google_rating ?? 0) >= minRating);
+      stop.restaurant_suggestions = stop.restaurant_suggestions.filter(s => !s.google_verified || (s.google_rating ?? 0) >= minRating);
+    }
+  }
   res.json(plan);
 }));
 

@@ -53,6 +53,18 @@ export const routes: Routes = [
       ),
   },
   {
+    path: 'would-return',
+    loadComponent: () =>
+      import('./features/lists/would-return.component').then((m) => m.WouldReturnComponent),
+    data: { mode: 'would_return' },
+  },
+  {
+    path: 'avoid-list',
+    loadComponent: () =>
+      import('./features/lists/would-return.component').then((m) => m.WouldReturnComponent),
+    data: { mode: 'avoid' },
+  },
+  {
     path: 'settings',
     loadComponent: () =>
       import('./features/settings/settings.component').then((m) => m.SettingsComponent),

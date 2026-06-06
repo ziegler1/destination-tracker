@@ -119,7 +119,15 @@ type StatusFilter = DestinationStatus | 'all';
                   <div class="card-img-placeholder">📍</div>
                 }
                 <div class="card-body">
-                  <p class="card-name">{{ d.name }}</p>
+                  <p class="card-name">
+                    {{ d.name }}
+                    @if (isInSeason(d)) {
+                      <span style="font-size:11px;font-weight:700;padding:2px 7px;border-radius:10px;
+                                   background:#E8F5E9;color:#2E7D32;margin-left:6px;vertical-align:middle">
+                        ✓ In Season
+                      </span>
+                    }
+                  </p>
                   <p class="card-loc">{{ d.city }}, {{ d.state_province }} · {{ d.country }}</p>
                   <div class="card-meta">
                     <span class="status-badge {{ d.status }}">
@@ -205,5 +213,16 @@ export class DestinationListComponent implements OnInit {
 
   statusLabel(s: DestinationStatus): string {
     return { want_to_visit: 'Want to Visit', planned: 'Planned', visited: 'Visited' }[s];
+  }
+
+  private static readonly MONTHS = [
+    'January','February','March','April','May','June',
+    'July','August','September','October','November','December',
+  ];
+
+  isInSeason(d: Destination): boolean {
+    if (!d.best_months?.length) return false;
+    const now = DestinationListComponent.MONTHS[new Date().getMonth()];
+    return d.best_months.includes(now);
   }
 }

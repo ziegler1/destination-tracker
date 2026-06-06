@@ -11,6 +11,7 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatListModule } from '@angular/material/list';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { DestinationService } from '../../../core/services/destination.service';
 import { WeatherService, weatherEmoji } from '../../../core/services/weather.service';
 import { ClaudeService } from '../../../core/services/claude.service';
@@ -34,7 +35,7 @@ interface WeatherDay {
     RouterLink, DatePipe, DecimalPipe,
     MatCardModule, MatChipsModule, MatIconModule, MatButtonModule,
     MatDividerModule, MatProgressSpinnerModule, MatListModule, MatTooltipModule,
-    MiniMapComponent, PhotoUploaderComponent,
+    MatSnackBarModule, MiniMapComponent, PhotoUploaderComponent,
   ],
   styles: [`
     .back-btn { margin-bottom: 16px; }
@@ -125,6 +126,11 @@ interface WeatherDay {
             }
           </span>
           <span class="spacer"></span>
+          <button mat-raised-button color="primary" (click)="logVisit()" [disabled]="visitLogging()">
+            <mat-icon>add_location_alt</mat-icon>
+            {{ visitLogging() ? 'Logged!' : 'Log a Visit' }}
+            @if ((dest()?.visit_count ?? 0) > 0) { &nbsp;({{ dest()!.visit_count }}x) }
+          </button>
           <button mat-stroked-button [routerLink]="['/destinations', dest()!.id, 'edit']">
             <mat-icon>edit</mat-icon> Edit
           </button>
@@ -309,8 +315,10 @@ export class DestinationDetailComponent implements OnInit {
   private destSvc    = inject(DestinationService);
   private weatherSvc = inject(WeatherService);
   private claudeSvc  = inject(ClaudeService);
+  private snack      = inject(MatSnackBar);
 
   loading        = signal(true);
+  visitLogging   = signal(false);
   weatherLoading = signal(false);
   dest           = signal<Destination | null>(null);
   weatherDays    = signal<WeatherDay[]>([]);
@@ -394,6 +402,20 @@ export class DestinationDetailComponent implements OnInit {
     if (!d || !months?.length) return;
     this.destSvc.update(d.id, { ...d, best_months: months }).subscribe((updated) => {
       this.dest.update((cur) => cur ? { ...cur, best_months: updated.best_months } : cur);
+    });
+  }
+
+  logVisit(): void {
+    const d = this.dest();
+    if (!d) return;
+    this.visitLogging.set(true);
+    this.destSvc.logVisit(d.id).subscribe({
+      next: ({ visit_count }) => {
+        this.dest.update(cur => cur ? { ...cur, visit_count } : cur);
+        this.snack.open('Visit logged!', 'OK', { duration: 2000 });
+        setTimeout(() => this.visitLogging.set(false), 1500);
+      },
+      error: () => { this.snack.open('Failed to log visit', 'Dismiss', { duration: 3000 }); this.visitLogging.set(false); },
     });
   }
 

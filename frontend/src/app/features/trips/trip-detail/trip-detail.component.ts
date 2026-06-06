@@ -539,8 +539,17 @@ function lodgingMarkerEl(): HTMLElement {
                       @if (stop.departure_date) { Depart {{ stop.departure_date | date:'MMM d' }} }
                     </p>
                   }
-                  @if (stop.notes?.includes('Fuel')) {
-                    <p class="stop-row gas-flag"><mat-icon>local_gas_station</mat-icon> Fuel up before this stop</p>
+                  @if (stop.drive_minutes_from_prev && stop.drive_minutes_from_prev > 0) {
+                    <p class="stop-row" style="color:var(--wp-text-hint)">
+                      <mat-icon>directions_car</mat-icon>
+                      {{ driveLbl(stop.drive_minutes_from_prev) }} drive
+                      @if (stop.estimated_fuel_cost) {
+                        &nbsp;·&nbsp;~{{ stop.estimated_fuel_cost | currency:'USD':'symbol':'1.0-0' }} fuel
+                      }
+                    </p>
+                  }
+                  @if (stop.gas_stop_before) {
+                    <p class="stop-row gas-flag"><mat-icon>local_gas_station</mat-icon> Fill up before leaving</p>
                   }
                   @if (stop.lodging) {
                     <p class="stop-row"><mat-icon>hotel</mat-icon>
@@ -977,6 +986,11 @@ export class TripDetailComponent implements OnInit {
 
   stars(rating: number): boolean[] {
     return Array.from({ length: Math.round(rating) }, () => true);
+  }
+
+  driveLbl(mins: number): string {
+    const h = Math.floor(mins / 60), m = mins % 60;
+    return m ? `${h}h ${m}m` : `${h}h`;
   }
 
   statusColor(s: TripStatus): string { return STATUS_COLOR[s] ?? '#666'; }

@@ -405,5 +405,6 @@ export interface WizardGenerateRequest {
     cuisine_preferences?: string[];
     pet_friendly?:        boolean;
     interests?:           string[];
+    min_rating?:          number;
   };
 }

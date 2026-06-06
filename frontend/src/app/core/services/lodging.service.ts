@@ -26,4 +26,8 @@ export class LodgingService {
   delete(id: number) {
     return this.http.delete<void>(`${this.base}/${id}`);
   }
+
+  logVisit(id: number) {
+    return this.http.patch<{ visit_count: number }>(`${this.base}/${id}/visit`, {});
+  }
 }

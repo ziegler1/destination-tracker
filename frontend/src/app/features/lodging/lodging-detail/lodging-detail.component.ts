@@ -9,6 +9,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { LodgingService } from '../../../core/services/lodging.service';
 import { MiniMapComponent } from '../../../shared/mini-map/mini-map.component';
 import { PhotoUploaderComponent } from '../../../shared/photo-uploader/photo-uploader.component';
@@ -25,7 +26,8 @@ const TYPE_LABELS: Record<LodgingType, string> = {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     RouterLink, CurrencyPipe, MatCardModule, MatButtonModule, MatIconModule,
-    MatDividerModule, MatChipsModule, MatProgressSpinnerModule, MiniMapComponent, PhotoUploaderComponent,
+    MatDividerModule, MatChipsModule, MatProgressSpinnerModule, MatSnackBarModule,
+    MiniMapComponent, PhotoUploaderComponent,
   ],
   styles: [`
     .hero { width:100%; max-height:320px; object-fit:cover; border-radius:12px; margin-bottom:20px; }
@@ -70,6 +72,11 @@ const TYPE_LABELS: Record<LodgingType, string> = {
             <p class="subtitle">{{ l.city }}, {{ l.state_province }} · {{ typeLabel(l.lodging_type) }}</p>
           </div>
           <div class="actions">
+            <button mat-raised-button color="primary" (click)="logVisit(l.id)" [disabled]="visitLogging()">
+              <mat-icon>add_location_alt</mat-icon>
+              {{ visitLogging() ? 'Logged!' : 'Log a Stay' }}
+              @if ((l.visit_count ?? 0) > 0) { &nbsp;({{ l.visit_count }}x) }
+            </button>
             <button mat-stroked-button [routerLink]="['/lodging', l.id, 'edit']">
               <mat-icon>edit</mat-icon> Edit
             </button>
@@ -183,10 +190,12 @@ const TYPE_LABELS: Record<LodgingType, string> = {
 export class LodgingDetailComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
-  private svc = inject(LodgingService);
+  private svc   = inject(LodgingService);
+  private snack = inject(MatSnackBar);
 
-  loading = signal(true);
-  lodging = signal<Lodging | null>(null);
+  loading      = signal(true);
+  visitLogging = signal(false);
+  lodging      = signal<Lodging | null>(null);
   protected get l(): Lodging | null { return this.lodging(); }
 
   ngOnInit() {
@@ -210,6 +219,18 @@ export class LodgingDetailComponent implements OnInit {
     const l = this.lodging();
     if (!l) return;
     this.svc.get(l.id).subscribe((updated) => this.lodging.set(updated));
+  }
+
+  logVisit(id: number) {
+    this.visitLogging.set(true);
+    this.svc.logVisit(id).subscribe({
+      next: ({ visit_count }) => {
+        this.lodging.update(l => l ? { ...l, visit_count } : l);
+        this.snack.open('Stay logged!', 'OK', { duration: 2000 });
+        setTimeout(() => this.visitLogging.set(false), 1500);
+      },
+      error: () => { this.snack.open('Failed to log stay', 'Dismiss', { duration: 3000 }); this.visitLogging.set(false); },
+    });
   }
 
   confirmDelete(id: number) {

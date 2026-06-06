@@ -314,6 +314,22 @@ const STOP_TIMINGS = [
                 <mat-slide-toggle formControlName="pet_friendly">Pet friendly</mat-slide-toggle>
               </div>
 
+              <div class="full" style="margin:4px 0">
+                <p style="font-size:13px;font-weight:600;margin-bottom:4px;color:var(--wp-text-secondary)">
+                  Minimum Google rating for suggestions
+                </p>
+                <div class="slider-row">
+                  <span style="font-size:12px;color:var(--wp-text-hint)">Any</span>
+                  <mat-slider style="flex:1" [min]="0" [max]="5" [step]="0.5" discrete>
+                    <input matSliderThumb formControlName="min_rating" />
+                  </mat-slider>
+                  <span style="font-size:12px;color:var(--wp-text-hint)">5.0</span>
+                  <span class="slider-val" style="font-size:16px">
+                    {{ form.value.min_rating === 0 ? 'Any' : form.value.min_rating + '★' }}
+                  </span>
+                </div>
+              </div>
+
             </div>
 
             <p style="font-size:13px;font-weight:600;margin-bottom:8px;color:var(--wp-text-secondary)">Cuisine preferences</p>
@@ -644,6 +660,7 @@ export class TripWizardComponent implements OnInit, OnDestroy {
     stop_timing:         ['flexible'],
     base_nights:         [4],
     include_return:      [true],
+    min_rating:          [0],
   });
 
   ngOnInit() {
@@ -713,6 +730,7 @@ export class TripWizardComponent implements OnInit, OnDestroy {
         cuisine_preferences: this.selectedCuisines().length ? this.selectedCuisines() : undefined,
         interests:           this.selectedInterests().length ? this.selectedInterests() : undefined,
         pet_friendly:        v.pet_friendly ?? false,
+        min_rating:          v.min_rating ?? 0,
       },
     };
 

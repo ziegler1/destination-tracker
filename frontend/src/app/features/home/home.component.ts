@@ -112,7 +112,9 @@ const TRIP_COLORS = ['#00695C', '#1565C0', '#6A1B9A', '#B71C1C', '#E65100', '#2E
     .stat-tile {
       background:var(--wp-surface); border-radius:12px; padding:18px 16px;
       box-shadow:0 1px 4px rgba(0,0,0,.07); text-align:center;
+      cursor:pointer; transition:transform .15s, box-shadow .15s; display:block;
     }
+    .stat-tile:hover { transform:translateY(-2px); box-shadow:0 4px 14px rgba(0,0,0,.12); }
     .stat-emoji { font-size:26px; display:block; margin-bottom:6px; }
     .stat-value { font-size:26px; font-weight:800; color:var(--wp-primary); line-height:1; }
     .stat-label { font-size:12px; color:var(--wp-text-secondary); margin-top:4px; }
@@ -250,26 +252,26 @@ const TRIP_COLORS = ['#00695C', '#1565C0', '#6A1B9A', '#B71C1C', '#E65100', '#2E
         <!-- ════ Quick Stats ════ -->
         @if (stats(); as s) {
           <div class="stats-row">
-            <div class="stat-tile">
+            <a class="stat-tile" [routerLink]="['/destinations']" [queryParams]="{status:'visited'}" style="text-decoration:none;color:inherit">
               <span class="stat-emoji">🗺️</span>
               <div class="stat-value">{{ s.statesVisited }}</div>
               <div class="stat-label">States Visited</div>
-            </div>
-            <div class="stat-tile">
+            </a>
+            <a class="stat-tile" [routerLink]="['/trips']" style="text-decoration:none;color:inherit">
               <span class="stat-emoji">✈️</span>
               <div class="stat-value">{{ s.tripsTotal }}</div>
               <div class="stat-label">Trips Taken</div>
-            </div>
-            <div class="stat-tile">
+            </a>
+            <a class="stat-tile" [routerLink]="['/would-return']" style="text-decoration:none;color:inherit">
               <span class="stat-emoji">🍽️</span>
               <div class="stat-value">{{ s.restaurantsTotal }}</div>
               <div class="stat-label">Restaurants Logged</div>
-            </div>
-            <div class="stat-tile">
+            </a>
+            <a class="stat-tile" [routerLink]="['/trips']" style="text-decoration:none;color:inherit">
               <span class="stat-emoji">🏨</span>
               <div class="stat-value">{{ s.nightsAway }}</div>
               <div class="stat-label">Nights Away</div>
-            </div>
+            </a>
           </div>
         }
 
