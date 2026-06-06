@@ -19,6 +19,7 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { TripWizardService } from '../../../core/services/trip-wizard.service';
+import { SettingsService } from '../../../core/services/settings.service';
 import {
   WizardPlan, WizardGenerateRequest,
   WizardLodgingSuggestion, WizardRestaurantSuggestion, WizardPoiSuggestion,
@@ -152,14 +153,23 @@ const PROGRESS_MSGS = [
                 <input matInput formControlName="name" placeholder="e.g. Nashville Summer Run" />
               </mat-form-field>
 
-              <mat-form-field appearance="outline">
-                <mat-label>Origin city *</mat-label>
-                <input matInput formControlName="origin" placeholder="Columbus, OH" />
-              </mat-form-field>
+              <div>
+                <mat-form-field appearance="outline" style="width:100%">
+                  <mat-label>Starting from *</mat-label>
+                  <input matInput formControlName="origin" placeholder="Address or city" />
+                </mat-form-field>
+                @if (!form.value.origin) {
+                  <button type="button" mat-stroked-button style="margin-top:-8px;margin-bottom:8px;font-size:12px"
+                          (click)="useHome()">
+                    <mat-icon style="font-size:16px;width:16px;height:16px">home</mat-icon>
+                    Use My Home
+                  </button>
+                }
+              </div>
 
               <mat-form-field appearance="outline">
-                <mat-label>Destination city *</mat-label>
-                <input matInput formControlName="destination" placeholder="Nashville, TN" />
+                <mat-label>Destination *</mat-label>
+                <input matInput formControlName="destination" placeholder="Nashville, TN or full address" />
               </mat-form-field>
 
               <mat-form-field appearance="outline">
@@ -434,11 +444,12 @@ const PROGRESS_MSGS = [
     </div>
   `,
 })
-export class TripWizardComponent implements OnDestroy {
-  private wizardSvc = inject(TripWizardService);
-  private snack     = inject(MatSnackBar);
-  private router    = inject(Router);
-  private fb        = inject(FormBuilder);
+export class TripWizardComponent implements OnInit, OnDestroy {
+  private wizardSvc  = inject(TripWizardService);
+  private snack      = inject(MatSnackBar);
+  private router     = inject(Router);
+  private fb         = inject(FormBuilder);
+  private settingsSvc = inject(SettingsService);
 
   // ── Step state ──────────────────────────────────────────────────────
   step       = signal(1);
@@ -471,6 +482,19 @@ export class TripWizardComponent implements OnDestroy {
     lodging_type: [''],
     pet_friendly: [false],
   });
+
+  ngOnInit() {
+    this.settingsSvc.load().subscribe(s => {
+      if (s.home_address) {
+        this.form.patchValue({ origin: s.home_address });
+      }
+    });
+  }
+
+  useHome() {
+    const s = this.settingsSvc.settings();
+    this.form.patchValue({ origin: s.home_address || '8404 Union Drive, Galloway, Ohio 43119' });
+  }
 
   // ── Progress ticker ─────────────────────────────────────────────────
   private progressInterval?: ReturnType<typeof setInterval>;
