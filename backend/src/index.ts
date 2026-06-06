@@ -20,6 +20,7 @@ import geocodeRouter  from './routes/geocode';
 import wizardRouter   from './routes/tripWizard';
 import searchRouter   from './routes/search';
 import settingsRouter from './routes/settings';
+import specialInterestsRouter from './routes/specialInterests';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -53,7 +54,8 @@ app.use('/api/stats',         statsRouter);
 app.use('/api/geocode',       geocodeRouter);
 app.use('/api/trips/wizard',  wizardRouter);
 app.use('/api/search',        searchRouter);
-app.use('/api/settings',      settingsRouter);
+app.use('/api/settings',          settingsRouter);
+app.use('/api/special-interests', specialInterestsRouter);
 
 app.use(errorHandler);
 

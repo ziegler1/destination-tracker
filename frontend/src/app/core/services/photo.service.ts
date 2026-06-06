@@ -6,7 +6,7 @@ import { catchError } from 'rxjs/operators';
 import { DestinationPhoto, RestaurantPhoto, LodgingPhoto } from '../../types/schema.types';
 
 export type EntityPhoto = DestinationPhoto | RestaurantPhoto | LodgingPhoto;
-export type PhotoEntityType = 'destinations' | 'restaurants' | 'lodging';
+export type PhotoEntityType = 'destinations' | 'restaurants' | 'lodging' | 'special-interests';
 
 @Injectable({ providedIn: 'root' })
 export class PhotoService {

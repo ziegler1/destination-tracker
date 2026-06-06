@@ -257,6 +257,47 @@ export interface WeatherResponse {
   };
 }
 
+// ─── Special Interest Places ──────────────────────────────────────────────────
+
+export type SpecialInterestCategory =
+  | 'winery_brewery' | 'museum' | 'historic_site' | 'state_park'
+  | 'national_park' | 'live_music' | 'scenic' | 'roadside_attraction'
+  | 'shopping' | 'other';
+
+export interface SpecialInterestPhoto {
+  id: number;
+  special_interest_id: number;
+  r2_key: string;
+  url: string;
+  caption?: string;
+  is_primary: boolean;
+  uploaded_at: string;
+}
+
+export interface SpecialInterestPlace {
+  id: number;
+  name: string;
+  city: string;
+  state_province: string;
+  country: string;
+  category?: SpecialInterestCategory;
+  address?: string;
+  latitude?: number;
+  longitude?: number;
+  website?: string;
+  phone?: string;
+  rating?: number;
+  would_return?: boolean;
+  highlights?: string;
+  notes?: string;
+  image_url?: string;
+  suggested_by_ai?: boolean;
+  google_place_id?: string;
+  created_at: string;
+  updated_at: string;
+  photos?: SpecialInterestPhoto[];
+}
+
 // ─── Trip Wizard ──────────────────────────────────────────────────────────────
 
 export interface WizardPlaceSuggestion {

@@ -17,6 +17,7 @@ import { QuickAddRestaurantComponent } from '../../shared/components/quick-add/q
 import { QuickAddLodgingComponent } from '../../shared/components/quick-add/quick-add-lodging.component';
 import { QuickAddDestinationComponent } from '../../shared/components/quick-add/quick-add-destination.component';
 import { QuickAddFuelComponent } from '../../shared/components/quick-add/quick-add-fuel.component';
+import { QuickAddSpecialInterestComponent } from '../../shared/components/quick-add/quick-add-special-interest.component';
 import { GlobalSearchComponent } from '../../shared/components/global-search/global-search.component';
 
 interface NavItem { icon: string; label: string; path: string; exact?: boolean; }
@@ -30,16 +31,18 @@ const PRIMARY_NAV: NavItem[] = [
 ];
 
 const SECONDARY_NAV: NavItem[] = [
-  { icon: '📍',  label: 'Destinations',  path: '/destinations' },
-  { icon: '🍽️', label: 'Restaurants',   path: '/restaurants' },
-  { icon: '🏨',  label: 'Lodging',       path: '/lodging' },
+  { icon: '📍',  label: 'Destinations',        path: '/destinations' },
+  { icon: '🍽️', label: 'Restaurants',          path: '/restaurants' },
+  { icon: '🏨',  label: 'Lodging',             path: '/lodging' },
+  { icon: '🌟',  label: 'Special Interests',   path: '/special-interests' },
 ];
 
 const QUICK_ADD_ITEMS: QuickAddItem[] = [
-  { icon: '📍', label: 'Destination', type: 'destination' },
-  { icon: '🍽️', label: 'Restaurant', type: 'restaurant' },
-  { icon: '🏨', label: 'Lodging',     type: 'lodging' },
-  { icon: '⛽', label: 'Fuel Stop',   type: 'fuel' },
+  { icon: '📍', label: 'Destination',     type: 'destination' },
+  { icon: '🍽️', label: 'Restaurant',     type: 'restaurant' },
+  { icon: '🏨', label: 'Lodging',         type: 'lodging' },
+  { icon: '🌟', label: 'Special Interest', type: 'special-interest' },
+  { icon: '⛽', label: 'Fuel Stop',        type: 'fuel' },
 ];
 
 @Component({
@@ -382,6 +385,9 @@ const QUICK_ADD_ITEMS: QuickAddItem[] = [
           <a class="more-item" routerLink="/lodging">
             <span style="font-size:24px">🏨</span>Lodging
           </a>
+          <a class="more-item" routerLink="/special-interests">
+            <span style="font-size:24px">🌟</span>Interests
+          </a>
           <a class="more-item" routerLink="/settings">
             <span style="font-size:24px">⚙️</span>Settings
           </a>
@@ -439,10 +445,11 @@ export class ShellComponent implements OnInit {
     this.qaOpen.set(false);
     this.moreOpen.set(false);
     const map: Record<string, unknown> = {
-      restaurant:  QuickAddRestaurantComponent,
-      lodging:     QuickAddLodgingComponent,
-      destination: QuickAddDestinationComponent,
-      fuel:        QuickAddFuelComponent,
+      restaurant:       QuickAddRestaurantComponent,
+      lodging:          QuickAddLodgingComponent,
+      destination:      QuickAddDestinationComponent,
+      fuel:             QuickAddFuelComponent,
+      'special-interest': QuickAddSpecialInterestComponent,
     };
     const component = map[type] as Parameters<MatBottomSheet['open']>[0];
     if (component) this.bottomSheet.open(component);

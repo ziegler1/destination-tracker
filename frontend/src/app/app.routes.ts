@@ -46,6 +46,13 @@ export const routes: Routes = [
       import('./features/stats/stats.component').then((m) => m.StatsComponent),
   },
   {
+    path: 'special-interests',
+    loadChildren: () =>
+      import('./features/special-interests/special-interests.routes').then(
+        (m) => m.SPECIAL_INTEREST_ROUTES,
+      ),
+  },
+  {
     path: 'settings',
     loadComponent: () =>
       import('./features/settings/settings.component').then((m) => m.SettingsComponent),
