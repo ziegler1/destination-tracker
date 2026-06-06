@@ -49,21 +49,22 @@ export class MapsService {
     });
   }
 
-  /** Fetch full Place Details for a place_id. */
+  /** Fetch full Place details using the new Places API (fetchFields). */
   getPlaceDetails(
     placeId: string,
-    fields = ['name', 'formatted_address', 'geometry', 'formatted_phone_number', 'website', 'rating', 'price_level', 'photos'],
-  ): Observable<google.maps.places.PlaceResult | null> {
+    fields: string[] = ['id', 'displayName', 'formattedAddress', 'location',
+                        'nationalPhoneNumber', 'websiteURI', 'priceLevel'],
+  ): Observable<google.maps.places.Place | null> {
     return new Observable(obs => {
-      if (!this.ready()) { obs.next(null); obs.complete(); return; }
-      const el = document.createElement('div');
-      new google.maps.places.PlacesService(el).getDetails(
-        { placeId, fields },
-        (result, status) => {
-          obs.next(status === google.maps.places.PlacesServiceStatus.OK ? result : null);
-          obs.complete();
-        },
-      );
+      google.maps.importLibrary('places').then(async (lib: any) => {
+        const place: google.maps.places.Place = new lib.Place({ id: placeId });
+        await place.fetchFields({ fields });
+        obs.next(place);
+        obs.complete();
+      }).catch(() => {
+        obs.next(null);
+        obs.complete();
+      });
     });
   }
 

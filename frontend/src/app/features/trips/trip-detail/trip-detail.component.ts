@@ -4,7 +4,7 @@ import {
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { DatePipe, CurrencyPipe, TitleCasePipe, DecimalPipe } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
-import { GoogleMap, MapMarker, MapDirectionsRenderer } from '@angular/google-maps';
+import { GoogleMap, MapAdvancedMarker, MapDirectionsRenderer } from '@angular/google-maps';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -37,20 +37,22 @@ const STOP_STATUS_COLOR: Record<string, string> = {
   upcoming: '#9e9e9e', current: '#1565c0', completed: '#2e7d32',
 };
 
-function stopIconSvg(order: number, status: string): string {
+function stopMarkerEl(order: number, status: string): HTMLElement {
   const color = STOP_STATUS_COLOR[status] ?? '#9e9e9e';
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28">
+  const el = document.createElement('div');
+  el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28">
     <circle cx="14" cy="14" r="12" fill="${color}" stroke="white" stroke-width="2"/>
     <text x="14" y="19" font-family="Arial" font-size="11" font-weight="bold"
           fill="white" text-anchor="middle">${order}</text></svg>`;
-  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+  return el.firstElementChild as HTMLElement;
 }
 
-function lodgingIconSvg(): string {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24">
+function lodgingMarkerEl(): HTMLElement {
+  const el = document.createElement('div');
+  el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24">
     <rect x="2" y="2" width="20" height="20" rx="4" fill="#6a1b9a" stroke="white" stroke-width="2"/>
     <text x="12" y="17" font-size="13" text-anchor="middle" fill="white">🏨</text></svg>`;
-  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+  return el.firstElementChild as HTMLElement;
 }
 
 @Component({
@@ -59,7 +61,7 @@ function lodgingIconSvg(): string {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     RouterLink, ReactiveFormsModule, DatePipe, CurrencyPipe, TitleCasePipe, DecimalPipe,
-    GoogleMap, MapMarker, MapDirectionsRenderer,
+    GoogleMap, MapAdvancedMarker, MapDirectionsRenderer,
     MatCardModule, MatButtonModule, MatIconModule, MatTabsModule,
     MatProgressSpinnerModule, MatSnackBarModule, MatDividerModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatDatepickerModule,
@@ -341,11 +343,11 @@ function lodgingIconSvg(): string {
             }
             <!-- Numbered stop markers -->
             @for (m of stopMarkers(); track m.stopId) {
-              <map-marker [position]="m.position" [options]="m.options" [title]="m.title" />
+              <map-advanced-marker [position]="m.position" [content]="m.content" [title]="m.title" [zIndex]="m.zIndex" />
             }
             <!-- Lodging markers -->
             @for (m of lodgingMarkers(); track m.title) {
-              <map-marker [position]="m.position" [options]="m.options" [title]="m.title" />
+              <map-advanced-marker [position]="m.position" [content]="m.content" [title]="m.title" [zIndex]="m.zIndex" />
             }
           </google-map>
           <button mat-mini-fab class="map-recenter" (click)="recenterMap()" title="Recenter">
@@ -403,13 +405,11 @@ export class TripDetailComponent implements OnInit {
       .map(s => ({ stop: s, pos: this.stopCoords(s) }))
       .filter(x => x.pos !== null)
       .map(x => ({
-        stopId: x.stop.id,
+        stopId:   x.stop.id,
         position: x.pos!,
-        title: x.stop.destination?.name ?? `Stop ${x.stop.stop_order}`,
-        options: {
-          icon: { url: stopIconSvg(x.stop.stop_order, x.stop.status), scaledSize: new google.maps.Size(28, 28) },
-          zIndex: 10,
-        } as google.maps.MarkerOptions,
+        title:    x.stop.destination?.name ?? `Stop ${x.stop.stop_order}`,
+        content:  stopMarkerEl(x.stop.stop_order, x.stop.status),
+        zIndex:   10,
       })),
   );
 
@@ -417,12 +417,10 @@ export class TripDetailComponent implements OnInit {
     this.sortedStops()
       .filter(s => s.lodging?.latitude && s.lodging?.longitude)
       .map(s => ({
-        title: s.lodging!.name,
+        title:    s.lodging!.name,
         position: { lat: Number(s.lodging!.latitude), lng: Number(s.lodging!.longitude) },
-        options: {
-          icon: { url: lodgingIconSvg(), scaledSize: new google.maps.Size(24, 24) },
-          zIndex: 5,
-        } as google.maps.MarkerOptions,
+        content:  lodgingMarkerEl(),
+        zIndex:   5,
       })),
   );
 
@@ -438,6 +436,7 @@ export class TripDetailComponent implements OnInit {
 
   readonly STOP_STATUS_COLOR = STOP_STATUS_COLOR;
   readonly mapOptions: google.maps.MapOptions = {
+    mapId: 'DEMO_MAP_ID',
     mapTypeControl: false, streetViewControl: false, fullscreenControl: false,
   };
 

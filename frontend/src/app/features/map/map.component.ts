@@ -1,9 +1,12 @@
 import {
-  Component, OnInit, ChangeDetectionStrategy, inject, signal, computed,
+  Component, OnInit, ChangeDetectionStrategy, ViewChild,
+  inject, signal, computed,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { GoogleMap, MapMarker, MapInfoWindow, MapDirectionsRenderer } from '@angular/google-maps';
+import {
+  GoogleMap, MapAdvancedMarker, MapInfoWindow, MapDirectionsRenderer,
+} from '@angular/google-maps';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -23,21 +26,23 @@ const STATUS_COLORS: Record<DestinationStatus, string> = {
   visited:       '#2e7d32',
 };
 
-function destIconSvg(status: DestinationStatus): string {
-  const c = STATUS_COLORS[status];
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18">
+function destMarkerEl(status: DestinationStatus): HTMLElement {
+  const el = document.createElement('div');
+  const c  = STATUS_COLORS[status];
+  el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18">
     <circle cx="9" cy="9" r="7" fill="${c}" stroke="white" stroke-width="2"/>
   </svg>`;
-  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+  return el.firstElementChild as HTMLElement;
 }
 
-function stopIconSvg(n: number, color = '#00695C'): string {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28">
+function stopMarkerEl(n: number, color = '#00695C'): HTMLElement {
+  const el = document.createElement('div');
+  el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28">
     <circle cx="14" cy="14" r="12" fill="${color}" stroke="white" stroke-width="2"/>
     <text x="14" y="19" font-family="Arial" font-size="11" font-weight="bold"
           fill="white" text-anchor="middle">${n}</text>
   </svg>`;
-  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+  return el.firstElementChild as HTMLElement;
 }
 
 const TRIP_COLORS = ['#1565c0','#c62828','#6a1b9a','#e65100','#1b5e20','#0277bd','#880e4f','#33691e'];
@@ -47,7 +52,7 @@ const TRIP_COLORS = ['#1565c0','#c62828','#6a1b9a','#e65100','#1b5e20','#0277bd'
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    FormsModule, GoogleMap, MapMarker, MapInfoWindow, MapDirectionsRenderer,
+    FormsModule, GoogleMap, MapAdvancedMarker, MapInfoWindow, MapDirectionsRenderer,
     MatCardModule, MatButtonModule, MatIconModule,
     MatCheckboxModule, MatSelectModule, MatProgressSpinnerModule, MatDividerModule,
   ],
@@ -87,24 +92,26 @@ const TRIP_COLORS = ['#1565c0','#c62828','#6a1b9a','#e65100','#1b5e20','#0277bd'
 
       <!-- Destination markers -->
       @if (showDestinations) {
-        @for (d of validDests(); track d.id) {
-          <map-marker
-            [position]="{ lat: +d.latitude!, lng: +d.longitude! }"
-            [options]="destMarkerOptions(d)"
+        @for (d of destMarkers(); track d.id) {
+          <map-advanced-marker
+            [position]="d.position"
+            [content]="d.content"
             [title]="d.name"
-            (mapClick)="openDestInfo(d, destMarker)"
-            #destMarker="mapMarker" />
+            (mapClick)="openDestInfo(d.dest, advMarker)"
+            #advMarker="mapAdvancedMarker" />
         }
       }
 
-      <!-- Trip route stops -->
+      <!-- Trip route polyline -->
       @if (directionsResult()) {
         <map-directions-renderer
           [directions]="directionsResult()!"
           [options]="{ suppressMarkers: true, polylineOptions: { strokeColor: '#00695C', strokeOpacity: 0.8, strokeWeight: 4 } }" />
       }
+
+      <!-- Numbered stop markers -->
       @for (s of tripStopMarkers(); track s.label) {
-        <map-marker [position]="s.position" [options]="s.options" [title]="s.label" />
+        <map-advanced-marker [position]="s.position" [content]="s.content" [title]="s.label" />
       }
 
       <map-info-window #infoWindow>
@@ -112,7 +119,9 @@ const TRIP_COLORS = ['#1565c0','#c62828','#6a1b9a','#e65100','#1b5e20','#0277bd'
           <div style="min-width:160px;font-family:Roboto,sans-serif;padding:4px">
             <strong style="font-size:14px">{{ selectedDest()!.name }}</strong><br/>
             <small style="color:#666">{{ selectedDest()!.city }}, {{ selectedDest()!.state_province }}</small><br/>
-            <span style="font-size:12px;text-transform:capitalize;color:#888">{{ selectedDest()!.status.replace('_',' ') }}</span><br/>
+            <span style="font-size:12px;text-transform:capitalize;color:#888">
+              {{ selectedDest()!.status.replace('_',' ') }}
+            </span><br/>
             <button (click)="router.navigate(['/destinations', selectedDest()!.id])"
               style="margin-top:8px;padding:4px 12px;background:#00695C;color:white;border:none;
                      border-radius:4px;cursor:pointer;font-size:12px">
@@ -151,10 +160,12 @@ const TRIP_COLORS = ['#1565c0','#c62828','#6a1b9a','#e65100','#1b5e20','#0277bd'
   `,
 })
 export class MapComponent implements OnInit {
-  protected router  = inject(Router);
-  private destSvc   = inject(DestinationService);
-  private tripSvc   = inject(TripService);
-  private mapsSvc   = inject(MapsService);
+  protected router = inject(Router);
+  private destSvc  = inject(DestinationService);
+  private tripSvc  = inject(TripService);
+  private mapsSvc  = inject(MapsService);
+
+  @ViewChild(MapInfoWindow) infoWindow!: MapInfoWindow;
 
   loading      = signal(true);
   destinations = signal<Destination[]>([]);
@@ -165,14 +176,25 @@ export class MapComponent implements OnInit {
   selectedTripId: number | null = null;
 
   directionsResult = signal<google.maps.DirectionsResult | null>(null);
-  tripStopMarkers  = signal<Array<{ position: google.maps.LatLngLiteral; options: google.maps.MarkerOptions; label: string }>>([]);
+  tripStopMarkers  = signal<Array<{ position: google.maps.LatLngLiteral; content: HTMLElement; label: string }>>([]);
 
   validDests = computed(() =>
     this.destinations().filter(d => d.latitude != null && d.longitude != null),
   );
 
+  destMarkers = computed(() =>
+    this.validDests().map(d => ({
+      id:       d.id,
+      name:     d.name,
+      position: { lat: Number(d.latitude), lng: Number(d.longitude) } as google.maps.LatLngLiteral,
+      content:  destMarkerEl(d.status),
+      dest:     d,
+    })),
+  );
+
   readonly mapCenter: google.maps.LatLngLiteral = { lat: 39.5, lng: -98.35 };
   readonly mapOptions: google.maps.MapOptions = {
+    mapId: 'DEMO_MAP_ID',
     mapTypeControl: false,
     streetViewControl: false,
     fullscreenControl: false,
@@ -190,15 +212,9 @@ export class MapComponent implements OnInit {
     });
   }
 
-  destMarkerOptions(d: Destination): google.maps.MarkerOptions {
-    return {
-      icon: { url: destIconSvg(d.status), scaledSize: new google.maps.Size(18, 18) },
-      title: d.name,
-    };
-  }
-
-  openDestInfo(d: Destination, marker: MapMarker & { _marker?: google.maps.Marker }) {
+  openDestInfo(d: Destination, marker: MapAdvancedMarker) {
     this.selectedDest.set(d);
+    this.infoWindow.open(marker);
   }
 
   onTripSelect(tripId: number | null) {
@@ -222,11 +238,10 @@ export class MapComponent implements OnInit {
         this.directionsResult.set(result);
       });
 
-      // Numbered stop markers
       this.tripStopMarkers.set(
-        stops.map((s, i) => ({
+        stops.map(s => ({
           position: { lat: Number(s.destination!.latitude), lng: Number(s.destination!.longitude) },
-          options:  { icon: { url: stopIconSvg(s.stop_order), scaledSize: new google.maps.Size(28, 28) }, zIndex: 10 },
+          content:  stopMarkerEl(s.stop_order),
           label:    s.destination!.name ?? `Stop ${s.stop_order}`,
         })),
       );

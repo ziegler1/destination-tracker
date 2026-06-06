@@ -2,123 +2,145 @@ import {
   Component, AfterViewInit, OnDestroy, ViewChild, ElementRef,
   ChangeDetectionStrategy, input, output,
 } from '@angular/core';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatIconModule } from '@angular/material/icon';
 
 export interface PlaceSelectedEvent {
-  name:             string;
-  formatted_address:string;
-  lat:              number;
-  lng:              number;
-  place_id:         string;
-  city:             string;
-  state_province:   string;
-  country:          'USA' | 'Canada';
-  phone?:           string;
-  website?:         string;
-  price_level?:     number;
+  name:              string;
+  formatted_address: string;
+  lat:               number;
+  lng:               number;
+  place_id:          string;
+  city:              string;
+  state_province:    string;
+  country:           'USA' | 'Canada';
+  phone?:            string;
+  website?:          string;
+  price_level?:      number;
 }
 
-function extractComponent(
-  components: google.maps.GeocoderAddressComponent[],
-  type: string,
-  nameType: 'long_name' | 'short_name' = 'long_name',
-): string {
-  return components.find(c => c.types.includes(type))?.[nameType] ?? '';
-}
+const PRICE_MAP: Record<string, number> = {
+  FREE:          0,
+  INEXPENSIVE:   1,
+  MODERATE:      2,
+  EXPENSIVE:     3,
+  VERY_EXPENSIVE: 4,
+};
 
 @Component({
   selector: 'app-places-autocomplete',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MatFormFieldModule, MatInputModule, MatIconModule],
+  styles: [`
+    :host { display: block; width: 100%; margin-bottom: 8px; }
+    .hint { font-size: 12px; color: var(--wp-text-hint); margin-top: 2px; }
+  `],
   template: `
-    <mat-form-field appearance="outline" style="width:100%">
-      <mat-label>{{ placeholder() }}</mat-label>
-      <mat-icon matPrefix>search</mat-icon>
-      <input matInput #input [placeholder]="placeholder()" autocomplete="off" />
-      @if (hint()) {
-        <mat-hint>{{ hint() }}</mat-hint>
-      }
-    </mat-form-field>
+    <div #container style="width:100%"></div>
+    @if (hint()) {
+      <div class="hint">{{ hint() }}</div>
+    }
   `,
 })
 export class PlacesAutocompleteComponent implements AfterViewInit, OnDestroy {
-  placeholder = input('Search location…');
-  hint        = input('');
-  /** Google Places types — e.g. ['geocode'], ['establishment'], ['(cities)'] */
-  types       = input<string[]>(['geocode']);
-  /** ISO 3166-1 alpha-2 country codes */
-  countries   = input<string[]>(['us', 'ca']);
-  /** Pre-populate the input (display-only) */
+  placeholder  = input('Search location…');
+  hint         = input('');
+  types        = input<string[]>(['geocode']);
+  countries    = input<string[]>(['us', 'ca']);
   initialValue = input('');
 
   placeSelected = output<PlaceSelectedEvent>();
   cleared       = output<void>();
 
-  @ViewChild('input') inputRef!: ElementRef<HTMLInputElement>;
+  @ViewChild('container') containerRef!: ElementRef<HTMLDivElement>;
 
-  private autocomplete?: google.maps.places.Autocomplete;
-  private listener?: google.maps.MapsEventListener;
-  private retryTimer?: ReturnType<typeof setTimeout>;
+  private element?: google.maps.places.PlaceAutocompleteElement;
+  private abortCtrl = new AbortController();
 
   ngAfterViewInit() {
-    this.tryInit();
+    this.init();
+  }
+
+  private async init() {
+    await this.waitForMaps();
+    const lib = await google.maps.importLibrary('places') as google.maps.PlacesLibrary;
+    const { PlaceAutocompleteElement } = lib;
+
+    this.element = new PlaceAutocompleteElement({
+      types:                this.types(),
+      componentRestrictions: { country: this.countries() },
+    } as google.maps.places.PlaceAutocompleteElementOptions);
+
+    const el = this.element as unknown as HTMLElement;
+    el.setAttribute('placeholder', this.placeholder());
+    el.style.width = '100%';
+
+    this.containerRef.nativeElement.appendChild(el);
+
     if (this.initialValue()) {
-      this.inputRef.nativeElement.value = this.initialValue();
+      (this.element as unknown as { value: string }).value = this.initialValue();
     }
+
+    (this.element as unknown as EventTarget).addEventListener(
+      'gmp-select',
+      async (raw: Event) => {
+        const prediction = (raw as CustomEvent & { placePrediction: google.maps.places.PlacePrediction })
+          .placePrediction;
+        if (!prediction) return;
+
+        const place = prediction.toPlace();
+        await place.fetchFields({
+          fields: ['id', 'displayName', 'formattedAddress', 'location',
+                   'addressComponents', 'nationalPhoneNumber', 'websiteURI', 'priceLevel'],
+        });
+
+        if (!place.location) return;
+
+        const comps: google.maps.places.AddressComponent[] = place.addressComponents ?? [];
+        const city =
+          comps.find(c => c.types.includes('locality'))?.longText ??
+          comps.find(c => c.types.includes('administrative_area_level_3'))?.longText ??
+          comps.find(c => c.types.includes('sublocality_level_1'))?.longText ??
+          '';
+        const stateShort  = comps.find(c => c.types.includes('administrative_area_level_1'))?.shortText ?? '';
+        const countryCode = comps.find(c => c.types.includes('country'))?.shortText ?? '';
+
+        const priceLevelKey = place.priceLevel
+          ? String(place.priceLevel).replace('PRICE_LEVEL_', '')
+          : undefined;
+
+        this.placeSelected.emit({
+          name:              place.displayName  ?? '',
+          formatted_address: place.formattedAddress ?? '',
+          lat:               place.location.lat(),
+          lng:               place.location.lng(),
+          place_id:          place.id ?? '',
+          city,
+          state_province:    stateShort,
+          country:           countryCode === 'CA' ? 'Canada' : 'USA',
+          phone:             place.nationalPhoneNumber  ?? undefined,
+          website:           place.websiteURI           ?? undefined,
+          price_level:       priceLevelKey !== undefined ? PRICE_MAP[priceLevelKey] : undefined,
+        });
+      },
+      { signal: this.abortCtrl.signal },
+    );
+  }
+
+  private waitForMaps(): Promise<void> {
+    return new Promise(resolve => {
+      if (typeof google !== 'undefined' && google.maps) { resolve(); return; }
+      const t = setInterval(() => {
+        if (typeof google !== 'undefined' && google.maps) { clearInterval(t); resolve(); }
+      }, 100);
+    });
   }
 
   ngOnDestroy() {
-    this.listener?.remove();
-    if (this.retryTimer) clearTimeout(this.retryTimer);
+    this.abortCtrl.abort();
+    (this.element as unknown as HTMLElement | undefined)?.remove();
   }
 
-  private tryInit() {
-    if (typeof google === 'undefined' || !google.maps?.places?.Autocomplete) {
-      this.retryTimer = setTimeout(() => this.tryInit(), 150);
-      return;
-    }
-    this.autocomplete = new google.maps.places.Autocomplete(this.inputRef.nativeElement, {
-      types:                this.types(),
-      componentRestrictions: { country: this.countries() },
-      fields: ['address_components', 'formatted_address', 'geometry', 'name',
-               'place_id', 'formatted_phone_number', 'website', 'price_level'],
-    });
-
-    this.listener = this.autocomplete.addListener('place_changed', () => this.onPlaceChanged());
-  }
-
-  private onPlaceChanged() {
-    const place = this.autocomplete!.getPlace();
-    if (!place.geometry?.location) return;
-
-    const comps = place.address_components ?? [];
-    const city = extractComponent(comps, 'locality')
-      || extractComponent(comps, 'administrative_area_level_3')
-      || extractComponent(comps, 'sublocality_level_1');
-    const stateShort  = extractComponent(comps, 'administrative_area_level_1', 'short_name');
-    const countryCode = extractComponent(comps, 'country', 'short_name');
-
-    this.placeSelected.emit({
-      name:              place.name ?? '',
-      formatted_address: place.formatted_address ?? '',
-      lat:               place.geometry.location.lat(),
-      lng:               place.geometry.location.lng(),
-      place_id:          place.place_id ?? '',
-      city,
-      state_province:    stateShort,
-      country:           countryCode === 'CA' ? 'Canada' : 'USA',
-      phone:             place.formatted_phone_number,
-      website:           place.website,
-      price_level:       place.price_level,
-    });
-  }
-
-  /** Programmatically clear the input. */
   clear() {
-    if (this.inputRef) this.inputRef.nativeElement.value = '';
+    if (this.element) (this.element as unknown as { value: string }).value = '';
     this.cleared.emit();
   }
 }

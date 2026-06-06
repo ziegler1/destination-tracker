@@ -1,15 +1,11 @@
 import { Component, ChangeDetectionStrategy, input } from '@angular/core';
-import { GoogleMap, MapMarker } from '@angular/google-maps';
+import { GoogleMap, MapAdvancedMarker } from '@angular/google-maps';
 
-/**
- * Non-interactive location preview using Google Maps.
- * Replaces the previous Leaflet implementation.
- */
 @Component({
   selector: 'app-mini-map',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [GoogleMap, MapMarker],
+  imports: [GoogleMap, MapAdvancedMarker],
   template: `
     <div [style.height]="height()" style="width:100%;border-radius:8px;overflow:hidden">
       <google-map
@@ -18,7 +14,7 @@ import { GoogleMap, MapMarker } from '@angular/google-maps';
         [center]="center()"
         [zoom]="14"
         [options]="mapOptions">
-        <map-marker [position]="center()" [title]="label()" />
+        <map-advanced-marker [position]="center()" [title]="label()" />
       </google-map>
     </div>
   `,
@@ -32,6 +28,7 @@ export class MiniMapComponent {
   center = () => ({ lat: Number(this.lat()), lng: Number(this.lon()) });
 
   readonly mapOptions: google.maps.MapOptions = {
+    mapId: 'DEMO_MAP_ID',
     zoomControl: false,
     scrollwheel: false,
     disableDoubleClickZoom: true,
