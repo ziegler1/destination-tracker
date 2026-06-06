@@ -70,19 +70,29 @@ router.put('/:id', asyncHandler(async (req, res) => {
   const {
     name, city, state_province, country, region, description,
     latitude, longitude, status, best_months, visited_at,
-    rating, notes, image_url,
+    rating, notes, image_url, travel_tips,
   } = req.body;
   const { rows } = await pool.query(`
     UPDATE destinations SET
       name=$1, city=$2, state_province=$3, country=$4, region=$5,
       description=$6, latitude=$7, longitude=$8, status=$9,
       best_months=$10, visited_at=$11, rating=$12, notes=$13, image_url=$14,
-      updated_at=NOW()
-    WHERE id=$15
+      travel_tips=$15, updated_at=NOW()
+    WHERE id=$16
     RETURNING *
   `, [name, city, state_province, country, region, description,
       latitude, longitude, status, best_months ?? null, visited_at,
-      rating, notes, image_url, req.params.id]);
+      rating, notes, image_url, travel_tips ?? null, req.params.id]);
+  if (!rows[0]) return void res.status(404).json({ error: 'Destination not found' });
+  res.json(rows[0]);
+}));
+
+// PATCH /api/destinations/:id/visit
+router.patch('/:id/visit', asyncHandler(async (req, res) => {
+  const { rows } = await pool.query(
+    'UPDATE destinations SET visit_count = visit_count + 1, updated_at=NOW() WHERE id=$1 RETURNING *',
+    [req.params.id],
+  );
   if (!rows[0]) return void res.status(404).json({ error: 'Destination not found' });
   res.json(rows[0]);
 }));

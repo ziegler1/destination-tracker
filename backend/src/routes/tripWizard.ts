@@ -481,8 +481,9 @@ router.post('/confirm', asyncHandler(async (req, res) => {
       const { rows: [savedStop] } = await client.query<{ id: number }>(
         `INSERT INTO trip_stops
            (trip_id, destination_id, stop_order, arrival_date, departure_date,
-            status, lodging_id, notes)
-         VALUES ($1,$2,$3,$4,$5,'upcoming',$6,$7)
+            status, lodging_id, notes,
+            drive_minutes_from_prev, gas_stop_before, estimated_fuel_cost)
+         VALUES ($1,$2,$3,$4,$5,'upcoming',$6,$7,$8,$9,$10)
          RETURNING id`,
         [
           tripId,
@@ -491,7 +492,10 @@ router.post('/confirm', asyncHandler(async (req, res) => {
           stop.arrive_date,
           stop.depart_date,
           lodgingId,
-          stop.gas_stop_before ? '⛽ Gas stop recommended before this stop' : null,
+          null,
+          stop.drive_minutes_from_prev ?? null,
+          stop.gas_stop_before ?? false,
+          stop.estimated_fuel_cost ?? null,
         ],
       );
       savedStopIds.push(savedStop.id);

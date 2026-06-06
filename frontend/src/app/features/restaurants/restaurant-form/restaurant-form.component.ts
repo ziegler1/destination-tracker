@@ -127,6 +127,12 @@ const CUISINES = [
                 <input matInput formControlName="website" />
               </mat-form-field>
 
+              <mat-form-field appearance="outline" class="full">
+                <mat-label>Menu URL</mat-label>
+                <input matInput formControlName="menu_url" placeholder="https://…" />
+                <mat-hint>Link to their online menu</mat-hint>
+              </mat-form-field>
+
               <!-- Rating -->
               <div class="full">
                 <div style="font-size:13px;color:var(--wp-text-secondary);margin-bottom:4px">Rating</div>
@@ -218,6 +224,7 @@ export class RestaurantFormComponent implements OnInit {
     phone:         [''],
     pet_friendly:  [false],
     image_url:     [''],
+    menu_url:      [''],
   });
 
   ngOnInit() {

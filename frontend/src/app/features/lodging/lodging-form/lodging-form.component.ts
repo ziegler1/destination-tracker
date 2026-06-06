@@ -132,6 +132,12 @@ const AMENITY_SUGGESTIONS = [
                 <input matInput formControlName="website" />
               </mat-form-field>
 
+              <mat-form-field appearance="outline" class="full">
+                <mat-label>Booking URL</mat-label>
+                <input matInput formControlName="booking_url" placeholder="https://…" />
+                <mat-hint>Reservation link (Hotels.com, Airbnb, etc.)</mat-hint>
+              </mat-form-field>
+
               <!-- Room Quality -->
               <div>
                 <p class="rating-label">Room quality</p>
@@ -265,6 +271,7 @@ export class LodgingFormComponent implements OnInit {
     phone:          [''],
     pet_friendly:   [false],
     image_url:      [''],
+    booking_url:    [''],
   });
 
   ngOnInit() {

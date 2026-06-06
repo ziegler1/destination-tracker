@@ -42,18 +42,18 @@ router.post('/', asyncHandler(async (req, res) => {
   const {
     name, city, state_province, country, address, latitude, longitude,
     cuisine_type, price_range, rating, would_return, highlights,
-    notes, website, phone, pet_friendly, image_url,
+    notes, website, phone, pet_friendly, image_url, menu_url,
   } = req.body;
   const { rows } = await pool.query(`
     INSERT INTO restaurants
       (name, city, state_province, country, address, latitude, longitude,
        cuisine_type, price_range, rating, would_return, highlights,
-       notes, website, phone, pet_friendly, image_url)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+       notes, website, phone, pet_friendly, image_url, menu_url)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
     RETURNING *
   `, [name, city, state_province, country, address, latitude, longitude,
       cuisine_type, price_range, rating, would_return, highlights,
-      notes, website, phone, pet_friendly ?? false, image_url]);
+      notes, website, phone, pet_friendly ?? false, image_url, menu_url ?? null]);
   res.status(201).json(rows[0]);
 }));
 
@@ -62,20 +62,30 @@ router.put('/:id', asyncHandler(async (req, res) => {
   const {
     name, city, state_province, country, address, latitude, longitude,
     cuisine_type, price_range, rating, would_return, highlights,
-    notes, website, phone, pet_friendly, image_url,
+    notes, website, phone, pet_friendly, image_url, menu_url,
   } = req.body;
   const { rows } = await pool.query(`
     UPDATE restaurants SET
       name=$1, city=$2, state_province=$3, country=$4, address=$5,
       latitude=$6, longitude=$7, cuisine_type=$8, price_range=$9,
       rating=$10, would_return=$11, highlights=$12, notes=$13,
-      website=$14, phone=$15, pet_friendly=$16, image_url=$17,
+      website=$14, phone=$15, pet_friendly=$16, image_url=$17, menu_url=$18,
       updated_at=NOW()
-    WHERE id=$18
+    WHERE id=$19
     RETURNING *
   `, [name, city, state_province, country, address, latitude, longitude,
       cuisine_type, price_range, rating, would_return, highlights,
-      notes, website, phone, pet_friendly ?? false, image_url, req.params.id]);
+      notes, website, phone, pet_friendly ?? false, image_url, menu_url ?? null, req.params.id]);
+  if (!rows[0]) return void res.status(404).json({ error: 'Restaurant not found' });
+  res.json(rows[0]);
+}));
+
+// PATCH /api/restaurants/:id/visit
+router.patch('/:id/visit', asyncHandler(async (req, res) => {
+  const { rows } = await pool.query(
+    'UPDATE restaurants SET visit_count = visit_count + 1, updated_at=NOW() WHERE id=$1 RETURNING *',
+    [req.params.id],
+  );
   if (!rows[0]) return void res.status(404).json({ error: 'Restaurant not found' });
   res.json(rows[0]);
 }));

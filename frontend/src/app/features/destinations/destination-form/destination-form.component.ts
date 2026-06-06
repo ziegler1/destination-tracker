@@ -189,6 +189,11 @@ const MONTHS = [
               <textarea matInput formControlName="notes" rows="2"></textarea>
             </mat-form-field>
             <mat-form-field appearance="outline">
+              <mat-label>Travel Tips</mat-label>
+              <textarea matInput formControlName="travel_tips" rows="3"
+                        placeholder="Best time to visit, parking tips, insider advice…"></textarea>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
               <mat-label>Image URL</mat-label>
               <input matInput formControlName="image_url" placeholder="https://…" />
             </mat-form-field>
@@ -243,6 +248,7 @@ export class DestinationFormComponent implements OnInit {
     description:    [''],
     notes:          [''],
     image_url:      [''],
+    travel_tips:    [''],
   });
 
   private destId?: number;

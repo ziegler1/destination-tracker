@@ -42,19 +42,19 @@ router.post('/', asyncHandler(async (req, res) => {
   const {
     name, city, state_province, country, address, latitude, longitude,
     lodging_type, price_per_night, room_quality, cleanliness, amenities,
-    would_return, highlights, notes, website, phone, pet_friendly, image_url,
+    would_return, highlights, notes, website, phone, pet_friendly, image_url, booking_url,
   } = req.body;
   const { rows } = await pool.query(`
     INSERT INTO lodging
       (name, city, state_province, country, address, latitude, longitude,
        lodging_type, price_per_night, room_quality, cleanliness, amenities,
-       would_return, highlights, notes, website, phone, pet_friendly, image_url)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+       would_return, highlights, notes, website, phone, pet_friendly, image_url, booking_url)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
     RETURNING *
   `, [name, city, state_province, country, address, latitude, longitude,
       lodging_type ?? 'hotel', price_per_night, room_quality, cleanliness,
       amenities ?? null, would_return, highlights, notes, website, phone,
-      pet_friendly ?? false, image_url]);
+      pet_friendly ?? false, image_url, booking_url ?? null]);
   res.status(201).json(rows[0]);
 }));
 
@@ -63,7 +63,7 @@ router.put('/:id', asyncHandler(async (req, res) => {
   const {
     name, city, state_province, country, address, latitude, longitude,
     lodging_type, price_per_night, room_quality, cleanliness, amenities,
-    would_return, highlights, notes, website, phone, pet_friendly, image_url,
+    would_return, highlights, notes, website, phone, pet_friendly, image_url, booking_url,
   } = req.body;
   const { rows } = await pool.query(`
     UPDATE lodging SET
@@ -71,13 +71,23 @@ router.put('/:id', asyncHandler(async (req, res) => {
       latitude=$6, longitude=$7, lodging_type=$8, price_per_night=$9,
       room_quality=$10, cleanliness=$11, amenities=$12, would_return=$13,
       highlights=$14, notes=$15, website=$16, phone=$17, pet_friendly=$18,
-      image_url=$19, updated_at=NOW()
-    WHERE id=$20
+      image_url=$19, booking_url=$20, updated_at=NOW()
+    WHERE id=$21
     RETURNING *
   `, [name, city, state_province, country, address, latitude, longitude,
       lodging_type, price_per_night, room_quality, cleanliness,
       amenities ?? null, would_return, highlights, notes, website, phone,
-      pet_friendly ?? false, image_url, req.params.id]);
+      pet_friendly ?? false, image_url, booking_url ?? null, req.params.id]);
+  if (!rows[0]) return void res.status(404).json({ error: 'Lodging not found' });
+  res.json(rows[0]);
+}));
+
+// PATCH /api/lodging/:id/visit
+router.patch('/:id/visit', asyncHandler(async (req, res) => {
+  const { rows } = await pool.query(
+    'UPDATE lodging SET visit_count = visit_count + 1, updated_at=NOW() WHERE id=$1 RETURNING *',
+    [req.params.id],
+  );
   if (!rows[0]) return void res.status(404).json({ error: 'Lodging not found' });
   res.json(rows[0]);
 }));

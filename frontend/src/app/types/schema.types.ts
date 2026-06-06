@@ -19,6 +19,8 @@ export interface Destination {
   rating?: number;
   notes?: string;
   image_url?: string;
+  travel_tips?: string;
+  visit_count?: number;
   created_at: string;
   updated_at: string;
   photos?: DestinationPhoto[];
@@ -56,6 +58,8 @@ export interface Restaurant {
   phone?: string;
   pet_friendly: boolean;
   image_url?: string;
+  menu_url?: string;
+  visit_count?: number;
   suggested_by_ai?: boolean;
   google_place_id?: string;
   created_at: string;
@@ -96,6 +100,8 @@ export interface Lodging {
   phone?: string;
   pet_friendly: boolean;
   image_url?: string;
+  booking_url?: string;
+  visit_count?: number;
   suggested_by_ai?: boolean;
   google_place_id?: string;
   created_at: string;
@@ -146,6 +152,9 @@ export interface TripStop {
   status: TripStopStatus;
   lodging_id?: number;
   notes?: string;
+  drive_minutes_from_prev?: number;
+  gas_stop_before?: boolean;
+  estimated_fuel_cost?: number;
   created_at: string;
   destination?: Destination;
   lodging?: Lodging;
