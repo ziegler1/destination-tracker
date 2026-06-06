@@ -27,4 +27,12 @@ export class StopService {
   delete(tripId: number, stopId: number) {
     return this.http.delete<void>(`${this.base(tripId)}/${stopId}`);
   }
+
+  addRestaurant(tripId: number, stopId: number, restaurantId: number) {
+    return this.http.post<unknown>(`${this.base(tripId)}/${stopId}/restaurants`, { restaurant_id: restaurantId });
+  }
+
+  setLodging(tripId: number, stopId: number, lodgingId: number) {
+    return this.http.patch<TripStop>(`${this.base(tripId)}/${stopId}/lodging`, { lodging_id: lodgingId });
+  }
 }

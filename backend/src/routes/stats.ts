@@ -6,7 +6,7 @@ const router = Router();
 
 // GET /api/stats — single call returns all aggregated stats
 router.get('/', asyncHandler(async (_req, res) => {
-  const [destStats, topStates, tripStats, tripsByYear, expenseStats, fuelStats] =
+  const [destStats, topStates, tripStats, tripsByYear, expenseStats, fuelStats, records, mostExpensive, cuisineBreakdown] =
     await Promise.all([
 
       // Destination counts by status
@@ -80,7 +80,51 @@ router.get('/', asyncHandler(async (_req, res) => {
         FROM fuel_stops
         WHERE gallons IS NOT NULL
       `),
+
+      // Personal records
+      pool.query(`
+        SELECT
+          (SELECT name  FROM trips WHERE start_date IS NOT NULL AND end_date IS NOT NULL AND status != 'cancelled'
+           ORDER BY (end_date - start_date) DESC LIMIT 1)                           AS longest_trip_name,
+          (SELECT (end_date - start_date)::int FROM trips WHERE start_date IS NOT NULL AND end_date IS NOT NULL AND status != 'cancelled'
+           ORDER BY (end_date - start_date) DESC LIMIT 1)                           AS longest_trip_days,
+          (SELECT id   FROM trips WHERE start_date IS NOT NULL AND end_date IS NOT NULL AND status != 'cancelled'
+           ORDER BY (end_date - start_date) DESC LIMIT 1)                           AS longest_trip_id,
+          (SELECT state_province FROM destinations WHERE status = 'visited'
+           GROUP BY state_province ORDER BY COUNT(*) DESC LIMIT 1)                  AS most_visited_state,
+          (SELECT id     FROM restaurants WHERE rating IS NOT NULL ORDER BY rating DESC, created_at DESC LIMIT 1) AS top_restaurant_id,
+          (SELECT name   FROM restaurants WHERE rating IS NOT NULL ORDER BY rating DESC, created_at DESC LIMIT 1) AS top_restaurant_name,
+          (SELECT city   FROM restaurants WHERE rating IS NOT NULL ORDER BY rating DESC, created_at DESC LIMIT 1) AS top_restaurant_city,
+          (SELECT rating FROM restaurants WHERE rating IS NOT NULL ORDER BY rating DESC, created_at DESC LIMIT 1) AS top_restaurant_rating,
+          (SELECT id           FROM lodging WHERE room_quality IS NOT NULL ORDER BY room_quality DESC, created_at DESC LIMIT 1) AS top_lodging_id,
+          (SELECT name         FROM lodging WHERE room_quality IS NOT NULL ORDER BY room_quality DESC, created_at DESC LIMIT 1) AS top_lodging_name,
+          (SELECT city         FROM lodging WHERE room_quality IS NOT NULL ORDER BY room_quality DESC, created_at DESC LIMIT 1) AS top_lodging_city,
+          (SELECT room_quality FROM lodging WHERE room_quality IS NOT NULL ORDER BY room_quality DESC, created_at DESC LIMIT 1) AS top_lodging_quality
+      `),
+
+      // Most expensive trip
+      pool.query(`
+        SELECT t.id, t.name, SUM(e.amount)::float AS total_spent
+        FROM trips t
+        JOIN trip_expenses e ON e.trip_id = t.id
+        GROUP BY t.id, t.name
+        ORDER BY total_spent DESC
+        LIMIT 1
+      `),
+
+      // Cuisine breakdown for diversity donut
+      pool.query(`
+        SELECT cuisine_type, COUNT(*)::int AS count
+        FROM restaurants
+        WHERE cuisine_type IS NOT NULL AND cuisine_type != ''
+        GROUP BY cuisine_type
+        ORDER BY count DESC
+        LIMIT 8
+      `),
     ]);
+
+  const rec = records.rows[0] ?? {};
+  const exp = mostExpensive.rows[0] ?? null;
 
   res.json({
     destinations: {
@@ -93,6 +137,24 @@ router.get('/', asyncHandler(async (_req, res) => {
     },
     expenses: expenseStats.rows[0],
     fuel:     fuelStats.rows[0],
+    records: {
+      longest_trip_name:        rec.longest_trip_name   ?? null,
+      longest_trip_days:        rec.longest_trip_days   ?? null,
+      longest_trip_id:          rec.longest_trip_id     ?? null,
+      most_visited_state:       rec.most_visited_state  ?? null,
+      top_restaurant_id:        rec.top_restaurant_id   ?? null,
+      top_restaurant_name:      rec.top_restaurant_name ?? null,
+      top_restaurant_city:      rec.top_restaurant_city ?? null,
+      top_restaurant_rating:    rec.top_restaurant_rating ? Number(rec.top_restaurant_rating) : null,
+      top_lodging_id:           rec.top_lodging_id      ?? null,
+      top_lodging_name:         rec.top_lodging_name    ?? null,
+      top_lodging_city:         rec.top_lodging_city    ?? null,
+      top_lodging_quality:      rec.top_lodging_quality ? Number(rec.top_lodging_quality) : null,
+      most_expensive_trip_id:   exp?.id                 ?? null,
+      most_expensive_trip_name: exp?.name               ?? null,
+      most_expensive_trip_total:exp?.total_spent         ?? null,
+    },
+    cuisine_breakdown: cuisineBreakdown.rows,
   });
 }));
 

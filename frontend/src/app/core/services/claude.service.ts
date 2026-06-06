@@ -33,4 +33,8 @@ export class ClaudeService {
   restaurantDescription(restaurant: Restaurant) {
     return this.http.post<ClaudeResult>('/api/claude/restaurant-description', { restaurant });
   }
+
+  travelInsights(payload: { stats: unknown; records: unknown; cuisineBreakdown: unknown }) {
+    return this.http.post<ClaudeResult>('/api/claude/travel-insights', payload);
+  }
 }

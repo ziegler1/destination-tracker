@@ -17,6 +17,7 @@ import { QuickAddRestaurantComponent } from '../../shared/components/quick-add/q
 import { QuickAddLodgingComponent } from '../../shared/components/quick-add/quick-add-lodging.component';
 import { QuickAddDestinationComponent } from '../../shared/components/quick-add/quick-add-destination.component';
 import { QuickAddFuelComponent } from '../../shared/components/quick-add/quick-add-fuel.component';
+import { GlobalSearchComponent } from '../../shared/components/global-search/global-search.component';
 
 interface NavItem { icon: string; label: string; path: string; exact?: boolean; }
 interface QuickAddItem { icon: string; label: string; type: string; }
@@ -49,6 +50,7 @@ const QUICK_ADD_ITEMS: QuickAddItem[] = [
     RouterOutlet, RouterLink, RouterLinkActive, DatePipe,
     MatIconModule, MatButtonModule, MatTooltipModule,
     MatDividerModule, MatSnackBarModule,
+    GlobalSearchComponent,
   ],
   styles: [`
     /* ── Layout ────────────────────────────────────────────────── */
@@ -168,7 +170,7 @@ const QUICK_ADD_ITEMS: QuickAddItem[] = [
       border-top: 1px solid var(--wp-border);
       z-index: 500; box-shadow: 0 -2px 8px var(--wp-shadow);
     }
-    .btab-grid { display: grid; grid-template-columns: repeat(5,1fr); height: 100%; }
+    .btab-grid { display: grid; grid-template-columns: repeat(6,1fr); height: 100%; }
     .btab {
       display: flex; flex-direction: column; align-items: center; justify-content: center;
       gap: 2px; color: var(--wp-text-secondary); text-decoration: none;
@@ -191,10 +193,34 @@ const QUICK_ADD_ITEMS: QuickAddItem[] = [
       text-decoration: none; font-size: 12px; color: var(--wp-text-primary);
     }
 
+    /* ── Search Bar ─────────────────────────────────────────────── */
+    .search-trigger {
+      display: flex; align-items: center; gap: 8px;
+      margin: 6px 12px 4px;
+      padding: 8px 12px;
+      border-radius: 10px;
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.15);
+      cursor: pointer; transition: background .15s;
+      color: rgba(255,255,255,.6);
+      font-size: 13px;
+    }
+    .search-trigger:hover { background: rgba(255,255,255,.14); }
+    .search-trigger mat-icon { font-size: 18px; width: 18px; height: 18px; flex-shrink: 0; }
+    .search-kbd {
+      margin-left: auto;
+      font-size: 10px; padding: 2px 5px;
+      border-radius: 4px;
+      background: rgba(255,255,255,.12);
+      color: rgba(255,255,255,.45);
+      font-family: monospace;
+    }
+
     @media (max-width: 768px) {
       .sidebar { display: none; }
       .main-content { height: calc(100vh - 56px); margin-bottom: 56px; }
       .bottom-tabs { display: block; }
+      .search-kbd { display: none; }
     }
   `],
   template: `
@@ -209,6 +235,13 @@ const QUICK_ADD_ITEMS: QuickAddItem[] = [
           <span class="brand-tag">Your Travel Encyclopedia</span>
         </div>
       </div>
+
+      <!-- Search trigger -->
+      <button class="search-trigger" (click)="searchOpen.set(true)">
+        <mat-icon>search</mat-icon>
+        Search everything…
+        <span class="search-kbd">⌘K</span>
+      </button>
 
       <!-- Plan a Trip CTA -->
       <div class="cta-wrap">
@@ -303,6 +336,9 @@ const QUICK_ADD_ITEMS: QuickAddItem[] = [
         <button class="btab" (click)="toggleQA()">
           <mat-icon>add_circle</mat-icon><span>Add</span>
         </button>
+        <button class="btab" (click)="searchOpen.set(true)">
+          <mat-icon>search</mat-icon><span>Search</span>
+        </button>
         <button class="btab" (click)="toggleMore()">
           <mat-icon>more_horiz</mat-icon><span>More</span>
         </button>
@@ -320,6 +356,11 @@ const QUICK_ADD_ITEMS: QuickAddItem[] = [
           }
         </div>
       </div>
+    }
+
+    <!-- Global Search Overlay -->
+    @if (searchOpen()) {
+      <app-global-search (close)="searchOpen.set(false)" />
     }
 
     <!-- Mobile More overlay -->
@@ -351,6 +392,7 @@ export class ShellComponent implements OnInit {
 
   qaOpen       = signal(false);
   moreOpen     = signal(false);
+  searchOpen   = signal(false);
   isMobile     = signal(window.innerWidth <= 768);
   activeTrip   = signal<Trip | null>(null);
 
@@ -367,6 +409,14 @@ export class ShellComponent implements OnInit {
 
   @HostListener('window:resize')
   onResize() { this.isMobile.set(window.innerWidth <= 768); }
+
+  @HostListener('window:keydown', ['$event'])
+  onKeydown(e: KeyboardEvent) {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      e.preventDefault();
+      this.searchOpen.set(true);
+    }
+  }
 
   ngOnInit() {
     // Load trips to detect active trip for sidebar card

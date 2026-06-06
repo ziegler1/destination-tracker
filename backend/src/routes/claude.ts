@@ -115,6 +115,31 @@ router.post('/trip-summary', asyncHandler(async (req, res) => {
   res.json({ result: textOf(msg) });
 }));
 
+// POST /api/claude/travel-insights
+router.post('/travel-insights', asyncHandler(async (req, res) => {
+  const { stats, records, cuisineBreakdown } = req.body;
+
+  const msg = await anthropic.messages.create({
+    model: MODEL,
+    max_tokens: 1024,
+    system: [SYSTEM],
+    messages: [
+      {
+        role: 'user',
+        content:
+          `Analyze this traveler's history and generate 5 personalized insights. Be specific — ` +
+          `reference actual places, cuisines, and patterns from the data.\n\n` +
+          `Stats: ${JSON.stringify(stats)}\n` +
+          `Records: ${JSON.stringify(records)}\n` +
+          `Cuisine breakdown: ${JSON.stringify(cuisineBreakdown)}\n\n` +
+          `Return a JSON array of 5 objects with keys: icon (single emoji), headline (≤8 words), ` +
+          `detail (1–2 sentences, specific and personal).`,
+      },
+    ],
+  });
+  res.json({ result: textOf(msg) });
+}));
+
 // POST /api/claude/restaurant-description
 router.post('/restaurant-description', asyncHandler(async (req, res) => {
   const { restaurant } = req.body;

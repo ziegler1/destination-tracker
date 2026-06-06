@@ -18,6 +18,7 @@ import claudeRouter from './routes/claude';
 import statsRouter    from './routes/stats';
 import geocodeRouter  from './routes/geocode';
 import wizardRouter   from './routes/tripWizard';
+import searchRouter   from './routes/search';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -50,6 +51,7 @@ app.use('/api/claude',  claudeRouter);
 app.use('/api/stats',         statsRouter);
 app.use('/api/geocode',       geocodeRouter);
 app.use('/api/trips/wizard',  wizardRouter);
+app.use('/api/search',        searchRouter);
 
 app.use(errorHandler);
 

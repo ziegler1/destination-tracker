@@ -1,5 +1,5 @@
 import {
-  Component, OnInit, ChangeDetectionStrategy, ViewChild,
+  Component, OnInit, AfterViewInit, ChangeDetectionStrategy, ViewChild,
   inject, signal, computed,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -26,6 +26,24 @@ const STATUS_COLORS: Record<DestinationStatus, string> = {
   visited:       '#2e7d32',
 };
 
+// Maps US state abbreviations to full names used in GeoJSON
+const ABBREV_TO_STATE: Record<string, string> = {
+  AL:'Alabama',AK:'Alaska',AZ:'Arizona',AR:'Arkansas',CA:'California',
+  CO:'Colorado',CT:'Connecticut',DE:'Delaware',FL:'Florida',GA:'Georgia',
+  HI:'Hawaii',ID:'Idaho',IL:'Illinois',IN:'Indiana',IA:'Iowa',
+  KS:'Kansas',KY:'Kentucky',LA:'Louisiana',ME:'Maine',MD:'Maryland',
+  MA:'Massachusetts',MI:'Michigan',MN:'Minnesota',MS:'Mississippi',MO:'Missouri',
+  MT:'Montana',NE:'Nebraska',NV:'Nevada',NH:'New Hampshire',NJ:'New Jersey',
+  NM:'New Mexico',NY:'New York',NC:'North Carolina',ND:'North Dakota',OH:'Ohio',
+  OK:'Oklahoma',OR:'Oregon',PA:'Pennsylvania',RI:'Rhode Island',SC:'South Carolina',
+  SD:'South Dakota',TN:'Tennessee',TX:'Texas',UT:'Utah',VT:'Vermont',
+  VA:'Virginia',WA:'Washington',WV:'West Virginia',WI:'Wisconsin',WY:'Wyoming',
+  DC:'District of Columbia',
+};
+
+const US_STATES_GEOJSON_URL =
+  'https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json';
+
 function destMarkerEl(status: DestinationStatus): HTMLElement {
   const el = document.createElement('div');
   const c  = STATUS_COLORS[status];
@@ -35,17 +53,15 @@ function destMarkerEl(status: DestinationStatus): HTMLElement {
   return el.firstElementChild as HTMLElement;
 }
 
-function stopMarkerEl(n: number, color = '#00695C'): HTMLElement {
+function stopMarkerEl(n: number): HTMLElement {
   const el = document.createElement('div');
   el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28">
-    <circle cx="14" cy="14" r="12" fill="${color}" stroke="white" stroke-width="2"/>
+    <circle cx="14" cy="14" r="12" fill="#00695C" stroke="white" stroke-width="2"/>
     <text x="14" y="19" font-family="Arial" font-size="11" font-weight="bold"
           fill="white" text-anchor="middle">${n}</text>
   </svg>`;
   return el.firstElementChild as HTMLElement;
 }
-
-const TRIP_COLORS = ['#1565c0','#c62828','#6a1b9a','#e65100','#1b5e20','#0277bd','#880e4f','#33691e'];
 
 @Component({
   selector: 'app-map',
@@ -75,6 +91,10 @@ const TRIP_COLORS = ['#1565c0','#c62828','#6a1b9a','#e65100','#1b5e20','#0277bd'
     }
     .leg-row { display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:4px; }
     .leg-dot { width:11px; height:11px; border-radius:50%; flex-shrink:0; }
+    .leg-rect {
+      width:18px; height:11px; border-radius:3px; flex-shrink:0;
+      background:rgba(0,105,92,.22); border:1px solid #00695C;
+    }
   `],
   template: `
     @if (loading()) {
@@ -88,7 +108,8 @@ const TRIP_COLORS = ['#1565c0','#c62828','#6a1b9a','#e65100','#1b5e20','#0277bd'
       width="100%"
       [center]="mapCenter"
       [zoom]="4"
-      [options]="mapOptions">
+      [options]="mapOptions"
+      (tilesloaded)="onTilesLoaded()">
 
       <!-- Destination markers -->
       @if (showDestinations) {
@@ -140,6 +161,11 @@ const TRIP_COLORS = ['#1565c0','#c62828','#6a1b9a','#e65100','#1b5e20','#0277bd'
           Destinations ({{ validDests().length }})
         </mat-checkbox>
       </div>
+      <div class="ctrl-row">
+        <mat-checkbox [(ngModel)]="showStateFill" (ngModelChange)="toggleStateFill($event)">
+          Visited States
+        </mat-checkbox>
+      </div>
       <mat-divider style="margin:10px 0" />
       <div class="ctrl-title">Trip Route</div>
       <mat-select [(ngModel)]="selectedTripId" (selectionChange)="onTripSelect($event.value)"
@@ -156,27 +182,35 @@ const TRIP_COLORS = ['#1565c0','#c62828','#6a1b9a','#e65100','#1b5e20','#0277bd'
       <div class="leg-row"><div class="leg-dot" style="background:#1565c0"></div> Want to Visit</div>
       <div class="leg-row"><div class="leg-dot" style="background:#f57f17"></div> Planned</div>
       <div class="leg-row"><div class="leg-dot" style="background:#2e7d32"></div> Visited</div>
+      @if (visitedStates().size > 0) {
+        <div class="leg-row"><div class="leg-rect"></div> Visited States ({{ visitedStates().size }})</div>
+      }
     </div>
   `,
 })
-export class MapComponent implements OnInit {
+export class MapComponent implements OnInit, AfterViewInit {
   protected router = inject(Router);
   private destSvc  = inject(DestinationService);
   private tripSvc  = inject(TripService);
   private mapsSvc  = inject(MapsService);
 
   @ViewChild(MapInfoWindow) infoWindow!: MapInfoWindow;
+  @ViewChild(GoogleMap)     gmap!: GoogleMap;
 
-  loading      = signal(true);
-  destinations = signal<Destination[]>([]);
-  trips        = signal<Trip[]>([]);
-  selectedDest = signal<Destination | null>(null);
+  loading        = signal(true);
+  destinations   = signal<Destination[]>([]);
+  trips          = signal<Trip[]>([]);
+  selectedDest   = signal<Destination | null>(null);
+  visitedStates  = signal<Set<string>>(new Set());
 
   showDestinations = true;
+  showStateFill    = true;
   selectedTripId: number | null = null;
 
   directionsResult = signal<google.maps.DirectionsResult | null>(null);
   tripStopMarkers  = signal<Array<{ position: google.maps.LatLngLiteral; content: HTMLElement; label: string }>>([]);
+
+  private dataLayerLoaded = false;
 
   validDests = computed(() =>
     this.destinations().filter(d => d.latitude != null && d.longitude != null),
@@ -207,8 +241,86 @@ export class MapComponent implements OnInit {
         this.destinations.set(dests);
         this.trips.set(trips);
         this.loading.set(false);
+        this.computeVisitedStates(dests);
+        // Re-style data layer once states are known
+        if (this.dataLayerLoaded) {
+          this.applyDataLayerStyle();
+        }
       },
       error: () => this.loading.set(false),
+    });
+  }
+
+  ngAfterViewInit() {
+    // Map might not be ready yet; actual data layer setup happens in onTilesLoaded
+  }
+
+  onTilesLoaded() {
+    if (this.dataLayerLoaded) return;
+    this.dataLayerLoaded = true;
+    this.loadStateLayer();
+  }
+
+  private computeVisitedStates(dests: Destination[]) {
+    const visited = new Set<string>();
+    dests
+      .filter(d => d.status === 'visited' && d.state_province)
+      .forEach(d => {
+        const sp = d.state_province.trim();
+        // Lookup abbreviation or use as-is (already full name)
+        const fullName = ABBREV_TO_STATE[sp.toUpperCase()] ?? sp;
+        visited.add(fullName);
+      });
+    this.visitedStates.set(visited);
+  }
+
+  private loadStateLayer() {
+    const map = this.gmap.googleMap;
+    if (!map) return;
+
+    fetch(US_STATES_GEOJSON_URL)
+      .then(r => r.json())
+      .then((geojson: unknown) => {
+        map.data.addGeoJson(geojson as object);
+        this.applyDataLayerStyle();
+      })
+      .catch(() => { /* silently fail — map still works without state fill */ });
+  }
+
+  private applyDataLayerStyle() {
+    const map = this.gmap?.googleMap;
+    if (!map) return;
+    const visited = this.visitedStates();
+    map.data.setStyle((feature: google.maps.Data.Feature) => {
+      const name = feature.getProperty('name') as string | undefined;
+      const isVisited = name ? visited.has(name) : false;
+      return {
+        fillColor:    isVisited ? '#00695C' : 'transparent',
+        fillOpacity:  isVisited ? 0.18 : 0,
+        strokeColor:  isVisited ? '#00695C' : '#bbb',
+        strokeOpacity: isVisited ? 0.45 : 0.08,
+        strokeWeight: 0.5,
+        clickable:    false,
+      };
+    });
+  }
+
+  toggleStateFill(show: boolean) {
+    const map = this.gmap?.googleMap;
+    if (!map) return;
+    const visited = this.visitedStates();
+    map.data.setStyle((feature: google.maps.Data.Feature) => {
+      if (!show) return { fillOpacity: 0, strokeOpacity: 0, clickable: false };
+      const name = feature.getProperty('name') as string | undefined;
+      const isVisited = name ? visited.has(name) : false;
+      return {
+        fillColor:    isVisited ? '#00695C' : 'transparent',
+        fillOpacity:  isVisited ? 0.18 : 0,
+        strokeColor:  isVisited ? '#00695C' : '#bbb',
+        strokeOpacity: isVisited ? 0.45 : 0.08,
+        strokeWeight: 0.5,
+        clickable:    false,
+      };
     });
   }
 

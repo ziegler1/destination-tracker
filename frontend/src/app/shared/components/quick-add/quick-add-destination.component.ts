@@ -9,8 +9,11 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDatepickerModule } from '@angular/material/datepicker';
+import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { of, switchMap } from 'rxjs';
 import { DestinationService } from '../../../core/services/destination.service';
+import { PhotoService } from '../../../core/services/photo.service';
 import {
   PlacesAutocompleteComponent, PlaceSelectedEvent,
 } from '../places-autocomplete/places-autocomplete.component';
@@ -22,7 +25,7 @@ import {
   imports: [
     ReactiveFormsModule, PlacesAutocompleteComponent,
     MatFormFieldModule, MatInputModule, MatSelectModule,
-    MatButtonModule, MatDatepickerModule,
+    MatButtonModule, MatDatepickerModule, MatIconModule,
   ],
   styles: [`
     .sheet   { padding: 0 16px 24px; max-height: 90vh; overflow-y: auto; }
@@ -33,6 +36,26 @@ import {
     .star    { font-size: 28px; background: none; border: none; cursor: pointer; padding: 0; line-height: 1; }
     .actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 8px; }
     mat-form-field { width: 100%; }
+    .section-divider { margin: 12px 0; border: none; border-top: 1px solid var(--wp-border); }
+    .photo-row {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 16px;
+    }
+    .photo-preview {
+      width: 56px; height: 56px; border-radius: 8px;
+      object-fit: cover; flex-shrink: 0;
+    }
+    .photo-placeholder {
+      width: 56px; height: 56px; border-radius: 8px;
+      background: var(--wp-surface-variant); border: 1px dashed var(--wp-border);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--wp-text-secondary); font-size: 22px; flex-shrink: 0;
+    }
+    .optional-label {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .8px; color: var(--wp-text-secondary);
+      margin: 12px 0 8px;
+    }
   `],
   template: `
     <div class="sheet">
@@ -82,6 +105,30 @@ import {
           <textarea matInput formControlName="notes" rows="2"></textarea>
         </mat-form-field>
 
+        <!-- Photo upload -->
+        <hr class="section-divider" />
+        <div class="optional-label">📷 Add Photo (optional)</div>
+        <div class="photo-row">
+          @if (photoPreview()) {
+            <img class="photo-preview" [src]="photoPreview()!" alt="Preview" />
+          } @else {
+            <div class="photo-placeholder">📷</div>
+          }
+          <div>
+            <button type="button" mat-stroked-button (click)="fileInput.click()">
+              <mat-icon>upload</mat-icon>
+              {{ photoFile() ? 'Change Photo' : 'Choose Photo' }}
+            </button>
+            @if (photoFile()) {
+              <div style="font-size:12px;color:var(--wp-text-secondary);margin-top:4px">
+                {{ photoFile()!.name }}
+              </div>
+            }
+          </div>
+        </div>
+        <input #fileInput type="file" accept="image/*" style="display:none"
+               (change)="onFileChange($event)" />
+
         <div class="actions">
           <button mat-stroked-button type="button" (click)="dismiss()">Cancel</button>
           <button mat-raised-button color="primary" type="button"
@@ -95,13 +142,16 @@ import {
   `,
 })
 export class QuickAddDestinationComponent {
-  private ref    = inject(MatBottomSheetRef<QuickAddDestinationComponent>);
-  private svc    = inject(DestinationService);
-  private snack  = inject(MatSnackBar);
-  private fb     = inject(FormBuilder);
-  private router = inject(Router);
+  private ref       = inject(MatBottomSheetRef<QuickAddDestinationComponent>);
+  private svc       = inject(DestinationService);
+  private photoSvc  = inject(PhotoService);
+  private snack     = inject(MatSnackBar);
+  private fb        = inject(FormBuilder);
+  private router    = inject(Router);
 
-  saving = signal(false);
+  saving       = signal(false);
+  photoFile    = signal<File | null>(null);
+  photoPreview = signal<string | null>(null);
 
   form = this.fb.group({
     name:           ['', Validators.required],
@@ -127,6 +177,18 @@ export class QuickAddDestinationComponent {
     });
   }
 
+  onFileChange(event: Event) {
+    const file = (event.target as HTMLInputElement).files?.[0] ?? null;
+    this.photoFile.set(file);
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => this.photoPreview.set(reader.result as string);
+      reader.readAsDataURL(file);
+    } else {
+      this.photoPreview.set(null);
+    }
+  }
+
   save() {
     if (this.form.invalid || this.saving()) return;
     this.saving.set(true);
@@ -147,7 +209,13 @@ export class QuickAddDestinationComponent {
         : null;
       dto['rating'] = v.rating;
     }
-    this.svc.create(dto).subscribe({
+    this.svc.create(dto).pipe(
+      switchMap(dest => {
+        if (!this.photoFile()) return of(dest);
+        return this.photoSvc.upload(this.photoFile()!, 'destinations', dest.id, true)
+          .pipe(switchMap(() => of(dest)));
+      }),
+    ).subscribe({
       next:  (d) => { this.ref.dismiss(); this.router.navigate(['/destinations', d.id]); },
       error: () => { this.snack.open('Save failed', undefined, { duration: 3000 }); this.saving.set(false); },
     });
