@@ -558,6 +558,19 @@ function lodgingMarkerEl(): HTMLElement {
                     <p class="stop-row" style="color:var(--wp-text-hint)"><mat-icon>hotel</mat-icon> No lodging set</p>
                   }
 
+                  @if (stop.restaurants?.length) {
+                    <div class="stop-row" style="align-items:flex-start;flex-wrap:wrap;gap:4px;padding:4px 14px 6px">
+                      <mat-icon style="margin-top:2px">restaurant</mat-icon>
+                      @for (tr of stop.restaurants!; track tr.id) {
+                        @if (tr.restaurant; as r) {
+                          <span style="font-size:12px;background:var(--wp-surface-variant);padding:2px 8px;border-radius:8px;white-space:nowrap">
+                            {{ r.name }}@if (r.cuisine_type) { · {{ r.cuisine_type }}}
+                          </span>
+                        }
+                      }
+                    </div>
+                  }
+
                   @if (editingStopId() === stop.id) {
                     <div class="edit-form">
                       <form [formGroup]="editStopForm" (ngSubmit)="saveStopEdit(stop)">
@@ -820,6 +833,7 @@ export class TripDetailComponent implements OnInit {
   }
 
   private async geocodeAndRoute(t: Trip) {
+    // Geocode any stops whose destination lacks coordinates (needed for map markers)
     const missing = (t.stops ?? []).filter(s => s.destination && s.destination.latitude == null);
     if (missing.length) {
       this.geocodingInProgress.set(true);
@@ -834,12 +848,22 @@ export class TripDetailComponent implements OnInit {
       this.geocodingInProgress.set(false);
     }
 
-    const waypoints = this.sortedStops()
-      .map(s => this.stopCoords(s))
-      .filter(Boolean) as google.maps.LatLngLiteral[];
+    const sorted = this.sortedStops();
+    if (!sorted.length) return;
 
-    if (waypoints.length >= 2) {
-      this.mapsSvc.loadDirections(waypoints).subscribe(result => {
+    // Build direction addresses: origin (home) → each stop city → (end at origin if no addresses exist)
+    const stopAddresses = sorted
+      .map(s => s.destination ? `${s.destination.city}, ${s.destination.state_province}` : null)
+      .filter(Boolean) as string[];
+
+    if (stopAddresses.length === 0) return;
+
+    const addresses: string[] = t.origin_address
+      ? [t.origin_address, ...stopAddresses]
+      : stopAddresses;
+
+    if (addresses.length >= 2) {
+      this.mapsSvc.loadDirectionsFromAddresses(addresses).subscribe(result => {
         this.directionsResult.set(result);
         if (result?.routes?.[0]?.legs) {
           const totalDist = result.routes[0].legs.reduce((s, l) => s + l.distance!.value, 0);

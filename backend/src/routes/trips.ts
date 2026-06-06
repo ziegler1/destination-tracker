@@ -56,7 +56,26 @@ router.get('/:id', asyncHandler(async (req, res) => {
               'lodging_type', l.lodging_type, 'price_per_night', l.price_per_night,
               'address', l.address, 'latitude', l.latitude, 'longitude', l.longitude,
               'website', l.website, 'phone', l.phone
-            ) ELSE NULL END
+            ) ELSE NULL END,
+            'restaurants', (
+              SELECT COALESCE(jsonb_agg(
+                jsonb_build_object(
+                  'id', tr.id, 'trip_id', tr.trip_id, 'trip_stop_id', tr.trip_stop_id,
+                  'restaurant_id', tr.restaurant_id,
+                  'restaurant', jsonb_build_object(
+                    'id', r.id, 'name', r.name, 'city', r.city,
+                    'cuisine_type', r.cuisine_type, 'price_range', r.price_range,
+                    'rating', r.rating, 'would_return', r.would_return,
+                    'website', r.website, 'address', r.address,
+                    'google_place_id', r.google_place_id
+                  )
+                )
+                ORDER BY r.name
+              ), '[]')
+              FROM trip_restaurants tr
+              JOIN restaurants r ON r.id = tr.restaurant_id
+              WHERE tr.trip_stop_id = ts.id
+            )
           )
           ORDER BY ts.stop_order
         ) AS stops
@@ -151,14 +170,14 @@ router.post('/', asyncHandler(async (req, res) => {
 
 // PUT /api/trips/:id
 router.put('/:id', asyncHandler(async (req, res) => {
-  const { name, description, status, start_date, end_date, total_budget, notes } = req.body;
+  const { name, description, status, start_date, end_date, total_budget, notes, origin_address } = req.body;
   const { rows } = await pool.query(`
     UPDATE trips SET
       name=$1, description=$2, status=$3, start_date=$4,
-      end_date=$5, total_budget=$6, notes=$7, updated_at=NOW()
-    WHERE id=$8
+      end_date=$5, total_budget=$6, notes=$7, origin_address=$8, updated_at=NOW()
+    WHERE id=$9
     RETURNING *
-  `, [name, description, status, start_date, end_date, total_budget, notes, req.params.id]);
+  `, [name, description, status, start_date, end_date, total_budget, notes, origin_address ?? null, req.params.id]);
   if (!rows[0]) return void res.status(404).json({ error: 'Trip not found' });
   res.json(rows[0]);
 }));

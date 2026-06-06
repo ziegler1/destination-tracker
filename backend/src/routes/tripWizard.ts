@@ -384,8 +384,8 @@ router.post('/confirm', asyncHandler(async (req, res) => {
 
     // 1. Create trip record
     const { rows: [savedTrip] } = await client.query<{ id: number }>(
-      `INSERT INTO trips (name, description, status, start_date, end_date, total_budget, notes)
-       VALUES ($1, $2, 'planning', $3, $4, $5, $6)
+      `INSERT INTO trips (name, description, status, start_date, end_date, total_budget, notes, origin_address)
+       VALUES ($1, $2, 'planning', $3, $4, $5, $6, $7)
        RETURNING id`,
       [
         trip.name,
@@ -394,6 +394,7 @@ router.post('/confirm', asyncHandler(async (req, res) => {
         trip.end_date,
         trip.budget ?? null,
         `AI-generated trip from ${trip.origin} to ${trip.destination}`,
+        trip.origin ?? null,
       ],
     );
     const tripId = savedTrip.id;

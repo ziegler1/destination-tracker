@@ -131,6 +131,7 @@ export interface Trip {
   end_date?: string;
   total_budget?: number;
   notes?: string;
+  origin_address?: string;
   created_at: string;
   updated_at: string;
   stops?: TripStop[];
