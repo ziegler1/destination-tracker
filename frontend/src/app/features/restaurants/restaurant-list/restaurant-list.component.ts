@@ -60,6 +60,9 @@ type PriceFilter = PriceRange | 'all';
     }
     .pet-icon { font-size:16px; vertical-align:middle; title:"Pet friendly"; }
 
+    .return-yes { font-size:11px; font-weight:700; color:#2E7D32; background:#E8F5E9; padding:2px 8px; border-radius:10px; }
+    .return-no  { font-size:11px; font-weight:700; color:#B71C1C; background:#FFEBEE; padding:2px 8px; border-radius:10px; }
+
     .empty { text-align:center; color:var(--wp-text-secondary); padding:60px 0; }
     .empty-icon { font-size:56px; display:block; margin-bottom:12px; }
 
@@ -139,6 +142,11 @@ type PriceFilter = PriceRange | 'all';
                     }
                   </span>
                 </div>
+                @if (r.would_return === true) {
+                  <div style="margin-top:8px"><span class="return-yes">✓ Would Return</span></div>
+                } @else if (r.would_return === false) {
+                  <div style="margin-top:8px"><span class="return-no">✗ Wouldn't Return</span></div>
+                }
               </div>
             </mat-card>
           }

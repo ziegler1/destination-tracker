@@ -58,6 +58,9 @@ const TYPE_LABELS: Record<LodgingType, string> = {
       text-transform:capitalize;
     }
     .price { font-size:13px; font-weight:600; color:var(--wp-primary); }
+    .return-yes { font-size:11px; font-weight:700; color:#2E7D32; background:#E8F5E9; padding:2px 8px; border-radius:10px; }
+    .return-no  { font-size:11px; font-weight:700; color:#B71C1C; background:#FFEBEE; padding:2px 8px; border-radius:10px; }
+    .stars { display:flex; align-items:center; gap:2px; margin-bottom:4px; }
     .empty { text-align:center; color:var(--wp-text-secondary); padding:60px 0; }
     .empty-icon { font-size:56px; display:block; margin-bottom:12px; }
     .fab {
@@ -105,6 +108,13 @@ const TYPE_LABELS: Record<LodgingType, string> = {
               <div class="card-body">
                 <p class="card-name">{{ l.name }}</p>
                 <p class="card-loc">{{ l.city }}, {{ l.state_province }}</p>
+                @if (l.room_quality) {
+                  <div class="stars">
+                    @for (s of stars(l.room_quality); track $index) {
+                      <mat-icon style="font-size:14px;color:var(--wp-accent)">{{ s ? 'star' : 'star_border' }}</mat-icon>
+                    }
+                  </div>
+                }
                 <div class="card-meta">
                   <span class="type-badge">{{ typeLabel(l.lodging_type) }}</span>
                   <span>
@@ -114,6 +124,11 @@ const TYPE_LABELS: Record<LodgingType, string> = {
                     @if (l.pet_friendly) { <span title="Pet friendly"> 🐾</span> }
                   </span>
                 </div>
+                @if (l.would_return === true) {
+                  <div style="margin-top:8px"><span class="return-yes">✓ Would Return</span></div>
+                } @else if (l.would_return === false) {
+                  <div style="margin-top:8px"><span class="return-no">✗ Wouldn't Return</span></div>
+                }
               </div>
             </mat-card>
           }
@@ -166,4 +181,7 @@ export class LodgingListComponent implements OnInit {
     return l.photos?.find((p) => p.is_primary)?.url ?? l.photos?.[0]?.url ?? l.image_url ?? null;
   }
   typeLabel(t: LodgingType): string { return TYPE_LABELS[t] ?? t; }
+  stars(rating: number): boolean[] {
+    return Array.from({ length: 5 }, (_, i) => i < Math.round(rating));
+  }
 }
