@@ -139,9 +139,8 @@ const STOP_TIMINGS = [
       cursor:pointer; transition:border-color .2s, box-shadow .2s;
       background:var(--wp-surface);
     }
-    .suggestion-card.selected { border-color:var(--wp-primary); box-shadow:0 0 0 2px var(--wp-primary); }
-    .suggestion-card.approved  { border-color:var(--wp-accent); }
-    .suggestion-card.rejected  { opacity:.45; }
+    .suggestion-card.selected { border-color:var(--wp-primary); box-shadow:0 0 0 2px var(--wp-primary); background:color-mix(in srgb,var(--wp-primary) 6%,var(--wp-surface)); }
+    .suggestion-card.approved { border-color:#2e7d32; box-shadow:0 0 0 2px #2e7d32; background:color-mix(in srgb,#2e7d32 6%,var(--wp-surface)); }
 
     .card-photo { width:100%; height:110px; object-fit:cover; display:block;
                   background:linear-gradient(135deg,var(--wp-primary),var(--wp-primary-light)); }
@@ -392,7 +391,7 @@ const STOP_TIMINGS = [
                 </div>
               } @else {
                 <!-- Lodging — only for transit stops -->
-                <p class="section-label">🏨 Lodging — pick one</p>
+                <p class="section-label">🏨 Lodging — pick one to add (optional)</p>
                 <div class="suggestion-grid">
                   @for (s of stop.lodging_suggestions; track $index) {
                     <div class="suggestion-card"
@@ -428,12 +427,11 @@ const STOP_TIMINGS = [
               }
 
               <!-- Restaurants -->
-              <p class="section-label">🍽️ Restaurants — toggle on/off</p>
+              <p class="section-label">🍽️ Restaurants — click to add</p>
               <div class="suggestion-grid">
                 @for (s of stop.restaurant_suggestions; track $index) {
                   <div class="suggestion-card"
                        [class.approved]="isRestApproved(stop.stop_order, $index)"
-                       [class.rejected]="!isRestApproved(stop.stop_order, $index)"
                        (click)="toggleRest(stop.stop_order, $index)">
                     @if (s.photo_url) {
                       <img class="card-photo" [src]="s.photo_url" [alt]="s.name" (error)="onImgError($event)" />
@@ -456,12 +454,11 @@ const STOP_TIMINGS = [
               </div>
 
               <!-- POIs -->
-              <p class="section-label">📍 Points of Interest — toggle on/off</p>
+              <p class="section-label">📍 Points of Interest — click to add</p>
               <div class="suggestion-grid">
                 @for (s of stop.poi_suggestions; track $index) {
                   <div class="suggestion-card"
                        [class.approved]="isPoiApproved(stop.stop_order, $index)"
-                       [class.rejected]="!isPoiApproved(stop.stop_order, $index)"
                        (click)="togglePoi(stop.stop_order, $index)">
                     @if (s.photo_url) {
                       <img class="card-photo" [src]="s.photo_url" [alt]="s.name" (error)="onImgError($event)" />
@@ -695,10 +692,10 @@ export class TripWizardComponent implements OnInit, OnDestroy {
 
     for (const stop of p.stops) {
       if (stop.stop_type !== 'base') {
-        lodgingMap.set(stop.stop_order, 0);
+        lodgingMap.set(stop.stop_order, -1); // none selected by default
       }
-      restMap.set(stop.stop_order, new Set(stop.restaurant_suggestions.map((_, i) => i)));
-      poiMap.set(stop.stop_order, new Set(stop.poi_suggestions.map((_, i) => i)));
+      restMap.set(stop.stop_order, new Set()); // none added by default
+      poiMap.set(stop.stop_order, new Set());  // none added by default
     }
 
     this.selectedLodging.set(lodgingMap);
