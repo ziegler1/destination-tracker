@@ -60,6 +60,7 @@ const TYPE_LABELS: Record<LodgingType, string> = {
     .price { font-size:13px; font-weight:600; color:var(--wp-primary); }
     .return-yes { font-size:11px; font-weight:700; color:#2E7D32; background:#E8F5E9; padding:2px 8px; border-radius:10px; }
     .return-no  { font-size:11px; font-weight:700; color:#B71C1C; background:#FFEBEE; padding:2px 8px; border-radius:10px; }
+    .visit-badge { font-size:11px; font-weight:700; color:#00695C; background:#E0F2F1; padding:2px 8px; border-radius:10px; }
     .stars { display:flex; align-items:center; gap:2px; margin-bottom:4px; }
     .empty { text-align:center; color:var(--wp-text-secondary); padding:60px 0; }
     .empty-icon { font-size:56px; display:block; margin-bottom:12px; }
@@ -124,11 +125,16 @@ const TYPE_LABELS: Record<LodgingType, string> = {
                     @if (l.pet_friendly) { <span title="Pet friendly"> 🐾</span> }
                   </span>
                 </div>
-                @if (l.would_return === true) {
-                  <div style="margin-top:8px"><span class="return-yes">✓ Would Return</span></div>
-                } @else if (l.would_return === false) {
-                  <div style="margin-top:8px"><span class="return-no">✗ Wouldn't Return</span></div>
-                }
+                <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+                  @if (l.would_return === true) {
+                    <span class="return-yes">✓ Would Return</span>
+                  } @else if (l.would_return === false) {
+                    <span class="return-no">✗ Wouldn't Return</span>
+                  }
+                  @if ((l.visit_count ?? 0) > 0) {
+                    <span class="visit-badge">{{ l.visit_count }}× visited</span>
+                  }
+                </div>
               </div>
             </mat-card>
           }

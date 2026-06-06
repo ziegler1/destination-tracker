@@ -61,6 +61,7 @@ type StatusFilter = DestinationStatus | 'all';
     .card-loc  { font-size:13px; color:var(--wp-text-secondary); margin:0 0 8px; }
     .card-meta { display:flex; align-items:center; justify-content:space-between; }
 
+    .visit-badge { font-size:11px; font-weight:700; color:#00695C; background:#E0F2F1; padding:2px 8px; border-radius:10px; }
     .empty { text-align:center; color:var(--wp-text-secondary); padding:60px 0; }
     .empty-icon { font-size:56px; display:block; margin-bottom:12px; }
 
@@ -130,8 +131,11 @@ type StatusFilter = DestinationStatus | 'all';
                   </p>
                   <p class="card-loc">{{ d.city }}, {{ d.state_province }} · {{ d.country }}</p>
                   <div class="card-meta">
-                    <span class="status-badge {{ d.status }}">
-                      {{ statusLabel(d.status) }}
+                    <span>
+                      <span class="status-badge {{ d.status }}">{{ statusLabel(d.status) }}</span>
+                      @if ((d.visit_count ?? 0) > 0) {
+                        <span class="visit-badge" style="margin-left:6px">{{ d.visit_count }}× visited</span>
+                      }
                     </span>
                     <span>
                       @for (i of stars(d.rating); track $index) {

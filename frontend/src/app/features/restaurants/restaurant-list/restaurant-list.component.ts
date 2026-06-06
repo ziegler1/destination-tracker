@@ -62,6 +62,7 @@ type PriceFilter = PriceRange | 'all';
 
     .return-yes { font-size:11px; font-weight:700; color:#2E7D32; background:#E8F5E9; padding:2px 8px; border-radius:10px; }
     .return-no  { font-size:11px; font-weight:700; color:#B71C1C; background:#FFEBEE; padding:2px 8px; border-radius:10px; }
+    .visit-badge { font-size:11px; font-weight:700; color:#00695C; background:#E0F2F1; padding:2px 8px; border-radius:10px; }
 
     .empty { text-align:center; color:var(--wp-text-secondary); padding:60px 0; }
     .empty-icon { font-size:56px; display:block; margin-bottom:12px; }
@@ -142,11 +143,16 @@ type PriceFilter = PriceRange | 'all';
                     }
                   </span>
                 </div>
-                @if (r.would_return === true) {
-                  <div style="margin-top:8px"><span class="return-yes">✓ Would Return</span></div>
-                } @else if (r.would_return === false) {
-                  <div style="margin-top:8px"><span class="return-no">✗ Wouldn't Return</span></div>
-                }
+                <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+                  @if (r.would_return === true) {
+                    <span class="return-yes">✓ Would Return</span>
+                  } @else if (r.would_return === false) {
+                    <span class="return-no">✗ Wouldn't Return</span>
+                  }
+                  @if ((r.visit_count ?? 0) > 0) {
+                    <span class="visit-badge">{{ r.visit_count }}× visited</span>
+                  }
+                </div>
               </div>
             </mat-card>
           }

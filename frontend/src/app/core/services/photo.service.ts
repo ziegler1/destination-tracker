@@ -45,4 +45,11 @@ export class PhotoService {
       {},
     );
   }
+
+  updateCaption(entityType: PhotoEntityType, entityId: number, photoId: number, caption: string) {
+    return this.http.patch<EntityPhoto>(
+      `/api/${entityType}/${entityId}/photos/${photoId}/caption`,
+      { caption },
+    );
+  }
 }

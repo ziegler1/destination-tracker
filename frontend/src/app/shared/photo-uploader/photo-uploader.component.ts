@@ -1,6 +1,7 @@
 import {
   Component, ChangeDetectionStrategy, inject, signal, input, output, ViewChild, ElementRef,
 } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -11,7 +12,7 @@ import { PhotoService, EntityPhoto, PhotoEntityType } from '../../core/services/
   selector: 'app-photo-uploader',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MatIconModule, MatButtonModule, MatProgressSpinnerModule, MatSnackBarModule],
+  imports: [FormsModule, MatIconModule, MatButtonModule, MatProgressSpinnerModule, MatSnackBarModule],
   styles: [`
     .drop-zone {
       border: 2px dashed var(--wp-border); border-radius: 10px;
@@ -27,17 +28,18 @@ import { PhotoService, EntityPhoto, PhotoEntityType } from '../../core/services/
     .drop-zone small { font-size: 12px; color: var(--wp-text-hint); }
 
     .photo-grid {
-      display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
       gap: 10px; margin-top: 14px;
     }
-    .photo-item { position: relative; border-radius: 8px; overflow: hidden; aspect-ratio: 1; }
-    .photo-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .photo-item { border-radius: 8px; overflow: hidden; }
+    .photo-thumb { position: relative; aspect-ratio: 1; }
+    .photo-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
     .photo-overlay {
       position: absolute; inset: 0; background: rgba(0,0,0,.45);
       display: flex; align-items: center; justify-content: center; gap: 4px;
       opacity: 0; transition: opacity .2s;
     }
-    .photo-item:hover .photo-overlay { opacity: 1; }
+    .photo-thumb:hover .photo-overlay { opacity: 1; }
     .photo-overlay button { color: white !important; }
     .primary-badge {
       position: absolute; top: 4px; left: 4px; background: var(--wp-accent);
@@ -47,6 +49,15 @@ import { PhotoService, EntityPhoto, PhotoEntityType } from '../../core/services/
       position: absolute; inset: 0; background: rgba(255,255,255,.7);
       display: flex; align-items: center; justify-content: center;
     }
+    .caption-row { padding: 4px 2px 0; }
+    .caption-text { font-size: 11px; color: var(--wp-text-secondary); line-height: 1.3; margin: 0;
+                    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .caption-input {
+      width: 100%; font-size: 11px; padding: 2px 4px; border: 1px solid var(--wp-border);
+      border-radius: 4px; background: var(--wp-surface); color: var(--wp-text-primary);
+      outline: none;
+    }
+    .caption-input:focus { border-color: var(--wp-primary); }
   `],
   template: `
     <!-- Drop zone -->
@@ -72,21 +83,40 @@ import { PhotoService, EntityPhoto, PhotoEntityType } from '../../core/services/
       <div class="photo-grid">
         @for (p of photos(); track p.id) {
           <div class="photo-item">
-            <img [src]="p.url" [alt]="'photo'" loading="lazy" />
-            @if (p.is_primary) { <div class="primary-badge">PRIMARY</div> }
-            <div class="photo-overlay">
-              @if (!p.is_primary) {
-                <button mat-icon-button (click)="makePrimary(p)" title="Set as primary">
-                  <mat-icon>star</mat-icon>
+            <div class="photo-thumb">
+              <img [src]="p.url" [alt]="p.caption ?? 'photo'" loading="lazy" />
+              @if (p.is_primary) { <div class="primary-badge">PRIMARY</div> }
+              <div class="photo-overlay">
+                @if (!p.is_primary) {
+                  <button mat-icon-button (click)="makePrimary(p)" title="Set as primary">
+                    <mat-icon>star</mat-icon>
+                  </button>
+                }
+                <button mat-icon-button (click)="startEditCaption(p)" title="Edit caption">
+                  <mat-icon>edit</mat-icon>
                 </button>
+                <button mat-icon-button (click)="deletePhoto(p)" title="Delete photo">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </div>
+              @if (deletingId() === p.id) {
+                <div class="uploading-overlay"><mat-spinner diameter="24" /></div>
               }
-              <button mat-icon-button (click)="deletePhoto(p)" title="Delete photo">
-                <mat-icon>delete</mat-icon>
-              </button>
             </div>
-            @if (deletingId() === p.id) {
-              <div class="uploading-overlay"><mat-spinner diameter="24" /></div>
-            }
+            <div class="caption-row">
+              @if (editingCaptionId() === p.id) {
+                <input class="caption-input" type="text" [(ngModel)]="editingCaption"
+                       placeholder="Add caption…"
+                       (blur)="saveCaption(p)"
+                       (keydown.enter)="saveCaption(p)"
+                       (keydown.escape)="cancelCaption()" />
+              } @else if (p.caption) {
+                <p class="caption-text" (click)="startEditCaption(p)" title="Click to edit">{{ p.caption }}</p>
+              } @else {
+                <p class="caption-text" style="color:var(--wp-text-hint);font-style:italic"
+                   (click)="startEditCaption(p)">Add caption…</p>
+              }
+            </div>
           </div>
         }
       </div>
@@ -104,9 +134,11 @@ export class PhotoUploaderComponent {
   private svc   = inject(PhotoService);
   private snack = inject(MatSnackBar);
 
-  isDragging = signal(false);
-  uploading  = signal(false);
-  deletingId = signal<number | null>(null);
+  isDragging        = signal(false);
+  uploading         = signal(false);
+  deletingId        = signal<number | null>(null);
+  editingCaptionId  = signal<number | null>(null);
+  editingCaption    = '';
 
   onDragOver(e: DragEvent) {
     e.preventDefault();
@@ -159,5 +191,32 @@ export class PhotoUploaderComponent {
         this.deletingId.set(null);
       },
     });
+  }
+
+  startEditCaption(photo: EntityPhoto) {
+    this.editingCaption = photo.caption ?? '';
+    this.editingCaptionId.set(photo.id);
+    setTimeout(() => {
+      const el = document.querySelector<HTMLInputElement>('.caption-input');
+      el?.focus();
+      el?.select();
+    }, 0);
+  }
+
+  cancelCaption() {
+    this.editingCaptionId.set(null);
+    this.editingCaption = '';
+  }
+
+  saveCaption(photo: EntityPhoto) {
+    const id = this.editingCaptionId();
+    if (id === null) return;
+    this.editingCaptionId.set(null);
+    const caption = this.editingCaption.trim();
+    this.svc.updateCaption(this.entityType(), this.entityId(), photo.id, caption).subscribe({
+      next: () => this.changed.emit(),
+      error: () => this.snack.open('Failed to save caption', 'Dismiss', { duration: 3000 }),
+    });
+    this.editingCaption = '';
   }
 }

@@ -152,4 +152,14 @@ router.patch('/:id/photos/:photoId/primary', asyncHandler(async (req, res) => {
   res.json(rows[0]);
 }));
 
+router.patch('/:id/photos/:photoId/caption', asyncHandler(async (req, res) => {
+  const { caption } = req.body;
+  const { rows } = await pool.query(
+    'UPDATE destination_photos SET caption=$1 WHERE id=$2 AND destination_id=$3 RETURNING *',
+    [caption ?? null, req.params.photoId, req.params.id],
+  );
+  if (!rows[0]) return void res.status(404).json({ error: 'Photo not found' });
+  res.json(rows[0]);
+}));
+
 export default router;
