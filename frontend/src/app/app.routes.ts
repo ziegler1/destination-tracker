@@ -1,7 +1,16 @@
 import { Routes } from '@angular/router';
 
 export const routes: Routes = [
-  { path: '', redirectTo: 'trips', pathMatch: 'full' },
+  {
+    path: '',
+    loadComponent: () =>
+      import('./features/home/home.component').then((m) => m.HomeComponent),
+  },
+  {
+    path: 'travels',
+    loadComponent: () =>
+      import('./features/travels/travels.component').then((m) => m.TravelsComponent),
+  },
   {
     path: 'trips',
     loadChildren: () =>
