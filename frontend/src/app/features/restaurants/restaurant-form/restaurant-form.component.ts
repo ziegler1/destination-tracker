@@ -34,12 +34,15 @@ const CUISINES = [
   ],
   styles: [`
     mat-card { max-width:720px; margin:0 auto; padding:24px; }
-    .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:0 16px; }
+    .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
     .full { grid-column:1/-1; }
     .row { display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-bottom:8px; }
     .actions { display:flex; gap:12px; margin-top:8px; }
     .star-row { display:flex; gap:4px; cursor:pointer; }
-    .star-btn { font-size:28px; background:none; border:none; cursor:pointer; padding:0; line-height:1; }
+    .star-btn {
+      font-size:28px; background:none; border:none; cursor:pointer; line-height:1;
+      width:44px; height:44px; display:inline-flex; align-items:center; justify-content:center;
+    }
     h2 { margin:0 0 20px; font-size:20px; font-weight:600; }
   `],
   template: `

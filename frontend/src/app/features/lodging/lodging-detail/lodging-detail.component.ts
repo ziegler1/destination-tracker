@@ -47,7 +47,7 @@ const TYPE_LABELS: Record<LodgingType, string> = {
     .info-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:12px; margin:16px 0; }
     .info-item label { font-size:11px; text-transform:uppercase; letter-spacing:.8px; color:var(--wp-text-hint); display:block; }
     .info-item span  { font-size:15px; font-weight:500; }
-    .section-title { font-size:16px; font-weight:600; margin:20px 0 10px; }
+    .section-title { font-size:16px; font-weight:600; margin:24px 0 12px; }
     .amenities-row { display:flex; flex-wrap:wrap; gap:8px; }
     .amenity-chip { padding:4px 12px; border-radius:14px; background:var(--wp-surface-variant); font-size:13px; }
     .would-return { display:inline-flex; align-items:center; gap:4px; padding:4px 12px; border-radius:12px; font-size:13px; font-weight:500; }

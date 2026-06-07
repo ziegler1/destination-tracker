@@ -54,7 +54,7 @@ const CATEGORY_META: Record<string, { icon: string; label: string }> = {
     .info-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:12px; margin:16px 0; }
     .info-item label { font-size:11px; text-transform:uppercase; letter-spacing:.8px; color:var(--wp-text-hint); display:block; }
     .info-item span  { font-size:15px; font-weight:500; }
-    .section-title { font-size:16px; font-weight:600; margin:20px 0 10px; }
+    .section-title { font-size:16px; font-weight:600; margin:24px 0 12px; }
     .would-return { display:inline-flex; align-items:center; gap:4px; padding:4px 12px; border-radius:12px; font-size:13px; font-weight:500; }
     .would-return.yes { background:#e8f5e9; color:#2e7d32; }
     .would-return.no  { background:#fce4ec; color:#c62828; }

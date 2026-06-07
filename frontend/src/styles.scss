@@ -86,13 +86,26 @@ body {
 .page-container { padding: 24px; max-width: 1200px; margin: 0 auto; }
 
 @media (max-width: 768px) {
+  // 16px horizontal padding; extra bottom breathing room keeps Save/Cancel
+  // reachable above the fixed mobile bottom-tab bar.
   .page-container { padding: 16px 16px 120px; }
-}
 
-@media (max-width: 768px) {
-  // Extra top/bottom breathing room so page headers don't crowd content and
-  // Save/Cancel buttons stay reachable above the fixed mobile bottom-tab bar.
-  .page-container { padding-top: 16px; padding-bottom: 120px; }
+  // Fix 8 #4 — form inputs: ≥16px font prevents iOS auto-zoom; 52px min targets
+  form .mat-mdc-form-field { width: 100%; }
+  form .mat-mdc-form-field input,
+  form .mat-mdc-form-field textarea,
+  form .mat-mdc-form-field .mat-mdc-select-value { font-size: 16px !important; }
+  form .mat-mdc-text-field-wrapper,
+  form .mat-mdc-select { min-height: 52px; }
+
+  // Fix 8 #5 — primary form buttons: full width, comfortable tap target
+  form .actions { flex-direction: column; }
+  form .actions .mat-mdc-raised-button,
+  form .actions .mat-mdc-stroked-button,
+  form .actions .mat-mdc-flat-button { width: 100%; min-height: 52px; font-size: 16px; }
+
+  // icon buttons (edit/delete): minimum 44×44 touch target
+  .mat-mdc-icon-button { width: 44px; height: 44px; padding: 10px; }
 }
 .loading-wrap   { display:flex; justify-content:center; align-items:center; height:240px; }
 .status-badge {

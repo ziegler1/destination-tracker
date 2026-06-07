@@ -44,7 +44,7 @@ import { Restaurant } from '../../../types/schema.types';
     .info-item label { font-size:11px; text-transform:uppercase; letter-spacing:.8px; color:var(--wp-text-hint); display:block; }
     .info-item span  { font-size:15px; font-weight:500; }
 
-    .section-title { font-size:16px; font-weight:600; margin:20px 0 10px; }
+    .section-title { font-size:16px; font-weight:600; margin:24px 0 12px; }
     .stars { display:flex; align-items:center; gap:2px; }
 
     .would-return { display:inline-flex; align-items:center; gap:4px; padding:4px 12px; border-radius:12px; font-size:13px; font-weight:500; }

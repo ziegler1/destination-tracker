@@ -75,6 +75,12 @@ const TYPE_LABELS: Record<LodgingType, string> = {
     @media (max-width: 768px) {
       .page-container { padding-bottom: 160px; }
       .fab            { bottom: 88px; right: 20px; z-index: 100; }
+      .grid           { grid-template-columns: 1fr; gap: 12px; }
+      .card-img, .card-placeholder { height: 180px; }
+      .card-name {
+        font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .card-loc { font-size: 12px; }
     }
   `],
   template: `

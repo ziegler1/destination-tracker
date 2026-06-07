@@ -66,7 +66,7 @@ interface WeatherDay {
 
     .info-card { background:var(--wp-surface); border-radius:12px; padding:20px; }
     .section-title { font-size:14px; font-weight:600; text-transform:uppercase;
-                     letter-spacing:.8px; color:var(--wp-text-secondary); margin:0 0 12px; }
+                     letter-spacing:.8px; color:var(--wp-text-secondary); margin:24px 0 12px; }
 
     .meta-row  { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
     .meta-icon { color:var(--wp-primary); }

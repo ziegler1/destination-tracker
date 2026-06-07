@@ -57,6 +57,13 @@ const RATING_CHIPS: Array<{ value: RatingFilter; label: string }> = [
 
     @media (max-width: 768px) {
       .page { padding: 16px 16px 160px; }
+      .page-title { font-size: 22px; }
+      .grid       { grid-template-columns: 1fr; gap: 12px; }
+      .card-photo, .card-photo-placeholder { height: 180px; }
+      .card-name {
+        font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .card-loc { font-size: 12px; }
     }
     .page-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
     .page-title  { font-size: 26px; font-weight: 800; margin: 0; flex: 1; }

@@ -80,6 +80,12 @@ type StatusFilter = DestinationStatus | 'all';
       .page-container { padding-bottom: 160px; }
       .fab          { bottom: 88px; right: 20px; z-index: 100; }
       .fab-suggest  { bottom: 160px; right: 20px; }
+      .grid         { grid-template-columns: 1fr; gap: 12px; }
+      .card-img, .card-img-placeholder { height: 180px; }
+      .card-name {
+        font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .card-loc { font-size: 12px; }
     }
   `],
   template: `

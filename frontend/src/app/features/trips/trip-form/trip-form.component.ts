@@ -26,7 +26,7 @@ import { TripService } from '../../../core/services/trip.service';
   ],
   styles: [`
     mat-card { max-width:640px; margin:0 auto; padding:24px; }
-    .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:0 16px; }
+    .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
     .full { grid-column:1/-1; }
     .actions { display:flex; gap:12px; margin-top:8px; }
     h2 { margin:0 0 20px; font-size:20px; font-weight:600; }

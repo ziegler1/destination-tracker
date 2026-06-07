@@ -264,8 +264,30 @@ function restaurantMarkerEl(): HTMLElement {
     .bottom-tabs { border-top:1px solid var(--wp-border); }
     .geocoding-note { font-size:12px; color:var(--wp-text-hint); text-align:center; padding:8px; }
 
-    /* Map tab (mobile-friendly map view inside companion bottom-tabs) */
-    .map-tab { display:flex; flex-direction:column; }
+    /* Map tab — compact prompt that opens a full-screen map overlay */
+    .map-tab-prompt {
+      display:flex; flex-direction:column; align-items:center; text-align:center;
+      gap:12px; padding:48px 24px;
+    }
+    .map-tab-icon { font-size:48px; height:48px; width:48px; color:var(--wp-primary); opacity:.45; }
+    .map-tab-text { font-size:14px; color:var(--wp-text-secondary); max-width:320px; margin:0; line-height:1.5; }
+    .open-map-btn { background:#00695C !important; color:#fff !important; }
+
+    /* Full-screen map overlay (escapes companion-layout's overflow:hidden via position:fixed) */
+    .map-overlay {
+      position:fixed; inset:0; z-index:1000; background:var(--wp-bg);
+      display:flex; flex-direction:column;
+    }
+    .map-overlay-header {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:10px 8px 10px 16px; background:var(--wp-surface);
+      border-bottom:1px solid var(--wp-border); flex:0 0 auto;
+    }
+    .map-overlay-title { font-size:16px; font-weight:700; }
+    .map-overlay-body { flex:1 1 auto; position:relative; min-height:0; }
+    .map-overlay .stop-strip { flex:0 0 auto; }
+    .map-overlay .add-stop-btn { flex:0 0 auto; }
+
     .stop-strip {
       display:flex; gap:10px; overflow-x:auto; padding:12px;
       -webkit-overflow-scrolling:touch;
@@ -505,7 +527,7 @@ function restaurantMarkerEl(): HTMLElement {
                 }
                 @if (routeStats()) {
                   <span style="font-size:12px;color:var(--wp-text-hint)">
-                    {{ routeStats()!.distanceKm | number:'1.0-0' }} km · {{ routeStats()!.durationMin | number:'1.0-0' }} min
+                    {{ routeStats()!.distanceMi | number:'1.0-0' }} mi · {{ driveLbl(routeStats()!.durationMin) }}
                   </span>
                 }
                 <span style="margin-left:auto;display:flex;gap:4px;align-items:center">
@@ -701,52 +723,11 @@ function restaurantMarkerEl(): HTMLElement {
             <mat-tab-group animationDuration="150ms" class="bottom-tabs">
               <mat-tab label="Stops"><app-trip-stops-tab [tripId]="t.id" /></mat-tab>
               <mat-tab label="Map">
-                <div class="map-tab">
-                  <google-map #mapTabGmap height="calc(100vh - 200px)" width="100%"
-                              [center]="mapCenter()" [zoom]="mapZoom()" [options]="mapOptions">
-                    @if (directionsResult()) {
-                      <map-directions-renderer
-                        [directions]="directionsResult()!"
-                        [options]="{ suppressMarkers:true, polylineOptions:{ strokeColor:'#00695C', strokeOpacity:.85, strokeWeight:4 } }" />
-                    }
-                    @for (m of stopMarkers(); track m.stopId) {
-                      <map-advanced-marker [position]="m.position" [content]="m.content" [title]="m.title" [zIndex]="m.zIndex" />
-                    }
-                    @for (m of lodgingMarkers(); track m.title) {
-                      <map-advanced-marker [position]="m.position" [content]="m.content" [title]="m.title" [zIndex]="m.zIndex" />
-                    }
-                    @for (m of restaurantMarkers(); track m.title) {
-                      <map-advanced-marker [position]="m.position" [content]="m.content" [title]="m.title" [zIndex]="m.zIndex" />
-                    }
-                    <map-info-window #mapTabInfo>
-                      @if (selectedMapStop(); as s) {
-                        <div style="min-width:160px;font-family:Roboto,sans-serif;padding:2px">
-                          <strong style="font-size:14px">{{ s.destination?.name ?? ('Stop ' + s.stop_order) }}</strong><br/>
-                          <small style="color:#666">{{ s.destination?.city }}{{ s.destination?.city && s.destination?.state_province ? ', ' : '' }}{{ s.destination?.state_province }}</small>
-                        </div>
-                      }
-                    </map-info-window>
-                  </google-map>
-
-                  <div class="stop-strip">
-                    @for (s of sortedStops(); track s.id) {
-                      <div class="strip-card" [class.active]="selectedMapStop()?.id === s.id" (click)="flyToStop(s)">
-                        <div class="strip-num">Stop {{ s.stop_order }}</div>
-                        <div class="strip-city">{{ s.destination?.city || s.destination?.name || ('Stop ' + s.stop_order) }}</div>
-                        @if (s.arrival_date || s.departure_date) {
-                          <div class="strip-dates">
-                            {{ s.arrival_date ? (s.arrival_date | date:'MMM d') : '' }}
-                            {{ s.arrival_date && s.departure_date ? '→' : '' }}
-                            {{ s.departure_date ? (s.departure_date | date:'MMM d') : '' }}
-                          </div>
-                        }
-                        <span class="status-pill" [style.color]="STOP_STATUS_COLOR[s.status]">{{ s.status }}</span>
-                      </div>
-                    }
-                  </div>
-
-                  <button mat-raised-button class="add-stop-btn" (click)="openAddStop()">
-                    <mat-icon>add_location_alt</mat-icon> Add Stop
+                <div class="map-tab-prompt">
+                  <mat-icon class="map-tab-icon">map</mat-icon>
+                  <p class="map-tab-text">View your full route, numbered stops, lodging and restaurants on an interactive map.</p>
+                  <button mat-raised-button class="open-map-btn" (click)="mapOverlayOpen.set(true)">
+                    <mat-icon>fullscreen</mat-icon> Open Trip Map
                   </button>
                 </div>
               </mat-tab>
@@ -779,6 +760,66 @@ function restaurantMarkerEl(): HTMLElement {
           </div>
 
         </div>
+
+        <!-- ── Full-screen Map overlay (mobile-friendly map view) ── -->
+        @if (mapOverlayOpen()) {
+          <div class="map-overlay">
+            <div class="map-overlay-header">
+              <span class="map-overlay-title">{{ t.name }} — Map</span>
+              <button mat-icon-button (click)="mapOverlayOpen.set(false)" title="Close map">
+                <mat-icon>close</mat-icon>
+              </button>
+            </div>
+            <div class="map-overlay-body">
+              <google-map #mapTabGmap height="100%" width="100%"
+                          [center]="mapCenter()" [zoom]="mapZoom()" [options]="mapOptions">
+                @if (directionsResult()) {
+                  <map-directions-renderer
+                    [directions]="directionsResult()!"
+                    [options]="{ suppressMarkers:true, polylineOptions:{ strokeColor:'#00695C', strokeOpacity:.85, strokeWeight:4 } }" />
+                }
+                @for (m of stopMarkers(); track m.stopId) {
+                  <map-advanced-marker [position]="m.position" [content]="m.content" [title]="m.title" [zIndex]="m.zIndex" />
+                }
+                @for (m of lodgingMarkers(); track m.title) {
+                  <map-advanced-marker [position]="m.position" [content]="m.content" [title]="m.title" [zIndex]="m.zIndex" />
+                }
+                @for (m of restaurantMarkers(); track m.title) {
+                  <map-advanced-marker [position]="m.position" [content]="m.content" [title]="m.title" [zIndex]="m.zIndex" />
+                }
+                <map-info-window #mapTabInfo>
+                  @if (selectedMapStop(); as s) {
+                    <div style="min-width:160px;font-family:Roboto,sans-serif;padding:2px">
+                      <strong style="font-size:14px">{{ s.destination?.name ?? ('Stop ' + s.stop_order) }}</strong><br/>
+                      <small style="color:#666">{{ s.destination?.city }}{{ s.destination?.city && s.destination?.state_province ? ', ' : '' }}{{ s.destination?.state_province }}</small>
+                    </div>
+                  }
+                </map-info-window>
+              </google-map>
+            </div>
+
+            <div class="stop-strip">
+              @for (s of sortedStops(); track s.id) {
+                <div class="strip-card" [class.active]="selectedMapStop()?.id === s.id" (click)="flyToStop(s)">
+                  <div class="strip-num">Stop {{ s.stop_order }}</div>
+                  <div class="strip-city">{{ s.destination?.city || s.destination?.name || ('Stop ' + s.stop_order) }}</div>
+                  @if (s.arrival_date || s.departure_date) {
+                    <div class="strip-dates">
+                      {{ s.arrival_date ? (s.arrival_date | date:'MMM d') : '' }}
+                      {{ s.arrival_date && s.departure_date ? '→' : '' }}
+                      {{ s.departure_date ? (s.departure_date | date:'MMM d') : '' }}
+                    </div>
+                  }
+                  <span class="status-pill" [style.color]="STOP_STATUS_COLOR[s.status]">{{ s.status }}</span>
+                </div>
+              }
+            </div>
+
+            <button mat-raised-button class="add-stop-btn" (click)="openAddStop()">
+              <mat-icon>add_location_alt</mat-icon> Add Stop
+            </button>
+          </div>
+        }
       }
     }
   `,
@@ -797,6 +838,7 @@ export class TripDetailComponent implements OnInit {
   private fb         = inject(FormBuilder);
   private bottomSheet = inject(MatBottomSheet);
 
+  mapOverlayOpen = signal(false);
   mapTabGmap = viewChild<GoogleMap>('mapTabGmap');
   mapTabInfo = viewChild<MapInfoWindow>('mapTabInfo');
   selectedMapStop = signal<TripStop | null>(null);
@@ -808,7 +850,7 @@ export class TripDetailComponent implements OnInit {
   editingStopId       = signal<number | null>(null);
   savingStop          = signal(false);
   cityLodgings        = signal<Lodging[]>([]);
-  routeStats          = signal<{ distanceKm: number; durationMin: number } | null>(null);
+  routeStats          = signal<{ distanceMi: number; durationMin: number } | null>(null);
   directionsResult    = signal<google.maps.DirectionsResult | null>(null);
 
   private coordCache = new Map<number, { lat: number; lng: number }>();
@@ -981,9 +1023,12 @@ export class TripDetailComponent implements OnInit {
       this.mapsSvc.loadDirectionsFromAddresses(addresses).subscribe(result => {
         this.directionsResult.set(result);
         if (result?.routes?.[0]?.legs) {
-          const totalDist = result.routes[0].legs.reduce((s, l) => s + l.distance!.value, 0);
-          const totalDur  = result.routes[0].legs.reduce((s, l) => s + l.duration!.value, 0);
-          this.routeStats.set({ distanceKm: Math.round(totalDist / 1000), durationMin: Math.round(totalDur / 60) });
+          const totalDistM = result.routes[0].legs.reduce((s, l) => s + l.distance!.value, 0);
+          const totalDurS  = result.routes[0].legs.reduce((s, l) => s + l.duration!.value, 0);
+          this.routeStats.set({
+            distanceMi: Math.round((totalDistM / 1000) * 0.621371),
+            durationMin: Math.round(totalDurS / 60),
+          });
         }
       });
     }
@@ -1114,7 +1159,7 @@ export class TripDetailComponent implements OnInit {
 
   driveLbl(mins: number): string {
     const h = Math.floor(mins / 60), m = mins % 60;
-    return m ? `${h}h ${m}m` : `${h}h`;
+    return m ? `${h}h ${m}min` : `${h}h`;
   }
 
   statusColor(s: TripStatus): string { return STATUS_COLOR[s] ?? '#666'; }

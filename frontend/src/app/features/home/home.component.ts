@@ -80,7 +80,7 @@ const TRIP_COLORS = ['#00695C', '#1565C0', '#6A1B9A', '#B71C1C', '#E65100', '#2E
       display:flex; align-items:center; justify-content:space-between;
       margin:0 0 14px;
     }
-    .section-title { font-size:17px; font-weight:700; margin:0; }
+    .section-title { font-size:17px; font-weight:700; margin:24px 0 12px; }
     .section-link  { font-size:13px; color:var(--wp-primary); text-decoration:none; }
     .section-link:hover { text-decoration:underline; }
 
