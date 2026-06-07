@@ -71,6 +71,16 @@ type StatusFilter = DestinationStatus | 'all';
       color: #fff !important;
       box-shadow: 0 4px 12px var(--wp-shadow) !important;
     }
+    .fab-suggest {
+      position: fixed; bottom: 100px; right: 28px; z-index: 100;
+      background: var(--wp-surface) !important; color: var(--wp-primary) !important;
+    }
+
+    @media (max-width: 768px) {
+      .page-container { padding-bottom: 160px; }
+      .fab          { bottom: 88px; right: 20px; z-index: 100; }
+      .fab-suggest  { bottom: 160px; right: 20px; }
+    }
   `],
   template: `
     <div class="page-container">
@@ -153,7 +163,7 @@ type StatusFilter = DestinationStatus | 'all';
       }
     </div>
 
-    <button mat-mini-fab style="position:fixed;bottom:100px;right:28px;z-index:100;background:var(--wp-surface);color:var(--wp-primary)"
+    <button mat-mini-fab class="fab-suggest"
             [routerLink]="['/destinations/suggest']" matTooltip="AI suggest">
       <mat-icon>auto_awesome</mat-icon>
     </button>

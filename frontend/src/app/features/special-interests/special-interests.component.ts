@@ -45,6 +45,10 @@ const CATEGORIES: Array<{ value: SpecialInterestCategory | ''; label: string }> 
   ],
   styles: [`
     .page { max-width: 1100px; margin: 0 auto; padding: 24px; }
+
+    @media (max-width: 768px) {
+      .page { padding: 16px 16px 160px; }
+    }
     .page-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
     .page-title  { font-size: 26px; font-weight: 800; margin: 0; flex: 1; }
     .filters { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }

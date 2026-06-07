@@ -73,6 +73,11 @@ const STATUS_META: Record<TripStatus, { label: string; icon: string; color: stri
       background:var(--wp-primary) !important; color:#fff !important;
       box-shadow:0 4px 12px var(--wp-shadow) !important;
     }
+
+    @media (max-width: 768px) {
+      .page-container { padding-bottom: 160px; }
+      .fab            { bottom: 88px; right: 20px; z-index: 100; }
+    }
   `],
   template: `
     <div class="page-container">
