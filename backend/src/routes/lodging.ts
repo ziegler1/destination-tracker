@@ -2,6 +2,7 @@ import { Router } from 'express';
 import pool from '../db';
 import { asyncHandler } from '../lib/asyncHandler';
 import { deleteFile } from '../lib/r2';
+import { normalizeState } from '../lib/normalizeState';
 
 const router = Router();
 
@@ -44,6 +45,7 @@ router.post('/', asyncHandler(async (req, res) => {
     lodging_type, price_per_night, room_quality, cleanliness, amenities,
     would_return, highlights, notes, website, phone, pet_friendly, image_url, booking_url,
   } = req.body;
+  const normalizedState = state_province ? normalizeState(state_province) : state_province;
   const { rows } = await pool.query(`
     INSERT INTO lodging
       (name, city, state_province, country, address, latitude, longitude,
@@ -51,7 +53,7 @@ router.post('/', asyncHandler(async (req, res) => {
        would_return, highlights, notes, website, phone, pet_friendly, image_url, booking_url)
     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
     RETURNING *
-  `, [name, city, state_province, country, address, latitude, longitude,
+  `, [name, city, normalizedState, country, address, latitude, longitude,
       lodging_type ?? 'hotel', price_per_night, room_quality, cleanliness,
       amenities ?? null, would_return, highlights, notes, website, phone,
       pet_friendly ?? false, image_url, booking_url ?? null]);
@@ -65,6 +67,7 @@ router.put('/:id', asyncHandler(async (req, res) => {
     lodging_type, price_per_night, room_quality, cleanliness, amenities,
     would_return, highlights, notes, website, phone, pet_friendly, image_url, booking_url,
   } = req.body;
+  const normalizedState = state_province ? normalizeState(state_province) : state_province;
   const { rows } = await pool.query(`
     UPDATE lodging SET
       name=$1, city=$2, state_province=$3, country=$4, address=$5,
@@ -74,7 +77,7 @@ router.put('/:id', asyncHandler(async (req, res) => {
       image_url=$19, booking_url=$20, updated_at=NOW()
     WHERE id=$21
     RETURNING *
-  `, [name, city, state_province, country, address, latitude, longitude,
+  `, [name, city, normalizedState, country, address, latitude, longitude,
       lodging_type, price_per_night, room_quality, cleanliness,
       amenities ?? null, would_return, highlights, notes, website, phone,
       pet_friendly ?? false, image_url, booking_url ?? null, req.params.id]);

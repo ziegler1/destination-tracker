@@ -13,6 +13,7 @@ import { SkeletonGridComponent } from '../../../shared/skeleton-grid/skeleton-gr
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { LodgingService } from '../../../core/services/lodging.service';
 import { Lodging, LodgingType } from '../../../types/schema.types';
+import { EmptyStateComponent } from '../../../shared/components/empty-state/empty-state.component';
 
 type TypeFilter = LodgingType | 'all';
 
@@ -28,6 +29,7 @@ const TYPE_LABELS: Record<LodgingType, string> = {
   imports: [
     RouterLink, CurrencyPipe, MatCardModule, MatFormFieldModule, MatInputModule,
     MatIconModule, MatButtonModule, MatProgressSpinnerModule, MatTooltipModule, SkeletonGridComponent,
+    EmptyStateComponent,
   ],
   styles: [`
     .toolbar { display:flex; align-items:center; gap:12px; margin-bottom:20px; }
@@ -92,6 +94,10 @@ const TYPE_LABELS: Record<LodgingType, string> = {
 
       @if (loading()) {
         <app-skeleton-grid [count]="6" />
+      } @else if (lodgings().length === 0) {
+        <app-empty-state icon="🏨" title="Log your stays"
+          subtitle="Record hotels and lodging from your travels"
+          ctaLabel="Add Lodging" ctaRoute="/lodging/new" />
       } @else if (filtered().length === 0) {
         <div class="empty">
           <span class="empty-icon">🏨</span>

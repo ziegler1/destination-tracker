@@ -2,6 +2,7 @@ import { Router } from 'express';
 import pool from '../db';
 import { asyncHandler } from '../lib/asyncHandler';
 import { deleteFile } from '../lib/r2';
+import { normalizeState } from '../lib/normalizeState';
 
 const router = Router();
 
@@ -44,6 +45,7 @@ router.post('/', asyncHandler(async (req, res) => {
     cuisine_type, price_range, rating, would_return, highlights,
     notes, website, phone, pet_friendly, image_url, menu_url,
   } = req.body;
+  const normalizedState = state_province ? normalizeState(state_province) : state_province;
   const { rows } = await pool.query(`
     INSERT INTO restaurants
       (name, city, state_province, country, address, latitude, longitude,
@@ -51,7 +53,7 @@ router.post('/', asyncHandler(async (req, res) => {
        notes, website, phone, pet_friendly, image_url, menu_url)
     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
     RETURNING *
-  `, [name, city, state_province, country, address, latitude, longitude,
+  `, [name, city, normalizedState, country, address, latitude, longitude,
       cuisine_type, price_range, rating, would_return, highlights,
       notes, website, phone, pet_friendly ?? false, image_url, menu_url ?? null]);
   res.status(201).json(rows[0]);
@@ -64,6 +66,7 @@ router.put('/:id', asyncHandler(async (req, res) => {
     cuisine_type, price_range, rating, would_return, highlights,
     notes, website, phone, pet_friendly, image_url, menu_url,
   } = req.body;
+  const normalizedState = state_province ? normalizeState(state_province) : state_province;
   const { rows } = await pool.query(`
     UPDATE restaurants SET
       name=$1, city=$2, state_province=$3, country=$4, address=$5,
@@ -73,7 +76,7 @@ router.put('/:id', asyncHandler(async (req, res) => {
       updated_at=NOW()
     WHERE id=$19
     RETURNING *
-  `, [name, city, state_province, country, address, latitude, longitude,
+  `, [name, city, normalizedState, country, address, latitude, longitude,
       cuisine_type, price_range, rating, would_return, highlights,
       notes, website, phone, pet_friendly ?? false, image_url, menu_url ?? null, req.params.id]);
   if (!rows[0]) return void res.status(404).json({ error: 'Restaurant not found' });

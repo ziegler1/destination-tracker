@@ -126,6 +126,9 @@ const STOP_TIMINGS = [
     }
     .sum-item label { font-size:11px; text-transform:uppercase; letter-spacing:.7px; color:var(--wp-text-hint); display:block; }
     .sum-item span  { font-size:16px; font-weight:700; color:var(--wp-primary); }
+    .budget-indicator { font-size:12px; font-weight:600; margin-left:4px; }
+    .budget-indicator.under { color:#2e7d32; }
+    .budget-indicator.over  { color:#FFB300; }
 
     .stop-panel-header { display:flex; align-items:center; width:100%; gap:8px; }
     .stop-header-info  { display:flex; align-items:center; gap:10px; flex-wrap:wrap; flex:1; min-width:0; }
@@ -390,7 +393,19 @@ const STOP_TIMINGS = [
           <div class="sum-item"><label>Stops</label><span>{{ plan()!.stops.length }}</span></div>
           <div class="sum-item"><label>Drive time</label><span>{{ totalDriveHours() }}h</span></div>
           <div class="sum-item"><label>Est. cost</label><span>{{ plan()!.trip.estimated_costs.total | currency:'USD':'symbol':'1.0-0' }}</span></div>
-          <div class="sum-item"><label>Budget</label><span>{{ plan()!.trip.budget | currency:'USD':'symbol':'1.0-0' }}</span></div>
+          @if (plan()!.trip.budget > 0) {
+            <div class="sum-item">
+              <label>Budget</label>
+              <span>
+                {{ plan()!.trip.budget | currency:'USD':'symbol':'1.0-0' }}
+                @if (plan()!.trip.estimated_costs.total < plan()!.trip.budget) {
+                  <span class="budget-indicator under">(under budget)</span>
+                } @else if (plan()!.trip.estimated_costs.total > plan()!.trip.budget) {
+                  <span class="budget-indicator over">(over budget)</span>
+                }
+              </span>
+            </div>
+          }
         </div>
 
         @if (plan()!.trip.travel_notes) {

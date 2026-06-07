@@ -3,6 +3,8 @@ import {
 } from '@angular/core';
 import { Router } from '@angular/router';
 import { MatBottomSheetRef } from '@angular/material/bottom-sheet';
+import { MatDialog } from '@angular/material/dialog';
+import { HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -17,6 +19,7 @@ import { PhotoService } from '../../../core/services/photo.service';
 import {
   PlacesAutocompleteComponent, PlaceSelectedEvent,
 } from '../places-autocomplete/places-autocomplete.component';
+import { DuplicateDestinationDialogComponent } from '../duplicate-destination-dialog/duplicate-destination-dialog.component';
 
 @Component({
   selector: 'app-quick-add-destination',
@@ -148,6 +151,7 @@ export class QuickAddDestinationComponent {
   private snack     = inject(MatSnackBar);
   private fb        = inject(FormBuilder);
   private router    = inject(Router);
+  private dialog    = inject(MatDialog);
 
   saving       = signal(false);
   photoFile    = signal<File | null>(null);
@@ -209,7 +213,11 @@ export class QuickAddDestinationComponent {
         : null;
       dto['rating'] = v.rating;
     }
-    this.svc.create(dto).pipe(
+    this.submit(dto, false);
+  }
+
+  private submit(dto: Record<string, unknown>, force: boolean) {
+    this.svc.create(dto, force).pipe(
       switchMap(dest => {
         if (!this.photoFile()) return of(dest);
         return this.photoSvc.upload(this.photoFile()!, 'destinations', dest.id, true)
@@ -217,8 +225,29 @@ export class QuickAddDestinationComponent {
       }),
     ).subscribe({
       next:  (d) => { this.ref.dismiss(); this.router.navigate(['/destinations', d.id]); },
-      error: () => { this.snack.open('Save failed', undefined, { duration: 3000 }); this.saving.set(false); },
+      error: (err: HttpErrorResponse) => {
+        if (err.status === 409 && err.error?.duplicate) {
+          this.handleDuplicate(dto, err.error.existing);
+          return;
+        }
+        this.snack.open('Save failed', undefined, { duration: 3000 });
+        this.saving.set(false);
+      },
     });
+  }
+
+  private handleDuplicate(dto: Record<string, unknown>, existing: { id: number; name: string; city: string; state_province: string }) {
+    this.dialog.open(DuplicateDestinationDialogComponent, { data: { existing }, width: '420px' })
+      .afterClosed().subscribe((result) => {
+        if (result === 'view') {
+          this.ref.dismiss();
+          this.router.navigate(['/destinations', existing.id]);
+        } else if (result === 'save-anyway') {
+          this.submit(dto, true);
+        } else {
+          this.saving.set(false);
+        }
+      });
   }
 
   dismiss() { this.ref.dismiss(); }

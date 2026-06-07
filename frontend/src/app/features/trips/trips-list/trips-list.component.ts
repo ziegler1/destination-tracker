@@ -8,6 +8,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { SkeletonGridComponent } from '../../../shared/skeleton-grid/skeleton-grid.component';
+import { EmptyStateComponent } from '../../../shared/components/empty-state/empty-state.component';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { TripService } from '../../../core/services/trip.service';
 import { Trip, TripStatus } from '../../../types/schema.types';
@@ -29,6 +30,7 @@ const STATUS_META: Record<TripStatus, { label: string; icon: string; color: stri
     RouterLink, DatePipe, CurrencyPipe,
     MatCardModule, MatIconModule,
     MatButtonModule, MatProgressSpinnerModule, MatTooltipModule, SkeletonGridComponent,
+    EmptyStateComponent,
   ],
   styles: [`
     .chips { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:20px; }
@@ -86,10 +88,14 @@ const STATUS_META: Record<TripStatus, { label: string; icon: string; color: stri
 
       @if (loading()) {
         <app-skeleton-grid [count]="4" />
+      } @else if (trips().length === 0) {
+        <app-empty-state icon="🗺️" title="No trips yet"
+          subtitle="Plan your first road trip and Waypoint will build a complete itinerary"
+          ctaLabel="Plan a Trip" ctaRoute="/trips/new" />
       } @else if (filtered().length === 0) {
         <div class="empty">
           <span class="empty-icon">✈️</span>
-          <p>No trips found — plan your first adventure!</p>
+          <p>No trips match this filter</p>
         </div>
       } @else {
         <div class="grid">

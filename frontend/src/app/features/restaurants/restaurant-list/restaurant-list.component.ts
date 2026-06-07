@@ -13,6 +13,7 @@ import { SkeletonGridComponent } from '../../../shared/skeleton-grid/skeleton-gr
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { RestaurantService } from '../../../core/services/restaurant.service';
 import { Restaurant, PriceRange } from '../../../types/schema.types';
+import { EmptyStateComponent } from '../../../shared/components/empty-state/empty-state.component';
 
 type PriceFilter = PriceRange | 'all';
 
@@ -24,6 +25,7 @@ type PriceFilter = PriceRange | 'all';
     RouterLink, MatCardModule, MatFormFieldModule, MatInputModule,
     MatSelectModule, MatIconModule, MatButtonModule,
     MatProgressSpinnerModule, MatTooltipModule, SkeletonGridComponent,
+    EmptyStateComponent,
   ],
   styles: [`
     .toolbar { display:flex; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:20px; }
@@ -106,6 +108,10 @@ type PriceFilter = PriceRange | 'all';
 
       @if (loading()) {
         <app-skeleton-grid [count]="6" />
+      } @else if (restaurants().length === 0) {
+        <app-empty-state icon="🍽️" title="Add your favorite restaurants"
+          subtitle="Log places you've eaten and rate your experience"
+          ctaLabel="Add Restaurant" ctaRoute="/restaurants/new" />
       } @else if (filtered().length === 0) {
         <div class="empty">
           <span class="empty-icon">🍽️</span>
@@ -157,6 +163,11 @@ type PriceFilter = PriceRange | 'all';
             </mat-card>
           }
         </div>
+        @if (restaurants().length < 3) {
+          <app-empty-state icon="🍽️" title="Add your favorite restaurants"
+            subtitle="Log places you've eaten and rate your experience"
+            ctaLabel="Add Restaurant" ctaRoute="/restaurants/new" />
+        }
       }
     </div>
 

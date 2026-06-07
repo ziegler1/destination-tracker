@@ -12,6 +12,7 @@ import { BaseChartDirective } from 'ng2-charts';
 import { ChartData, ChartOptions } from 'chart.js';
 import { StatsService, StatsResponse } from '../../core/services/stats.service';
 import { ClaudeService } from '../../core/services/claude.service';
+import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 
 const EXP_COLORS: Record<string, string> = {
   lodging: '#1565c0', food: '#e65100', fuel: '#2e7d32',
@@ -32,7 +33,7 @@ interface InsightCard { icon: string; headline: string; detail: string; }
   imports: [
     RouterLink, CurrencyPipe, DecimalPipe,
     MatCardModule, MatProgressSpinnerModule, MatIconModule, MatDividerModule, MatButtonModule,
-    BaseChartDirective,
+    BaseChartDirective, EmptyStateComponent,
   ],
   styles: [`
     h2 { margin:0 0 24px; font-size:22px; font-weight:700; }
@@ -166,7 +167,9 @@ interface InsightCard { icon: string; headline: string; detail: string; }
             @if (tripsChartData().labels!.length > 0) {
               <canvas baseChart type="bar" [data]="tripsChartData()" [options]="barOptions"></canvas>
             } @else {
-              <p class="empty-note">No trip data yet</p>
+              <app-empty-state icon="✈️" title="No trips completed yet"
+                subtitle="Plan your first trip to start tracking stats"
+                ctaLabel="Plan a Trip" ctaRoute="/trips/new" />
             }
           </mat-card>
 
@@ -200,7 +203,8 @@ interface InsightCard { icon: string; headline: string; detail: string; }
                 }
               </div>
             } @else {
-              <p class="empty-note">No expenses logged yet</p>
+              <app-empty-state icon="💰" title="No expenses logged yet"
+                subtitle="Add expenses during a trip to track your spending" />
             }
           </mat-card>
 

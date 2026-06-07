@@ -2,6 +2,7 @@ import { Router } from 'express';
 import pool from '../db';
 import { asyncHandler } from '../lib/asyncHandler';
 import { deleteFile } from '../lib/r2';
+import { normalizeState } from '../lib/normalizeState';
 
 const router = Router();
 
@@ -44,6 +45,7 @@ router.post('/', asyncHandler(async (req, res) => {
     latitude, longitude, website, phone,
     rating, would_return, highlights, notes, image_url,
   } = req.body;
+  const normalizedState = state_province ? normalizeState(state_province) : state_province;
   const { rows } = await pool.query(`
     INSERT INTO special_interest_places
       (name, city, state_province, country, category, address,
@@ -51,7 +53,7 @@ router.post('/', asyncHandler(async (req, res) => {
        rating, would_return, highlights, notes, image_url)
     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
     RETURNING *
-  `, [name, city, state_province, country ?? 'USA', category, address,
+  `, [name, city, normalizedState, country ?? 'USA', category, address,
       latitude, longitude, website, phone,
       rating, would_return, highlights, notes, image_url]);
   res.status(201).json(rows[0]);
@@ -64,6 +66,7 @@ router.put('/:id', asyncHandler(async (req, res) => {
     latitude, longitude, website, phone,
     rating, would_return, highlights, notes, image_url,
   } = req.body;
+  const normalizedState = state_province ? normalizeState(state_province) : state_province;
   const { rows } = await pool.query(`
     UPDATE special_interest_places SET
       name=$1, city=$2, state_province=$3, country=$4, category=$5, address=$6,
@@ -72,7 +75,7 @@ router.put('/:id', asyncHandler(async (req, res) => {
       updated_at=NOW()
     WHERE id=$16
     RETURNING *
-  `, [name, city, state_province, country ?? 'USA', category, address,
+  `, [name, city, normalizedState, country ?? 'USA', category, address,
       latitude, longitude, website, phone,
       rating, would_return, highlights, notes, image_url, req.params.id]);
   if (!rows[0]) return void res.status(404).json({ error: 'Not found' });

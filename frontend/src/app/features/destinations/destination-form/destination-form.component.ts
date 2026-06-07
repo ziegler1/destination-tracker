@@ -15,9 +15,12 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { COMMA, ENTER } from '@angular/cdk/keycodes';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { MatDialog } from '@angular/material/dialog';
+import { HttpErrorResponse } from '@angular/common/http';
 import { DestinationService } from '../../../core/services/destination.service';
 import { GeocodingService } from '../../../core/services/geocoding.service';
 import { PlacesAutocompleteComponent, PlaceSelectedEvent } from '../../../shared/components/places-autocomplete/places-autocomplete.component';
+import { DuplicateDestinationDialogComponent } from '../../../shared/components/duplicate-destination-dialog/duplicate-destination-dialog.component';
 
 const MONTHS = [
   'January','February','March','April','May','June',
@@ -222,6 +225,7 @@ export class DestinationFormComponent implements OnInit {
   private geoSvc  = inject(GeocodingService);
   private snack   = inject(MatSnackBar);
   private fb      = inject(FormBuilder);
+  private dialog  = inject(MatDialog);
 
   isEdit     = signal(false);
   saving     = signal(false);
@@ -357,16 +361,44 @@ export class DestinationFormComponent implements OnInit {
       ? (raw.visited_at as Date).toISOString().slice(0, 10)
       : undefined;
 
-    const req$ = this.isEdit()
-      ? this.svc.update(this.destId!, dto)
-      : this.svc.create(dto);
+    if (this.isEdit()) {
+      this.svc.update(this.destId!, dto).subscribe({
+        next: (d) => this.router.navigate(['/destinations', d.id]),
+        error: (e) => {
+          this.error.set(e.error?.error ?? 'An error occurred');
+          this.saving.set(false);
+        },
+      });
+      return;
+    }
 
-    req$.subscribe({
+    this.submit(dto, false);
+  }
+
+  private submit(dto: Record<string, unknown>, force: boolean): void {
+    this.svc.create(dto, force).subscribe({
       next: (d) => this.router.navigate(['/destinations', d.id]),
-      error: (e) => {
+      error: (e: HttpErrorResponse) => {
+        if (e.status === 409 && e.error?.duplicate) {
+          this.handleDuplicate(dto, e.error.existing);
+          return;
+        }
         this.error.set(e.error?.error ?? 'An error occurred');
         this.saving.set(false);
       },
     });
+  }
+
+  private handleDuplicate(dto: Record<string, unknown>, existing: { id: number; name: string; city: string; state_province: string }): void {
+    this.dialog.open(DuplicateDestinationDialogComponent, { data: { existing }, width: '420px' })
+      .afterClosed().subscribe((result) => {
+        if (result === 'view') {
+          this.router.navigate(['/destinations', existing.id]);
+        } else if (result === 'save-anyway') {
+          this.submit(dto, true);
+        } else {
+          this.saving.set(false);
+        }
+      });
   }
 }

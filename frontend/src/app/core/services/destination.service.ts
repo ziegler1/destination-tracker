@@ -15,8 +15,8 @@ export class DestinationService {
     return this.http.get<Destination>(`${this.base}/${id}`);
   }
 
-  create(dto: Partial<Destination> | Record<string, unknown>) {
-    return this.http.post<Destination>(this.base, dto);
+  create(dto: Partial<Destination> | Record<string, unknown>, force = false) {
+    return this.http.post<Destination>(this.base, dto, force ? { params: { force: 'true' } } : {});
   }
 
   update(id: number, dto: Partial<Destination> | Record<string, unknown>) {

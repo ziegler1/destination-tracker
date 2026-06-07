@@ -2,6 +2,7 @@ import { Router } from 'express';
 import pool from '../db';
 import { asyncHandler } from '../lib/asyncHandler';
 import { deleteFile } from '../lib/r2';
+import { normalizeState } from '../lib/normalizeState';
 
 const router = Router();
 
@@ -53,13 +54,28 @@ router.post('/', asyncHandler(async (req, res) => {
     latitude, longitude, status, best_months, visited_at,
     rating, notes, image_url,
   } = req.body;
+  const normalizedState = state_province ? normalizeState(state_province) : state_province;
+
+  if (req.query.force !== 'true') {
+    const { rows: existing } = await pool.query(
+      `SELECT id, name, city, state_province FROM destinations
+       WHERE LOWER(TRIM(city)) = LOWER(TRIM($1))
+         AND LOWER(TRIM(state_province)) = LOWER(TRIM($2))
+       LIMIT 1`,
+      [city, normalizedState],
+    );
+    if (existing[0]) {
+      return void res.status(409).json({ duplicate: true, existing: existing[0] });
+    }
+  }
+
   const { rows } = await pool.query(`
     INSERT INTO destinations
       (name, city, state_province, country, region, description,
        latitude, longitude, status, best_months, visited_at, rating, notes, image_url)
     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
     RETURNING *
-  `, [name, city, state_province, country, region, description,
+  `, [name, city, normalizedState, country, region, description,
       latitude, longitude, status ?? 'want_to_visit', best_months ?? null,
       visited_at, rating, notes, image_url]);
   res.status(201).json(rows[0]);
@@ -72,6 +88,7 @@ router.put('/:id', asyncHandler(async (req, res) => {
     latitude, longitude, status, best_months, visited_at,
     rating, notes, image_url, travel_tips,
   } = req.body;
+  const normalizedState = state_province ? normalizeState(state_province) : state_province;
   const { rows } = await pool.query(`
     UPDATE destinations SET
       name=$1, city=$2, state_province=$3, country=$4, region=$5,
@@ -80,7 +97,7 @@ router.put('/:id', asyncHandler(async (req, res) => {
       travel_tips=$15, updated_at=NOW()
     WHERE id=$16
     RETURNING *
-  `, [name, city, state_province, country, region, description,
+  `, [name, city, normalizedState, country, region, description,
       latitude, longitude, status, best_months ?? null, visited_at,
       rating, notes, image_url, travel_tips ?? null, req.params.id]);
   if (!rows[0]) return void res.status(404).json({ error: 'Destination not found' });

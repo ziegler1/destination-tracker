@@ -210,7 +210,9 @@ export class MapComponent implements OnInit, AfterViewInit {
   directionsResult = signal<google.maps.DirectionsResult | null>(null);
   tripStopMarkers  = signal<Array<{ position: google.maps.LatLngLiteral; content: HTMLElement; label: string }>>([]);
 
-  private dataLayerLoaded = false;
+  private statesGeoJson: object | null = null;
+  private geoJsonAddedToMap = false;
+  private mapTilesReady = false;
 
   validDests = computed(() =>
     this.destinations().filter(d => d.latitude != null && d.longitude != null),
@@ -236,16 +238,21 @@ export class MapComponent implements OnInit, AfterViewInit {
   };
 
   ngOnInit() {
-    forkJoin([this.destSvc.list(), this.tripSvc.list()]).subscribe({
-      next: ([dests, trips]) => {
+    // Fetch the states GeoJSON in parallel with destinations/trips so it's
+    // ready (and awaited) before we ever try to add it to the map's data layer —
+    // adding it before it's loaded was the root cause of the missing fill.
+    forkJoin([
+      this.destSvc.list(),
+      this.tripSvc.list(),
+      fetch(US_STATES_GEOJSON_URL).then(r => r.json()).catch(() => null),
+    ]).subscribe({
+      next: ([dests, trips, geojson]) => {
         this.destinations.set(dests);
         this.trips.set(trips);
         this.loading.set(false);
         this.computeVisitedStates(dests);
-        // Re-style data layer once states are known
-        if (this.dataLayerLoaded) {
-          this.applyDataLayerStyle();
-        }
+        this.statesGeoJson = geojson as object | null;
+        this.maybeInitStateLayer();
       },
       error: () => this.loading.set(false),
     });
@@ -256,9 +263,8 @@ export class MapComponent implements OnInit, AfterViewInit {
   }
 
   onTilesLoaded() {
-    if (this.dataLayerLoaded) return;
-    this.dataLayerLoaded = true;
-    this.loadStateLayer();
+    this.mapTilesReady = true;
+    this.maybeInitStateLayer();
   }
 
   private computeVisitedStates(dests: Destination[]) {
@@ -267,61 +273,67 @@ export class MapComponent implements OnInit, AfterViewInit {
       .filter(d => d.status === 'visited' && d.state_province)
       .forEach(d => {
         const sp = d.state_province.trim();
-        // Lookup abbreviation or use as-is (already full name)
+        // Lookup abbreviation or use as-is (already a full name post-normalization)
         const fullName = ABBREV_TO_STATE[sp.toUpperCase()] ?? sp;
         visited.add(fullName);
       });
     this.visitedStates.set(visited);
   }
 
-  private loadStateLayer() {
-    const map = this.gmap.googleMap;
+  /** Adds the GeoJSON to the map's data layer (once) and applies the choropleth
+   *  style — but only once BOTH the map tiles are ready AND the GeoJSON has
+   *  finished loading, so we never style an empty/incomplete data layer. */
+  private maybeInitStateLayer() {
+    if (this.geoJsonAddedToMap || !this.mapTilesReady || !this.statesGeoJson) return;
+    const map = this.gmap?.googleMap;
     if (!map) return;
 
-    fetch(US_STATES_GEOJSON_URL)
-      .then(r => r.json())
-      .then((geojson: unknown) => {
-        map.data.addGeoJson(geojson as object);
-        this.applyDataLayerStyle();
-      })
-      .catch(() => { /* silently fail — map still works without state fill */ });
+    map.data.addGeoJson(this.statesGeoJson);
+    this.geoJsonAddedToMap = true;
+    this.applyDataLayerStyle();
   }
 
   private applyDataLayerStyle() {
     const map = this.gmap?.googleMap;
     if (!map) return;
     const visited = this.visitedStates();
+
+    const matched: string[] = [];
+    const unmatched: string[] = [];
+
     map.data.setStyle((feature: google.maps.Data.Feature) => {
-      const name = feature.getProperty('name') as string | undefined;
-      const isVisited = name ? visited.has(name) : false;
+      const name =
+        (feature.getProperty('NAME_1') as string | undefined) ||
+        (feature.getProperty('name') as string | undefined) ||
+        (feature.getProperty('NAME') as string | undefined);
+      const isVisited = !!name && visited.has(name);
+      if (name) (isVisited ? matched : unmatched).push(name);
       return {
-        fillColor:    isVisited ? '#00695C' : 'transparent',
-        fillOpacity:  isVisited ? 0.18 : 0,
-        strokeColor:  isVisited ? '#00695C' : '#bbb',
-        strokeOpacity: isVisited ? 0.45 : 0.08,
-        strokeWeight: 0.5,
-        clickable:    false,
+        fillColor:     isVisited ? '#00695C' : 'transparent',
+        fillOpacity:   isVisited ? 0.15 : 0,
+        strokeColor:   '#00695C',
+        strokeOpacity: isVisited ? 0.3 : 0,
+        strokeWeight:  1,
+        clickable:     false,
       };
     });
+
+    // eslint-disable-next-line no-console
+    console.log('[map] visited states:', [...visited]);
+    // eslint-disable-next-line no-console
+    console.log('[map] GeoJSON states matched (filled):', matched);
+    // eslint-disable-next-line no-console
+    console.log('[map] GeoJSON states not visited:', unmatched);
   }
 
   toggleStateFill(show: boolean) {
     const map = this.gmap?.googleMap;
     if (!map) return;
-    const visited = this.visitedStates();
-    map.data.setStyle((feature: google.maps.Data.Feature) => {
-      if (!show) return { fillOpacity: 0, strokeOpacity: 0, clickable: false };
-      const name = feature.getProperty('name') as string | undefined;
-      const isVisited = name ? visited.has(name) : false;
-      return {
-        fillColor:    isVisited ? '#00695C' : 'transparent',
-        fillOpacity:  isVisited ? 0.18 : 0,
-        strokeColor:  isVisited ? '#00695C' : '#bbb',
-        strokeOpacity: isVisited ? 0.45 : 0.08,
-        strokeWeight: 0.5,
-        clickable:    false,
-      };
-    });
+    if (!show) {
+      map.data.setStyle({ fillOpacity: 0, strokeOpacity: 0, clickable: false } as google.maps.Data.StyleOptions);
+      return;
+    }
+    this.applyDataLayerStyle();
   }
 
   openDestInfo(d: Destination, marker: MapAdvancedMarker) {
