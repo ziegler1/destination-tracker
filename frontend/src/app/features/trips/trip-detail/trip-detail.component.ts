@@ -92,19 +92,17 @@ function restaurantMarkerEl(): HTMLElement {
   styles: [`
     :host { display:block; }
 
-    /* ── Shared ── */
+    // Shared
     .loading-wrap { display:flex; justify-content:center; padding:80px; }
     .status-pill  { padding:3px 10px; border-radius:10px; font-size:12px; font-weight:600;
                     background:var(--wp-surface-variant); text-transform:capitalize; }
     .return-yes-sm { font-size:11px; font-weight:700; color:#2E7D32;
                      background:#E8F5E9; padding:1px 6px; border-radius:8px; }
 
-    /* ════════════════════════════════════════════
-       SCRAPBOOK LAYOUT (completed trips)
-    ════════════════════════════════════════════ */
+    // SCRAPBOOK LAYOUT (completed trips)
     .scrapbook { max-width:960px; margin:0 auto; padding:0 0 48px; }
 
-    /* Hero */
+    // Hero
     .scrap-hero {
       width:100%; height:320px; border-radius:16px; overflow:hidden;
       position:relative; margin-bottom:24px;
@@ -129,13 +127,13 @@ function restaurantMarkerEl(): HTMLElement {
     .scrap-btn-white  { background:#fff !important; color:var(--wp-primary) !important; font-weight:700 !important; }
     .scrap-btn-ghost  { border-color:rgba(255,255,255,.5) !important; color:#fff !important; }
 
-    /* Map strip */
+    // Map strip
     .scrap-map-strip {
       border-radius:12px; overflow:hidden; margin-bottom:24px;
       box-shadow:0 2px 8px rgba(0,0,0,.10);
     }
 
-    /* Timeline */
+    // Timeline
     .tl-heading { font-size:18px; font-weight:700; margin:0 0 16px; }
     .tl-wrap    { position:relative; }
 
@@ -201,7 +199,7 @@ function restaurantMarkerEl(): HTMLElement {
     }
     .tl-connector-line { flex:0 0 40px; height:1px; background:var(--wp-border); }
 
-    /* Scrapbook summary + tabs */
+    // Scrapbook summary + tabs
     .scrap-ai  { margin:24px 0; }
     .ai-box    { background:var(--wp-surface-variant); border-left:3px solid var(--wp-accent);
                  border-radius:0 8px 8px 0; padding:16px; font-size:14px; line-height:1.8;
@@ -209,9 +207,7 @@ function restaurantMarkerEl(): HTMLElement {
     .scrap-tabs { margin-top:24px; background:var(--wp-surface); border-radius:12px;
                   border:1px solid var(--wp-border); overflow:hidden; }
 
-    /* ════════════════════════════════════════════
-       COMPANION LAYOUT (active / planning trips)
-    ════════════════════════════════════════════ */
+    // COMPANION LAYOUT (active / planning trips)
     .companion-layout {
       display:grid; grid-template-columns:400px 1fr;
       height:calc(100vh - 56px); overflow:hidden;
@@ -264,7 +260,7 @@ function restaurantMarkerEl(): HTMLElement {
     .bottom-tabs { border-top:1px solid var(--wp-border); }
     .geocoding-note { font-size:12px; color:var(--wp-text-hint); text-align:center; padding:8px; }
 
-    /* Map tab — compact prompt that opens a full-screen map overlay */
+    // Map tab — compact prompt that opens a full-screen map overlay
     .map-tab-prompt {
       display:flex; flex-direction:column; align-items:center; text-align:center;
       gap:12px; padding:48px 24px;
@@ -273,7 +269,7 @@ function restaurantMarkerEl(): HTMLElement {
     .map-tab-text { font-size:14px; color:var(--wp-text-secondary); max-width:320px; margin:0; line-height:1.5; }
     .open-map-btn { background:#00695C !important; color:#fff !important; }
 
-    /* Full-screen map overlay (escapes companion-layout's overflow:hidden via position:fixed) */
+    // Full-screen overlay — escapes companion-layout's overflow:hidden via position:fixed
     .map-overlay {
       position:fixed; inset:0; z-index:1000; background:var(--wp-bg);
       display:flex; flex-direction:column;
