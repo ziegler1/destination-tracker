@@ -3,9 +3,9 @@ import { HttpClient } from '@angular/common/http';
 import { switchMap } from 'rxjs/operators';
 import { throwError } from 'rxjs';
 import { catchError } from 'rxjs/operators';
-import { DestinationPhoto, RestaurantPhoto, LodgingPhoto } from '../../types/schema.types';
+import { DestinationPhoto, RestaurantPhoto, LodgingPhoto, SpecialInterestPhoto } from '../../types/schema.types';
 
-export type EntityPhoto = DestinationPhoto | RestaurantPhoto | LodgingPhoto;
+export type EntityPhoto = DestinationPhoto | RestaurantPhoto | LodgingPhoto | SpecialInterestPhoto;
 export type PhotoEntityType = 'destinations' | 'restaurants' | 'lodging' | 'special-interests';
 
 @Injectable({ providedIn: 'root' })

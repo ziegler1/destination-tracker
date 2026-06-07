@@ -42,6 +42,16 @@ export class ClaudeService {
     return this.http.post<ClaudeResult>('/api/claude/restaurant-description', { restaurant });
   }
 
+  generateHighlights(payload: {
+    type: 'lodging' | 'restaurant' | 'destination' | 'special_interest';
+    name: string;
+    city: string;
+    state: string;
+    details?: string;
+  }) {
+    return this.http.post<ClaudeResult>('/api/claude/generate-highlights', payload);
+  }
+
   travelInsights(payload: { stats: unknown; records: unknown; cuisineBreakdown: unknown }) {
     return this.http.post<ClaudeResult>('/api/claude/travel-insights', payload);
   }

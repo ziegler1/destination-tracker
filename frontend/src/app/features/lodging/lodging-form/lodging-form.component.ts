@@ -16,6 +16,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { LodgingService } from '../../../core/services/lodging.service';
 import { GeocodingService } from '../../../core/services/geocoding.service';
+import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 
 const AMENITY_SUGGESTIONS = [
   'AC', 'Breakfast', 'EV Charging', 'Fireplace', 'Fitness Center', 'Hot Tub',
@@ -31,7 +32,7 @@ const AMENITY_SUGGESTIONS = [
     RouterLink, ReactiveFormsModule,
     MatCardModule, MatFormFieldModule, MatInputModule, MatSelectModule,
     MatButtonModule, MatIconModule, MatSlideToggleModule, MatChipsModule,
-    MatProgressSpinnerModule, MatSnackBarModule,
+    MatProgressSpinnerModule, MatSnackBarModule, PageHeaderComponent,
   ],
   styles: [`
     mat-card { max-width:720px; margin:0 auto; padding:24px; }
@@ -51,6 +52,8 @@ const AMENITY_SUGGESTIONS = [
     .sug-chip:hover { background:var(--wp-primary); color:#fff; }
   `],
   template: `
+    <app-page-header [title]="isEdit() ? 'Edit Lodging' : 'Add Lodging'"
+                     [backRoute]="isEdit() ? '/lodging/' + lodgingId() : '/lodging'" />
     @if (loading()) {
       <div class="loading-wrap"><mat-spinner diameter="48" /></div>
     } @else {

@@ -21,6 +21,7 @@ import { DestinationService } from '../../../core/services/destination.service';
 import { GeocodingService } from '../../../core/services/geocoding.service';
 import { PlacesAutocompleteComponent, PlaceSelectedEvent } from '../../../shared/components/places-autocomplete/places-autocomplete.component';
 import { DuplicateDestinationDialogComponent } from '../../../shared/components/duplicate-destination-dialog/duplicate-destination-dialog.component';
+import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 
 const MONTHS = [
   'January','February','March','April','May','June',
@@ -36,8 +37,11 @@ const MONTHS = [
     MatCardModule, MatFormFieldModule, MatInputModule, MatSelectModule,
     MatChipsModule, MatAutocompleteModule, MatIconModule, MatButtonModule,
     MatProgressSpinnerModule, MatDatepickerModule, MatSnackBarModule,
+    PageHeaderComponent,
   ],
   styles: [`
+    .back-row { margin-bottom: 16px; }
+    @media (max-width: 768px) { .back-row { display: none; } }
     .form-card { max-width: 720px; margin: 0 auto; }
     .form-title { font-size:22px; font-weight:700; margin-bottom:20px; }
     .row { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
@@ -52,8 +56,9 @@ const MONTHS = [
     .err { font-size:12px; color:#c62828; margin-bottom:4px; }
   `],
   template: `
+    <app-page-header [title]="isEdit() ? 'Edit Destination' : 'Add Destination'" backRoute="/destinations" />
     <div class="page-container">
-      <button mat-stroked-button routerLink="/destinations" style="margin-bottom:16px">
+      <button mat-stroked-button class="back-row" routerLink="/destinations" style="margin-bottom:16px">
         <mat-icon>arrow_back</mat-icon> Destinations
       </button>
 

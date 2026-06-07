@@ -15,6 +15,7 @@ import { SpecialInterestPlace, SpecialInterestCategory } from '../../types/schem
 
 const CATEGORY_META: Record<string, { icon: string; label: string }> = {
   winery_brewery:     { icon: '🍷', label: 'Winery / Brewery' },
+  bourbon_distillery: { icon: '🥃', label: 'Bourbon Distillery' },
   museum:             { icon: '🏛️', label: 'Museum' },
   historic_site:      { icon: '🏛️', label: 'Historic Site' },
   state_park:         { icon: '🌲', label: 'State Park' },

@@ -23,6 +23,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { TripWizardService } from '../../../core/services/trip-wizard.service';
 import { SettingsService } from '../../../core/services/settings.service';
+import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 import { MapsService } from '../../../core/services/maps.service';
 import {
   WizardPlan, WizardStop, WizardGenerateRequest, TripType,
@@ -64,7 +65,7 @@ const STOP_TIMINGS = [
     MatCardModule, MatFormFieldModule, MatInputModule, MatSelectModule,
     MatDatepickerModule, MatButtonModule, MatIconModule, MatSlideToggleModule,
     MatSliderModule, MatProgressSpinnerModule, MatDividerModule, MatCheckboxModule,
-    MatExpansionModule, MatSnackBarModule, MatTooltipModule,
+    MatExpansionModule, MatSnackBarModule, MatTooltipModule, PageHeaderComponent,
   ],
   styles: [`
     .wizard-wrap { max-width:900px; margin:0 auto; padding:24px; }
@@ -203,6 +204,7 @@ const STOP_TIMINGS = [
     .confirmed-icon { font-size:72px; display:block; margin-bottom:16px; }
   `],
   template: `
+    <app-page-header title="Plan a Trip" backRoute="/trips" />
     <div class="wizard-wrap">
 
       <!-- ── Step 1: Trip Basics ────────────────────────────────────── -->

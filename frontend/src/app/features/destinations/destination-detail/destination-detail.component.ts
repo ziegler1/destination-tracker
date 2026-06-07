@@ -19,6 +19,7 @@ import { ClaudeService } from '../../../core/services/claude.service';
 import { MiniMapComponent } from '../../../shared/mini-map/mini-map.component';
 import { PhotoUploaderComponent } from '../../../shared/photo-uploader/photo-uploader.component';
 import { AddToTripSheetComponent } from '../../../shared/components/add-to-trip-sheet/add-to-trip-sheet.component';
+import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 import { Destination, WeatherResponse } from '../../../types/schema.types';
 
 interface WeatherDay {
@@ -38,9 +39,11 @@ interface WeatherDay {
     MatCardModule, MatChipsModule, MatIconModule, MatButtonModule,
     MatDividerModule, MatProgressSpinnerModule, MatListModule, MatTooltipModule,
     MatSnackBarModule, MatBottomSheetModule, MiniMapComponent, PhotoUploaderComponent,
+    PageHeaderComponent,
   ],
   styles: [`
     .back-btn { margin-bottom: 16px; }
+    @media (max-width: 768px) { .back-btn { display: none; } }
 
     .hero { position:relative; width:100%; max-height:340px; overflow:hidden; border-radius:12px; margin-bottom:24px; }
     .hero img { width:100%; height:340px; object-fit:cover; }
@@ -98,6 +101,7 @@ interface WeatherDay {
     .notes { font-size:14px; color:var(--wp-text-secondary); line-height:1.6; white-space:pre-wrap; }
   `],
   template: `
+    <app-page-header [title]="dest()?.name ?? 'Destination'" backRoute="/destinations" />
     <div class="page-container">
       <button mat-stroked-button class="back-btn" routerLink="/destinations">
         <mat-icon>arrow_back</mat-icon> Destinations

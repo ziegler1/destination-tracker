@@ -33,6 +33,7 @@ import { TripExpensesTabComponent } from '../trip-expenses-tab/trip-expenses-tab
 import { TripPackingTabComponent }  from '../trip-packing-tab/trip-packing-tab.component';
 import { TripJournalTabComponent }  from '../trip-journal-tab/trip-journal-tab.component';
 import { TripFuelTabComponent }     from '../trip-fuel-tab/trip-fuel-tab.component';
+import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 
 const STATUS_COLOR: Record<TripStatus, string> = {
   planning: '#1565c0', active: '#2e7d32', completed: '#6a1b9a', cancelled: '#b71c1c',
@@ -76,6 +77,7 @@ function lodgingMarkerEl(): HTMLElement {
     MatFormFieldModule, MatInputModule, MatSelectModule, MatDatepickerModule,
     TripStopsTabComponent, TripExpensesTabComponent,
     TripPackingTabComponent, TripJournalTabComponent, TripFuelTabComponent,
+    PageHeaderComponent,
   ],
   styles: [`
     :host { display:block; }
@@ -256,6 +258,8 @@ function lodgingMarkerEl(): HTMLElement {
     @if (loading()) {
       <div class="loading-wrap"><mat-spinner diameter="48" /></div>
     } @else if (t) {
+
+      <app-page-header [title]="isJournalRoute() ? 'Journal' : 'Trip'" [backRoute]="headerBackRoute()" />
 
       <!-- ════════════════════════════════════
            SCRAPBOOK — completed trips
@@ -729,6 +733,12 @@ export class TripDetailComponent implements OnInit {
   private tripSig    = signal<Trip | null>(null);
   protected get t(): Trip | null { return this.tripSig(); }
 
+  isJournalRoute = signal(false);
+  headerBackRoute = computed(() => {
+    const id = this.tripSig()?.id;
+    return this.isJournalRoute() && id ? `/trips/${id}` : '/trips';
+  });
+
   sortedStops = computed(() =>
     [...(this.tripSig()?.stops ?? [])].sort((a, b) => a.stop_order - b.stop_order),
   );
@@ -835,6 +845,7 @@ export class TripDetailComponent implements OnInit {
 
   ngOnInit() {
     const id = Number(this.route.snapshot.paramMap.get('id'));
+    this.isJournalRoute.set(this.route.snapshot.url.some((seg) => seg.path === 'journal'));
     this.svc.get(id).subscribe({
       next: (t) => { this.tripSig.set(t); this.loading.set(false); this.geocodeAndRoute(t); },
       error: () => { this.loading.set(false); this.router.navigate(['/trips']); },

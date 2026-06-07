@@ -13,6 +13,7 @@ import { ChartData, ChartOptions } from 'chart.js';
 import { StatsService, StatsResponse } from '../../core/services/stats.service';
 import { ClaudeService } from '../../core/services/claude.service';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
+import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 
 const EXP_COLORS: Record<string, string> = {
   lodging: '#1565c0', food: '#e65100', fuel: '#2e7d32',
@@ -33,7 +34,7 @@ interface InsightCard { icon: string; headline: string; detail: string; }
   imports: [
     RouterLink, CurrencyPipe, DecimalPipe,
     MatCardModule, MatProgressSpinnerModule, MatIconModule, MatDividerModule, MatButtonModule,
-    BaseChartDirective, EmptyStateComponent,
+    BaseChartDirective, EmptyStateComponent, PageHeaderComponent,
   ],
   styles: [`
     h2 { margin:0 0 24px; font-size:22px; font-weight:700; }
@@ -100,6 +101,7 @@ interface InsightCard { icon: string; headline: string; detail: string; }
     .insights-empty   { color:var(--wp-text-hint); font-size:14px; text-align:center; padding:40px; }
   `],
   template: `
+    <app-page-header title="Stats & Insights" backRoute="/" />
     <div class="page-container">
       <h2>📊 Stats &amp; Insights</h2>
 

@@ -9,7 +9,7 @@ export class SpecialInterestService {
 
   list()               { return this.http.get<SpecialInterestPlace[]>(this.base); }
   get(id: number)      { return this.http.get<SpecialInterestPlace>(`${this.base}/${id}`); }
-  create(body: Partial<SpecialInterestPlace>) { return this.http.post<SpecialInterestPlace>(this.base, body); }
-  update(id: number, body: Partial<SpecialInterestPlace>) { return this.http.put<SpecialInterestPlace>(`${this.base}/${id}`, body); }
+  create(body: Partial<SpecialInterestPlace> | Record<string, unknown>) { return this.http.post<SpecialInterestPlace>(this.base, body); }
+  update(id: number, body: Partial<SpecialInterestPlace> | Record<string, unknown>) { return this.http.put<SpecialInterestPlace>(`${this.base}/${id}`, body); }
   delete(id: number)   { return this.http.delete<void>(`${this.base}/${id}`); }
 }

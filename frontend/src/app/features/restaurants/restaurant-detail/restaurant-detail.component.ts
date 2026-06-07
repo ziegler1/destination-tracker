@@ -15,6 +15,7 @@ import { ClaudeService, ScrapedSiteInfo } from '../../../core/services/claude.se
 import { MiniMapComponent } from '../../../shared/mini-map/mini-map.component';
 import { PhotoUploaderComponent } from '../../../shared/photo-uploader/photo-uploader.component';
 import { AddToTripSheetComponent } from '../../../shared/components/add-to-trip-sheet/add-to-trip-sheet.component';
+import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 import { Restaurant } from '../../../types/schema.types';
 
 @Component({
@@ -24,7 +25,7 @@ import { Restaurant } from '../../../types/schema.types';
   imports: [
     RouterLink, MatCardModule, MatButtonModule, MatIconModule,
     MatDividerModule, MatChipsModule, MatProgressSpinnerModule, MatSnackBarModule, MatBottomSheetModule,
-    MiniMapComponent, PhotoUploaderComponent,
+    MiniMapComponent, PhotoUploaderComponent, PageHeaderComponent,
   ],
   styles: [`
     .hero { width:100%; max-height:340px; object-fit:cover; border-radius:12px; margin-bottom:20px; }
@@ -68,6 +69,7 @@ import { Restaurant } from '../../../types/schema.types';
     @if (loading()) {
       <div class="loading-wrap"><mat-spinner diameter="48" /></div>
     } @else if (r) {
+      <app-page-header [title]="r.name" backRoute="/restaurants" />
       <div class="page-container">
 
         @if (heroPhoto(r)) {

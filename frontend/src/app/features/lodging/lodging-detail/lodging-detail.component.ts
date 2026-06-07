@@ -16,6 +16,7 @@ import { ClaudeService, ScrapedSiteInfo } from '../../../core/services/claude.se
 import { MiniMapComponent } from '../../../shared/mini-map/mini-map.component';
 import { PhotoUploaderComponent } from '../../../shared/photo-uploader/photo-uploader.component';
 import { AddToTripSheetComponent } from '../../../shared/components/add-to-trip-sheet/add-to-trip-sheet.component';
+import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 import { Lodging, LodgingType } from '../../../types/schema.types';
 
 const TYPE_LABELS: Record<LodgingType, string> = {
@@ -30,7 +31,7 @@ const TYPE_LABELS: Record<LodgingType, string> = {
   imports: [
     RouterLink, CurrencyPipe, MatCardModule, MatButtonModule, MatIconModule,
     MatDividerModule, MatChipsModule, MatProgressSpinnerModule, MatSnackBarModule, MatBottomSheetModule,
-    MiniMapComponent, PhotoUploaderComponent,
+    MiniMapComponent, PhotoUploaderComponent, PageHeaderComponent,
   ],
   styles: [`
     .hero { width:100%; max-height:320px; object-fit:cover; border-radius:12px; margin-bottom:20px; }
@@ -70,6 +71,7 @@ const TYPE_LABELS: Record<LodgingType, string> = {
     @if (loading()) {
       <div class="loading-wrap"><mat-spinner diameter="48" /></div>
     } @else if (l) {
+      <app-page-header [title]="l.name" backRoute="/lodging" />
       <div class="page-container">
 
         @if (heroPhoto(l)) {

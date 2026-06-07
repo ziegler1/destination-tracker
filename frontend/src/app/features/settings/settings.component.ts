@@ -17,6 +17,7 @@ import {
   PlacesAutocompleteComponent, PlaceSelectedEvent,
 } from '../../shared/components/places-autocomplete/places-autocomplete.component';
 import { SettingsService } from '../../core/services/settings.service';
+import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 
 const CUISINE_OPTIONS = [
   'American', 'BBQ', 'Bakery / Cafe', 'Breakfast', 'Burgers', 'Chinese',
@@ -50,7 +51,7 @@ function markerEl(): HTMLElement {
     MatButtonModule, MatIconModule, MatFormFieldModule,
     MatInputModule, MatSelectModule, MatSliderModule,
     MatChipsModule, MatDividerModule, MatCardModule,
-    PlacesAutocompleteComponent,
+    PlacesAutocompleteComponent, PageHeaderComponent,
   ],
   styles: [`
     .page { max-width: 760px; margin: 0 auto; padding: 24px 16px 48px; }
@@ -107,6 +108,7 @@ function markerEl(): HTMLElement {
     .save-row { display: flex; justify-content: flex-end; margin-top: 12px; }
   `],
   template: `
+    <app-page-header title="Settings" backRoute="/" />
     <div class="page">
       <h1 class="page-title">⚙️ Settings</h1>
 

@@ -14,6 +14,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { RestaurantService } from '../../../core/services/restaurant.service';
 import { GeocodingService } from '../../../core/services/geocoding.service';
+import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 
 const CUISINES = [
   'American', 'BBQ', 'Bakery / Cafe', 'Breakfast', 'Burgers', 'Chinese',
@@ -29,7 +30,7 @@ const CUISINES = [
     RouterLink, ReactiveFormsModule,
     MatCardModule, MatFormFieldModule, MatInputModule, MatSelectModule,
     MatButtonModule, MatIconModule, MatSlideToggleModule,
-    MatProgressSpinnerModule, MatSnackBarModule,
+    MatProgressSpinnerModule, MatSnackBarModule, PageHeaderComponent,
   ],
   styles: [`
     mat-card { max-width:720px; margin:0 auto; padding:24px; }
@@ -42,6 +43,8 @@ const CUISINES = [
     h2 { margin:0 0 20px; font-size:20px; font-weight:600; }
   `],
   template: `
+    <app-page-header [title]="isEdit() ? 'Edit Restaurant' : 'Add Restaurant'"
+                     [backRoute]="isEdit() ? '/restaurants/' + restaurantId() : '/restaurants'" />
     @if (loading()) {
       <div class="loading-wrap"><mat-spinner diameter="48" /></div>
     } @else {
