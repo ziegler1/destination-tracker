@@ -22,6 +22,22 @@ function textOf(msg: Anthropic.Messages.Message): string {
   return block.type === 'text' ? block.text : '';
 }
 
+// Claude sometimes wraps JSON in ```json fences or adds prose despite instructions —
+// extract the JSON object/array text so callers can JSON.parse it directly.
+function extractJson(raw: string): string {
+  let text = raw.trim();
+  const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fenceMatch) text = fenceMatch[1].trim();
+  if (!text.startsWith('{') && !text.startsWith('[')) {
+    const start = Math.min(
+      ...[text.indexOf('{'), text.indexOf('[')].filter((i) => i !== -1),
+    );
+    const end = Math.max(text.lastIndexOf('}'), text.lastIndexOf(']'));
+    if (Number.isFinite(start) && end > start) text = text.slice(start, end + 1);
+  }
+  return text;
+}
+
 function htmlToText(html: string): string {
   return html
     .replace(/<script[\s\S]*?<\/script>/gi, ' ')
@@ -213,7 +229,7 @@ router.post('/scrape-website', asyncHandler(async (req, res) => {
       },
     ],
   });
-  res.json({ result: textOf(msg) });
+  res.json({ result: extractJson(textOf(msg)) });
 }));
 
 export default router;
