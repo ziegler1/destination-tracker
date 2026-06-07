@@ -35,6 +35,15 @@ const CATEGORIES: Array<{ value: SpecialInterestCategory | ''; label: string }> 
   })),
 ];
 
+type RatingFilter = 'all' | '4plus' | '5' | 'would_return';
+
+const RATING_CHIPS: Array<{ value: RatingFilter; label: string }> = [
+  { value: 'all',          label: 'All' },
+  { value: '4plus',        label: '★ 4+' },
+  { value: '5',            label: '★ 5' },
+  { value: 'would_return', label: '✓ Would Return' },
+];
+
 @Component({
   selector: 'app-special-interests',
   standalone: true,
@@ -51,8 +60,15 @@ const CATEGORIES: Array<{ value: SpecialInterestCategory | ''; label: string }> 
     }
     .page-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
     .page-title  { font-size: 26px; font-weight: 800; margin: 0; flex: 1; }
-    .filters { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+    .filters { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
     .filters mat-form-field { flex: 1; min-width: 160px; max-width: 280px; }
+    .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+    .chip {
+      padding: 4px 14px; border-radius: 16px; border: 1.5px solid var(--wp-border);
+      background: var(--wp-surface); cursor: pointer; font-size: 13px; color: var(--wp-text-secondary);
+      transition: all .2s;
+    }
+    .chip.active { background: var(--wp-primary); color: #fff; border-color: var(--wp-primary); }
     .grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -117,6 +133,15 @@ const CATEGORIES: Array<{ value: SpecialInterestCategory | ''; label: string }> 
         </mat-form-field>
       </div>
 
+      <div class="chips">
+        @for (c of ratingChips; track c.value) {
+          <span class="chip" [class.active]="ratingFilter() === c.value"
+                (click)="ratingFilter.set(c.value)">
+            {{ c.label }}
+          </span>
+        }
+      </div>
+
       <div class="grid">
         @for (place of filtered(); track place.id) {
           <a class="card" [routerLink]="['/special-interests', place.id]">
@@ -165,15 +190,22 @@ export class SpecialInterestsComponent implements OnInit {
   places        = signal<SpecialInterestPlace[]>([]);
   searchQuery   = '';
   filterCategory: SpecialInterestCategory | '' = '';
+  ratingFilter  = signal<RatingFilter>('all');
 
-  readonly categories = CATEGORIES;
+  readonly categories   = CATEGORIES;
+  readonly ratingChips  = RATING_CHIPS;
 
   filtered = computed(() => {
-    const q   = this.searchQuery.toLowerCase();
-    const cat = this.filterCategory;
+    const q      = this.searchQuery.toLowerCase();
+    const cat    = this.filterCategory;
+    const rating = this.ratingFilter();
     return this.places().filter(p =>
       (!q || p.name.toLowerCase().includes(q) || p.city.toLowerCase().includes(q)) &&
-      (!cat || p.category === cat),
+      (!cat || p.category === cat) &&
+      (rating === 'all'
+        || (rating === '4plus'        && (p.rating ?? 0) >= 4)
+        || (rating === '5'            && (p.rating ?? 0) === 5)
+        || (rating === 'would_return' && p.would_return)),
     );
   });
 
