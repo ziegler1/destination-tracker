@@ -1,16 +1,10 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Restaurant, Trip } from '../../types/schema.types';
+import { Restaurant, ScrapedSiteInfo, Trip } from '../../types/schema.types';
 
 interface ClaudeResult { result: string; }
 
-export interface ScrapedSiteInfo {
-  description?: string | null;
-  hours?:       string | null;
-  phone?:       string | null;
-  address?:     string | null;
-  highlights?:  { name: string; detail?: string }[];
-}
+export type { ScrapedSiteInfo };
 
 @Injectable({ providedIn: 'root' })
 export class ClaudeService {

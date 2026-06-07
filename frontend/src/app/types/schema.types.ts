@@ -39,6 +39,14 @@ export interface DestinationPhoto {
 
 export type PriceRange = '$' | '$$' | '$$$' | '$$$$';
 
+export interface ScrapedSiteInfo {
+  description?: string | null;
+  hours?:       string | null;
+  phone?:       string | null;
+  address?:     string | null;
+  highlights?:  { name: string; detail?: string }[];
+}
+
 export interface Restaurant {
   id: number;
   name: string;
@@ -62,6 +70,8 @@ export interface Restaurant {
   visit_count?: number;
   suggested_by_ai?: boolean;
   google_place_id?: string;
+  site_info?: ScrapedSiteInfo | null;
+  site_info_fetched_at?: string | null;
   created_at: string;
   updated_at: string;
   photos?: RestaurantPhoto[];
@@ -104,6 +114,8 @@ export interface Lodging {
   visit_count?: number;
   suggested_by_ai?: boolean;
   google_place_id?: string;
+  site_info?: ScrapedSiteInfo | null;
+  site_info_fetched_at?: string | null;
   created_at: string;
   updated_at: string;
   photos?: LodgingPhoto[];

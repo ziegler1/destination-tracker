@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Restaurant } from '../../types/schema.types';
+import { Restaurant, ScrapedSiteInfo } from '../../types/schema.types';
 
 @Injectable({ providedIn: 'root' })
 export class RestaurantService {
@@ -29,5 +29,9 @@ export class RestaurantService {
 
   logVisit(id: number) {
     return this.http.patch<{ visit_count: number }>(`${this.base}/${id}/visit`, {});
+  }
+
+  saveSiteInfo(id: number, site_info: ScrapedSiteInfo | null) {
+    return this.http.patch<Restaurant>(`${this.base}/${id}/site-info`, { site_info });
   }
 }

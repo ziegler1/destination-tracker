@@ -2,7 +2,7 @@ import {
   Component, OnInit, ChangeDetectionStrategy, inject, signal,
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { CurrencyPipe } from '@angular/common';
+import { CurrencyPipe, DatePipe } from '@angular/common';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -29,7 +29,7 @@ const TYPE_LABELS: Record<LodgingType, string> = {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    RouterLink, CurrencyPipe, MatCardModule, MatButtonModule, MatIconModule,
+    RouterLink, CurrencyPipe, DatePipe, MatCardModule, MatButtonModule, MatIconModule,
     MatDividerModule, MatChipsModule, MatProgressSpinnerModule, MatSnackBarModule, MatBottomSheetModule,
     MiniMapComponent, PhotoUploaderComponent, PageHeaderComponent,
   ],
@@ -59,6 +59,7 @@ const TYPE_LABELS: Record<LodgingType, string> = {
     .link-row { display:flex; gap:12px; flex-wrap:wrap; margin-top:12px; }
 
     .site-info-box { margin-top:16px; padding:16px; border-radius:8px; background:var(--wp-surface-variant); border-left:3px solid var(--wp-primary); }
+    .site-info-updated { margin:0 0 8px; font-size:12px; color:var(--wp-text-hint); text-transform:uppercase; letter-spacing:.04em; }
     .site-info-meta { display:flex; gap:16px; flex-wrap:wrap; margin-top:10px; font-size:13px; color:var(--wp-text-secondary); }
     .site-info-meta span { display:inline-flex; align-items:center; gap:4px; }
     .site-info-meta mat-icon { font-size:16px; height:16px; width:16px; }
@@ -171,7 +172,7 @@ const TYPE_LABELS: Record<LodgingType, string> = {
               </a>
               <button mat-stroked-button (click)="fetchSiteInfo(l)" [disabled]="siteInfoLoading()">
                 <mat-icon>travel_explore</mat-icon>
-                {{ siteInfoLoading() ? 'Fetching…' : 'Fetch Info' }}
+                {{ siteInfoLoading() ? (siteInfo() ? 'Refreshing…' : 'Fetching…') : (siteInfo() ? 'Refresh Info' : 'Fetch Info') }}
               </button>
             }
             @if (l.phone) {
@@ -184,6 +185,9 @@ const TYPE_LABELS: Record<LodgingType, string> = {
 
         @if (siteInfo(); as info) {
           <div class="site-info-box">
+            @if (l.site_info_fetched_at) {
+              <p class="site-info-updated">Updated {{ l.site_info_fetched_at | date:'MMM d, y, h:mm a' }}</p>
+            }
             @if (info.description) {
               <p style="margin:0">{{ info.description }}</p>
             }
@@ -270,7 +274,7 @@ export class LodgingDetailComponent implements OnInit {
   ngOnInit() {
     const id = Number(this.route.snapshot.paramMap.get('id'));
     this.svc.get(id).subscribe({
-      next: (l) => { this.lodging.set(l); this.loading.set(false); },
+      next: (l) => { this.lodging.set(l); this.siteInfo.set(l.site_info ?? null); this.loading.set(false); },
       error: () => { this.loading.set(false); this.router.navigate(['/lodging']); },
     });
   }
@@ -297,7 +301,11 @@ export class LodgingDetailComponent implements OnInit {
     this.claudeSvc.scrapeWebsite(l.website, l.name, 'lodging').subscribe({
       next: (res) => {
         try {
-          this.siteInfo.set(JSON.parse(res.result) as ScrapedSiteInfo);
+          const info = JSON.parse(res.result) as ScrapedSiteInfo;
+          this.siteInfo.set(info);
+          this.svc.saveSiteInfo(l.id, info).subscribe((updated) => {
+            this.lodging.update((cur) => cur ? { ...cur, site_info: updated.site_info, site_info_fetched_at: updated.site_info_fetched_at } : cur);
+          });
         } catch {
           this.snack.open('Could not parse site info — try again', 'Dismiss', { duration: 3000 });
         }

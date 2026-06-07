@@ -93,6 +93,17 @@ router.patch('/:id/visit', asyncHandler(async (req, res) => {
   res.json(rows[0]);
 }));
 
+// PATCH /api/restaurants/:id/site-info — persist scraped "Fetch Info" results
+router.patch('/:id/site-info', asyncHandler(async (req, res) => {
+  const { site_info } = req.body;
+  const { rows } = await pool.query(
+    'UPDATE restaurants SET site_info=$1, site_info_fetched_at=NOW(), updated_at=NOW() WHERE id=$2 RETURNING *',
+    [site_info ?? null, req.params.id],
+  );
+  if (!rows[0]) return void res.status(404).json({ error: 'Restaurant not found' });
+  res.json(rows[0]);
+}));
+
 // DELETE /api/restaurants/:id
 router.delete('/:id', asyncHandler(async (req, res) => {
   const { rowCount } = await pool.query('DELETE FROM restaurants WHERE id=$1', [req.params.id]);

@@ -2,6 +2,7 @@ import {
   Component, OnInit, ChangeDetectionStrategy, inject, signal,
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { DatePipe } from '@angular/common';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -23,7 +24,7 @@ import { Restaurant } from '../../../types/schema.types';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    RouterLink, MatCardModule, MatButtonModule, MatIconModule,
+    RouterLink, DatePipe, MatCardModule, MatButtonModule, MatIconModule,
     MatDividerModule, MatChipsModule, MatProgressSpinnerModule, MatSnackBarModule, MatBottomSheetModule,
     MiniMapComponent, PhotoUploaderComponent, PageHeaderComponent,
   ],
@@ -53,6 +54,7 @@ import { Restaurant } from '../../../types/schema.types';
     .ai-box { margin-top:16px; padding:16px; border-radius:8px; background:var(--wp-surface-variant); border-left:3px solid var(--wp-accent); font-size:14px; line-height:1.6; white-space:pre-wrap; }
 
     .site-info-box { margin-top:16px; padding:16px; border-radius:8px; background:var(--wp-surface-variant); border-left:3px solid var(--wp-primary); }
+    .site-info-updated { margin:0 0 8px; font-size:12px; color:var(--wp-text-hint); text-transform:uppercase; letter-spacing:.04em; }
     .site-info-meta { display:flex; gap:16px; flex-wrap:wrap; margin-top:10px; font-size:13px; color:var(--wp-text-secondary); }
     .site-info-meta span { display:inline-flex; align-items:center; gap:4px; }
     .site-info-meta mat-icon { font-size:16px; height:16px; width:16px; }
@@ -153,7 +155,7 @@ import { Restaurant } from '../../../types/schema.types';
               </a>
               <button mat-stroked-button (click)="fetchSiteInfo(r)" [disabled]="siteInfoLoading()">
                 <mat-icon>travel_explore</mat-icon>
-                {{ siteInfoLoading() ? 'Fetching…' : 'Fetch Info' }}
+                {{ siteInfoLoading() ? (siteInfo() ? 'Refreshing…' : 'Fetching…') : (siteInfo() ? 'Refresh Info' : 'Fetch Info') }}
               </button>
             }
             @if (r.phone) {
@@ -166,6 +168,9 @@ import { Restaurant } from '../../../types/schema.types';
 
         @if (siteInfo(); as info) {
           <div class="site-info-box">
+            @if (r.site_info_fetched_at) {
+              <p class="site-info-updated">Updated {{ r.site_info_fetched_at | date:'MMM d, y, h:mm a' }}</p>
+            }
             @if (info.description) {
               <p style="margin:0">{{ info.description }}</p>
             }
@@ -255,7 +260,7 @@ export class RestaurantDetailComponent implements OnInit {
   ngOnInit() {
     const id = Number(this.route.snapshot.paramMap.get('id'));
     this.svc.get(id).subscribe({
-      next: (r) => { this.restaurant.set(r); this.loading.set(false); },
+      next: (r) => { this.restaurant.set(r); this.siteInfo.set(r.site_info ?? null); this.loading.set(false); },
       error: () => { this.loading.set(false); this.router.navigate(['/restaurants']); },
     });
   }
@@ -292,7 +297,11 @@ export class RestaurantDetailComponent implements OnInit {
     this.claudeSvc.scrapeWebsite(r.website, r.name, 'restaurant').subscribe({
       next: (res) => {
         try {
-          this.siteInfo.set(JSON.parse(res.result) as ScrapedSiteInfo);
+          const info = JSON.parse(res.result) as ScrapedSiteInfo;
+          this.siteInfo.set(info);
+          this.svc.saveSiteInfo(r.id, info).subscribe((updated) => {
+            this.restaurant.update((cur) => cur ? { ...cur, site_info: updated.site_info, site_info_fetched_at: updated.site_info_fetched_at } : cur);
+          });
         } catch {
           this.snack.open('Could not parse site info — try again', 'Dismiss', { duration: 3000 });
         }
