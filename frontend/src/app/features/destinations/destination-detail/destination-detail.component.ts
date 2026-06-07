@@ -196,6 +196,14 @@ interface WeatherDay {
               </div>
             }
 
+            <!-- Travel Tips -->
+            @if (dest()!.travel_tips) {
+              <div class="info-card" style="margin-bottom:16px">
+                <p class="section-title">Travel Tips</p>
+                <p class="notes">{{ dest()!.travel_tips }}</p>
+              </div>
+            }
+
             <!-- POIs -->
             @if (dest()!.pois?.length) {
               <div class="info-card" style="margin-bottom:16px">

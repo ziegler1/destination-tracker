@@ -132,12 +132,17 @@ import { Restaurant } from '../../../types/schema.types';
           }
         </div>
 
-        @if (r.address || r.phone || r.website) {
+        @if (r.address || r.phone || r.website || r.menu_url) {
           <mat-divider />
           <div class="link-row">
             @if (r.address) {
               <a [href]="mapsUrl(r)" target="_blank" rel="noopener">
                 <button mat-stroked-button><mat-icon>map</mat-icon> View on Maps</button>
+              </a>
+            }
+            @if (r.menu_url) {
+              <a [href]="r.menu_url" target="_blank" rel="noopener">
+                <button mat-stroked-button><mat-icon>restaurant_menu</mat-icon> View Menu</button>
               </a>
             }
             @if (r.website) {

@@ -149,12 +149,17 @@ const TYPE_LABELS: Record<LodgingType, string> = {
           </div>
         }
 
-        @if (l.address || l.phone || l.website) {
+        @if (l.address || l.phone || l.website || l.booking_url) {
           <mat-divider style="margin:16px 0" />
           <div class="link-row">
             @if (l.address) {
               <a [href]="mapsUrl(l)" target="_blank" rel="noopener">
                 <button mat-stroked-button><mat-icon>map</mat-icon> View on Maps</button>
+              </a>
+            }
+            @if (l.booking_url) {
+              <a [href]="l.booking_url" target="_blank" rel="noopener">
+                <button mat-stroked-button color="primary"><mat-icon>event_available</mat-icon> Book Now</button>
               </a>
             }
             @if (l.website) {
