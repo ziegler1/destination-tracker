@@ -841,6 +841,15 @@ export class TripWizardComponent implements OnInit, OnDestroy {
 
     const before = current.stops.filter(s => s.stop_order <= afterOrder);
     const after  = current.stops.filter(s => s.stop_order  > afterOrder);
+
+    // Dates are required by the backend (DATE columns) — fall back to the
+    // previous stop's departure date (or the trip start date) so a freshly
+    // inserted stop never carries an empty-string date into /confirm.
+    const prevStop = before[before.length - 1];
+    const fallbackDate = prevStop?.depart_date || prevStop?.arrive_date || current.trip.start_date;
+    stub.arrive_date = fallbackDate;
+    stub.depart_date = fallbackDate;
+
     const merged = [...before, stub, ...after].map((s, i) => ({ ...s, stop_order: i + 1 }));
 
     const updated = { ...current, stops: merged };
