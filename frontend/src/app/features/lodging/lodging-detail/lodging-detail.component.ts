@@ -66,6 +66,7 @@ const TYPE_LABELS: Record<LodgingType, string> = {
     .highlight-card { padding:10px 12px; border-radius:8px; background:var(--wp-surface); border:1px solid var(--wp-border); }
     .hl-name { font-size:14px; font-weight:600; margin:0 0 2px; }
     .hl-detail { font-size:12px; color:var(--wp-text-secondary); margin:0; }
+    .ai-box { margin-top:10px; padding:14px 16px; border-radius:8px; background:var(--wp-surface-variant); border-left:3px solid var(--wp-primary); line-height:1.6; }
   `],
   template: `
     @if (loading()) {
@@ -207,16 +208,26 @@ const TYPE_LABELS: Record<LodgingType, string> = {
           </div>
         }
 
-        @if (l.highlights || l.notes) {
+        <mat-divider style="margin:16px 0" />
+        <p class="section-title">Highlights</p>
+        <button mat-stroked-button (click)="generateHighlights(l)" [disabled]="aiLoading()">
+          <mat-icon>auto_awesome</mat-icon>
+          {{ aiLoading() ? 'Generating…' : 'Generate Highlights' }}
+        </button>
+        @if (aiResult(); as result) {
+          <div class="ai-box">{{ result }}</div>
+          <button mat-stroked-button color="primary" style="margin-top:8px" (click)="saveHighlights()">
+            <mat-icon>save</mat-icon> Save to Highlights
+          </button>
+        }
+        @if (l.highlights) {
+          <p style="color:var(--wp-text-secondary);line-height:1.6;margin-top:10px">{{ l.highlights }}</p>
+        }
+
+        @if (l.notes) {
           <mat-divider style="margin:16px 0" />
-          @if (l.highlights) {
-            <p class="section-title">Highlights</p>
-            <p style="color:var(--wp-text-secondary);line-height:1.6">{{ l.highlights }}</p>
-          }
-          @if (l.notes) {
-            <p class="section-title">Notes</p>
-            <p style="color:var(--wp-text-secondary);line-height:1.6">{{ l.notes }}</p>
-          }
+          <p class="section-title">Notes</p>
+          <p style="color:var(--wp-text-secondary);line-height:1.6">{{ l.notes }}</p>
         }
 
         <!-- Mini map -->
@@ -253,6 +264,8 @@ export class LodgingDetailComponent implements OnInit {
   protected get l(): Lodging | null { return this.lodging(); }
   siteInfoLoading = signal(false);
   siteInfo     = signal<ScrapedSiteInfo | null>(null);
+  aiLoading    = signal(false);
+  aiResult     = signal<string | null>(null);
 
   ngOnInit() {
     const id = Number(this.route.snapshot.paramMap.get('id'));
@@ -294,6 +307,29 @@ export class LodgingDetailComponent implements OnInit {
         this.snack.open('Fetch Info failed — the site may be unreachable', 'Dismiss', { duration: 3000 });
         this.siteInfoLoading.set(false);
       },
+    });
+  }
+
+  generateHighlights(l: Lodging) {
+    this.aiLoading.set(true);
+    this.aiResult.set(null);
+    this.claudeSvc.generateHighlights({
+      type: 'lodging',
+      name: l.name,
+      city: l.city,
+      state: l.state_province,
+      details: this.typeLabel(l.lodging_type),
+    }).subscribe({
+      next: (res) => { this.aiResult.set(res.result); this.aiLoading.set(false); },
+      error: () => { this.snack.open('AI generation failed', 'Dismiss', { duration: 3000 }); this.aiLoading.set(false); },
+    });
+  }
+  saveHighlights() {
+    const l = this.lodging();
+    if (!l || !this.aiResult()) return;
+    this.svc.update(l.id, { ...l, highlights: this.aiResult()! }).subscribe((updated) => {
+      this.lodging.update((cur) => cur ? { ...cur, highlights: updated.highlights } : cur);
+      this.snack.open('Highlights saved!', 'OK', { duration: 2000 });
     });
   }
 

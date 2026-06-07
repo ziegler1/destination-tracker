@@ -189,6 +189,44 @@ router.post('/restaurant-description', asyncHandler(async (req, res) => {
   res.json({ result: textOf(msg) });
 }));
 
+// POST /api/claude/generate-highlights
+router.post('/generate-highlights', asyncHandler(async (req, res) => {
+  const { type, name, city, state, details } = req.body as {
+    type?: 'lodging' | 'restaurant' | 'destination' | 'special_interest';
+    name?: string; city?: string; state?: string; details?: string;
+  };
+  if (!name) return void res.status(400).json({ error: 'name is required' });
+
+  const kind = (
+    {
+      lodging: 'lodging (hotel/motel/resort/etc.)',
+      restaurant: 'restaurant',
+      destination: 'travel destination',
+      special_interest: 'point of interest',
+    } as Record<string, string>
+  )[type ?? ''] ?? 'place';
+  const location = [city, state].filter(Boolean).join(', ');
+
+  const msg = await anthropic.messages.create({
+    model: MODEL,
+    max_tokens: 256,
+    system: [SYSTEM],
+    messages: [
+      {
+        role: 'user',
+        content:
+          `Write 2–3 enthusiastic sentences highlighting what makes "${name}"` +
+          (location ? ` in ${location}` : '') +
+          `, a ${kind}, worth visiting` +
+          (details ? ` (category: ${details})` : '') +
+          `. Focus on standout features, atmosphere, and what travelers should look forward to. ` +
+          `Return plain prose — no JSON, no markdown.`,
+      },
+    ],
+  });
+  res.json({ result: textOf(msg) });
+}));
+
 // POST /api/claude/scrape-website
 router.post('/scrape-website', asyncHandler(async (req, res) => {
   const { url, name, entityType } = req.body as { url?: string; name?: string; entityType?: string };
