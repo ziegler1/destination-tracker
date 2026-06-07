@@ -11,7 +11,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatBottomSheet, MatBottomSheetModule } from '@angular/material/bottom-sheet';
 import { RestaurantService } from '../../../core/services/restaurant.service';
-import { ClaudeService } from '../../../core/services/claude.service';
+import { ClaudeService, ScrapedSiteInfo } from '../../../core/services/claude.service';
 import { MiniMapComponent } from '../../../shared/mini-map/mini-map.component';
 import { PhotoUploaderComponent } from '../../../shared/photo-uploader/photo-uploader.component';
 import { AddToTripSheetComponent } from '../../../shared/components/add-to-trip-sheet/add-to-trip-sheet.component';
@@ -50,6 +50,15 @@ import { Restaurant } from '../../../types/schema.types';
     .would-return.no  { background:#fce4ec; color:#c62828; }
 
     .ai-box { margin-top:16px; padding:16px; border-radius:8px; background:var(--wp-surface-variant); border-left:3px solid var(--wp-accent); font-size:14px; line-height:1.6; white-space:pre-wrap; }
+
+    .site-info-box { margin-top:16px; padding:16px; border-radius:8px; background:var(--wp-surface-variant); border-left:3px solid var(--wp-primary); }
+    .site-info-meta { display:flex; gap:16px; flex-wrap:wrap; margin-top:10px; font-size:13px; color:var(--wp-text-secondary); }
+    .site-info-meta span { display:inline-flex; align-items:center; gap:4px; }
+    .site-info-meta mat-icon { font-size:16px; height:16px; width:16px; }
+    .highlight-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:10px; margin-top:10px; }
+    .highlight-card { padding:10px 12px; border-radius:8px; background:var(--wp-surface); border:1px solid var(--wp-border); }
+    .hl-name { font-size:14px; font-weight:600; margin:0 0 2px; }
+    .hl-detail { font-size:12px; color:var(--wp-text-secondary); margin:0; }
     .photos-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:8px; margin-top:8px; }
     .photos-grid img { width:100%; height:110px; object-fit:cover; border-radius:8px; }
 
@@ -135,11 +144,41 @@ import { Restaurant } from '../../../types/schema.types';
               <a [href]="r.website" target="_blank" rel="noopener">
                 <button mat-stroked-button><mat-icon>language</mat-icon> Website</button>
               </a>
+              <button mat-stroked-button (click)="fetchSiteInfo(r)" [disabled]="siteInfoLoading()">
+                <mat-icon>travel_explore</mat-icon>
+                {{ siteInfoLoading() ? 'Fetching…' : 'Fetch Info' }}
+              </button>
             }
             @if (r.phone) {
               <a [href]="'tel:' + r.phone">
                 <button mat-stroked-button><mat-icon>phone</mat-icon> {{ r.phone }}</button>
               </a>
+            }
+          </div>
+        }
+
+        @if (siteInfo(); as info) {
+          <div class="site-info-box">
+            @if (info.description) {
+              <p style="margin:0">{{ info.description }}</p>
+            }
+            @if (info.hours || info.phone || info.address) {
+              <div class="site-info-meta">
+                @if (info.hours)   { <span><mat-icon>schedule</mat-icon> {{ info.hours }}</span> }
+                @if (info.phone)   { <span><mat-icon>phone</mat-icon> {{ info.phone }}</span> }
+                @if (info.address) { <span><mat-icon>place</mat-icon> {{ info.address }}</span> }
+              </div>
+            }
+            @if (info.highlights?.length) {
+              <p class="section-title" style="margin:14px 0 0">Menu Highlights</p>
+              <div class="highlight-grid">
+                @for (h of info.highlights!; track h.name) {
+                  <div class="highlight-card">
+                    <p class="hl-name">{{ h.name }}</p>
+                    @if (h.detail) { <p class="hl-detail">{{ h.detail }}</p> }
+                  </div>
+                }
+              </div>
             }
           </div>
         }
@@ -203,6 +242,8 @@ export class RestaurantDetailComponent implements OnInit {
   protected get r(): Restaurant | null { return this.restaurant(); }
   aiLoading    = signal(false);
   aiDescription = signal('');
+  siteInfoLoading = signal(false);
+  siteInfo     = signal<ScrapedSiteInfo | null>(null);
 
   ngOnInit() {
     const id = Number(this.route.snapshot.paramMap.get('id'));
@@ -233,6 +274,26 @@ export class RestaurantDetailComponent implements OnInit {
       error: () => {
         this.snack.open('AI generation failed', 'Dismiss', { duration: 3000 });
         this.aiLoading.set(false);
+      },
+    });
+  }
+
+  fetchSiteInfo(r: Restaurant) {
+    if (!r.website) return;
+    this.siteInfoLoading.set(true);
+    this.siteInfo.set(null);
+    this.claudeSvc.scrapeWebsite(r.website, r.name, 'restaurant').subscribe({
+      next: (res) => {
+        try {
+          this.siteInfo.set(JSON.parse(res.result) as ScrapedSiteInfo);
+        } catch {
+          this.snack.open('Could not parse site info — try again', 'Dismiss', { duration: 3000 });
+        }
+        this.siteInfoLoading.set(false);
+      },
+      error: () => {
+        this.snack.open('Fetch Info failed — the site may be unreachable', 'Dismiss', { duration: 3000 });
+        this.siteInfoLoading.set(false);
       },
     });
   }

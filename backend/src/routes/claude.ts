@@ -22,6 +22,18 @@ function textOf(msg: Anthropic.Messages.Message): string {
   return block.type === 'text' ? block.text : '';
 }
 
+function htmlToText(html: string): string {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&[a-z#0-9]+;/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 // POST /api/claude/suggest-destination
 router.post('/suggest-destination', asyncHandler(async (req, res) => {
   const { preferences, visitedDestinations = [] } = req.body;
@@ -155,6 +167,49 @@ router.post('/restaurant-description', asyncHandler(async (req, res) => {
           `Write a mouth-watering 2–3 sentence description for this restaurant:\n` +
           `${JSON.stringify(restaurant, null, 2)}\n\n` +
           `Focus on cuisine, atmosphere, and standout qualities. Return plain prose — no JSON.`,
+      },
+    ],
+  });
+  res.json({ result: textOf(msg) });
+}));
+
+// POST /api/claude/scrape-website
+router.post('/scrape-website', asyncHandler(async (req, res) => {
+  const { url, name, entityType } = req.body as { url?: string; name?: string; entityType?: string };
+  if (!url) return void res.status(400).json({ error: 'url is required' });
+
+  let text = '';
+  try {
+    const pageRes = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Waypoint/1.0; +travel planning app)' },
+      signal: AbortSignal.timeout(10000),
+    });
+    const html = await pageRes.text();
+    text = htmlToText(html).slice(0, 12000);
+  } catch {
+    return void res.status(502).json({ error: 'Could not fetch that website' });
+  }
+  if (!text) return void res.status(502).json({ error: 'That website returned no readable content' });
+
+  const kind = entityType === 'lodging' ? 'lodging (hotel/motel/resort/etc.)' : 'restaurant';
+  const msg = await anthropic.messages.create({
+    model: MODEL,
+    max_tokens: 1024,
+    system: [SYSTEM],
+    messages: [
+      {
+        role: 'user',
+        content:
+          `Here is text scraped from the website of "${name ?? 'this place'}", a ${kind}:\n\n${text}\n\n` +
+          `Extract useful info for a traveler. Return JSON with keys:\n` +
+          `- description: a 1–2 sentence summary (string, or null if not enough info)\n` +
+          `- hours: operating hours or check-in/check-out times if mentioned (string, or null)\n` +
+          `- phone: contact phone number if found (string, or null)\n` +
+          `- address: street address if found (string, or null)\n` +
+          `- highlights: an array of up to 8 objects with { name: string, detail?: string } — ` +
+          `for restaurants, list standout menu items with prices in "detail"; for lodging, list room types ` +
+          `or notable amenities with brief details.\n\n` +
+          `Use null for missing fields. Return valid JSON only — no markdown fences, no extra prose.`,
       },
     ],
   });

@@ -4,6 +4,14 @@ import { Restaurant, Trip } from '../../types/schema.types';
 
 interface ClaudeResult { result: string; }
 
+export interface ScrapedSiteInfo {
+  description?: string | null;
+  hours?:       string | null;
+  phone?:       string | null;
+  address?:     string | null;
+  highlights?:  { name: string; detail?: string }[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class ClaudeService {
   private http = inject(HttpClient);
@@ -36,5 +44,9 @@ export class ClaudeService {
 
   travelInsights(payload: { stats: unknown; records: unknown; cuisineBreakdown: unknown }) {
     return this.http.post<ClaudeResult>('/api/claude/travel-insights', payload);
+  }
+
+  scrapeWebsite(url: string, name: string, entityType: 'restaurant' | 'lodging') {
+    return this.http.post<ClaudeResult>('/api/claude/scrape-website', { url, name, entityType });
   }
 }

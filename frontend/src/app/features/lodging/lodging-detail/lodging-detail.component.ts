@@ -12,6 +12,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatBottomSheet, MatBottomSheetModule } from '@angular/material/bottom-sheet';
 import { LodgingService } from '../../../core/services/lodging.service';
+import { ClaudeService, ScrapedSiteInfo } from '../../../core/services/claude.service';
 import { MiniMapComponent } from '../../../shared/mini-map/mini-map.component';
 import { PhotoUploaderComponent } from '../../../shared/photo-uploader/photo-uploader.component';
 import { AddToTripSheetComponent } from '../../../shared/components/add-to-trip-sheet/add-to-trip-sheet.component';
@@ -55,6 +56,15 @@ const TYPE_LABELS: Record<LodgingType, string> = {
     .photos-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:8px; margin-top:8px; }
     .photos-grid img { width:100%; height:110px; object-fit:cover; border-radius:8px; }
     .link-row { display:flex; gap:12px; flex-wrap:wrap; margin-top:12px; }
+
+    .site-info-box { margin-top:16px; padding:16px; border-radius:8px; background:var(--wp-surface-variant); border-left:3px solid var(--wp-primary); }
+    .site-info-meta { display:flex; gap:16px; flex-wrap:wrap; margin-top:10px; font-size:13px; color:var(--wp-text-secondary); }
+    .site-info-meta span { display:inline-flex; align-items:center; gap:4px; }
+    .site-info-meta mat-icon { font-size:16px; height:16px; width:16px; }
+    .highlight-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:10px; margin-top:10px; }
+    .highlight-card { padding:10px 12px; border-radius:8px; background:var(--wp-surface); border:1px solid var(--wp-border); }
+    .hl-name { font-size:14px; font-weight:600; margin:0 0 2px; }
+    .hl-detail { font-size:12px; color:var(--wp-text-secondary); margin:0; }
   `],
   template: `
     @if (loading()) {
@@ -151,11 +161,41 @@ const TYPE_LABELS: Record<LodgingType, string> = {
               <a [href]="l.website" target="_blank" rel="noopener">
                 <button mat-stroked-button><mat-icon>language</mat-icon> Website</button>
               </a>
+              <button mat-stroked-button (click)="fetchSiteInfo(l)" [disabled]="siteInfoLoading()">
+                <mat-icon>travel_explore</mat-icon>
+                {{ siteInfoLoading() ? 'Fetching…' : 'Fetch Info' }}
+              </button>
             }
             @if (l.phone) {
               <a [href]="'tel:' + l.phone">
                 <button mat-stroked-button><mat-icon>phone</mat-icon> {{ l.phone }}</button>
               </a>
+            }
+          </div>
+        }
+
+        @if (siteInfo(); as info) {
+          <div class="site-info-box">
+            @if (info.description) {
+              <p style="margin:0">{{ info.description }}</p>
+            }
+            @if (info.hours || info.phone || info.address) {
+              <div class="site-info-meta">
+                @if (info.hours)   { <span><mat-icon>schedule</mat-icon> {{ info.hours }}</span> }
+                @if (info.phone)   { <span><mat-icon>phone</mat-icon> {{ info.phone }}</span> }
+                @if (info.address) { <span><mat-icon>place</mat-icon> {{ info.address }}</span> }
+              </div>
+            }
+            @if (info.highlights?.length) {
+              <p class="section-title" style="margin:14px 0 0">Rooms &amp; Amenities</p>
+              <div class="highlight-grid">
+                @for (h of info.highlights!; track h.name) {
+                  <div class="highlight-card">
+                    <p class="hl-name">{{ h.name }}</p>
+                    @if (h.detail) { <p class="hl-detail">{{ h.detail }}</p> }
+                  </div>
+                }
+              </div>
             }
           </div>
         }
@@ -196,6 +236,7 @@ export class LodgingDetailComponent implements OnInit {
   private route       = inject(ActivatedRoute);
   private router      = inject(Router);
   private svc         = inject(LodgingService);
+  private claudeSvc   = inject(ClaudeService);
   private snack       = inject(MatSnackBar);
   private bottomSheet = inject(MatBottomSheet);
 
@@ -203,6 +244,8 @@ export class LodgingDetailComponent implements OnInit {
   visitLogging = signal(false);
   lodging      = signal<Lodging | null>(null);
   protected get l(): Lodging | null { return this.lodging(); }
+  siteInfoLoading = signal(false);
+  siteInfo     = signal<ScrapedSiteInfo | null>(null);
 
   ngOnInit() {
     const id = Number(this.route.snapshot.paramMap.get('id'));
@@ -225,6 +268,26 @@ export class LodgingDetailComponent implements OnInit {
     const l = this.lodging();
     if (!l) return;
     this.svc.get(l.id).subscribe((updated) => this.lodging.set(updated));
+  }
+
+  fetchSiteInfo(l: Lodging) {
+    if (!l.website) return;
+    this.siteInfoLoading.set(true);
+    this.siteInfo.set(null);
+    this.claudeSvc.scrapeWebsite(l.website, l.name, 'lodging').subscribe({
+      next: (res) => {
+        try {
+          this.siteInfo.set(JSON.parse(res.result) as ScrapedSiteInfo);
+        } catch {
+          this.snack.open('Could not parse site info — try again', 'Dismiss', { duration: 3000 });
+        }
+        this.siteInfoLoading.set(false);
+      },
+      error: () => {
+        this.snack.open('Fetch Info failed — the site may be unreachable', 'Dismiss', { duration: 3000 });
+        this.siteInfoLoading.set(false);
+      },
+    });
   }
 
   logVisit(id: number) {
