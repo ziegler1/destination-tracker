@@ -1,12 +1,12 @@
 import {
-  Component, OnInit, ChangeDetectionStrategy, inject, signal, computed,
+  Component, OnInit, ChangeDetectionStrategy, inject, signal, computed, viewChild,
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import {
   DatePipe, CurrencyPipe, TitleCasePipe, DecimalPipe, SlicePipe,
 } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
-import { GoogleMap, MapAdvancedMarker, MapDirectionsRenderer } from '@angular/google-maps';
+import { GoogleMap, MapAdvancedMarker, MapDirectionsRenderer, MapInfoWindow } from '@angular/google-maps';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -28,6 +28,8 @@ import { MapsService } from '../../../core/services/maps.service';
 import {
   Trip, TripStatus, TripStop, TripExpense, TripJournalEntry, Lodging,
 } from '../../../types/schema.types';
+import { AddStopSheetComponent } from '../../../shared/components/add-stop-sheet/add-stop-sheet.component';
+import { MatBottomSheet } from '@angular/material/bottom-sheet';
 import { TripStopsTabComponent }   from '../trip-stops-tab/trip-stops-tab.component';
 import { TripExpensesTabComponent } from '../trip-expenses-tab/trip-expenses-tab.component';
 import { TripPackingTabComponent }  from '../trip-packing-tab/trip-packing-tab.component';
@@ -64,6 +66,14 @@ function lodgingMarkerEl(): HTMLElement {
   return el.firstElementChild as HTMLElement;
 }
 
+function restaurantMarkerEl(): HTMLElement {
+  const el = document.createElement('div');
+  el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24">
+    <rect x="2" y="2" width="20" height="20" rx="4" fill="#FF8F00" stroke="white" stroke-width="2"/>
+    <text x="12" y="17" font-size="13" text-anchor="middle" fill="white">🍴</text></svg>`;
+  return el.firstElementChild as HTMLElement;
+}
+
 @Component({
   selector: 'app-trip-detail',
   standalone: true,
@@ -71,7 +81,7 @@ function lodgingMarkerEl(): HTMLElement {
   imports: [
     RouterLink, ReactiveFormsModule,
     DatePipe, CurrencyPipe, TitleCasePipe, DecimalPipe, SlicePipe,
-    GoogleMap, MapAdvancedMarker, MapDirectionsRenderer,
+    GoogleMap, MapAdvancedMarker, MapDirectionsRenderer, MapInfoWindow,
     MatCardModule, MatButtonModule, MatIconModule, MatTabsModule,
     MatProgressSpinnerModule, MatSnackBarModule, MatDividerModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatDatepickerModule,
@@ -253,6 +263,23 @@ function lodgingMarkerEl(): HTMLElement {
                border-left:3px solid var(--wp-accent); font-size:14px; line-height:1.7; white-space:pre-wrap; }
     .bottom-tabs { border-top:1px solid var(--wp-border); }
     .geocoding-note { font-size:12px; color:var(--wp-text-hint); text-align:center; padding:8px; }
+
+    /* Map tab (mobile-friendly map view inside companion bottom-tabs) */
+    .map-tab { display:flex; flex-direction:column; }
+    .stop-strip {
+      display:flex; gap:10px; overflow-x:auto; padding:12px;
+      -webkit-overflow-scrolling:touch;
+    }
+    .strip-card {
+      flex:0 0 auto; min-width:150px; padding:10px 12px; border-radius:10px;
+      background:var(--wp-surface); border:2px solid var(--wp-border); cursor:pointer;
+      transition:border-color .2s;
+    }
+    .strip-card.active { border-color:#1565c0; }
+    .strip-num   { font-size:11px; font-weight:700; color:var(--wp-text-hint); text-transform:uppercase; letter-spacing:.04em; }
+    .strip-city  { font-size:14px; font-weight:600; margin:2px 0; }
+    .strip-dates { font-size:12px; color:var(--wp-text-secondary); margin-bottom:4px; }
+    .add-stop-btn { margin:0 12px 12px; background:#00695C !important; color:#fff !important; }
   `],
   template: `
     @if (loading()) {
@@ -673,6 +700,56 @@ function lodgingMarkerEl(): HTMLElement {
             <mat-divider style="margin-top:16px" />
             <mat-tab-group animationDuration="150ms" class="bottom-tabs">
               <mat-tab label="Stops"><app-trip-stops-tab [tripId]="t.id" /></mat-tab>
+              <mat-tab label="Map">
+                <div class="map-tab">
+                  <google-map #mapTabGmap height="calc(100vh - 200px)" width="100%"
+                              [center]="mapCenter()" [zoom]="mapZoom()" [options]="mapOptions">
+                    @if (directionsResult()) {
+                      <map-directions-renderer
+                        [directions]="directionsResult()!"
+                        [options]="{ suppressMarkers:true, polylineOptions:{ strokeColor:'#00695C', strokeOpacity:.85, strokeWeight:4 } }" />
+                    }
+                    @for (m of stopMarkers(); track m.stopId) {
+                      <map-advanced-marker [position]="m.position" [content]="m.content" [title]="m.title" [zIndex]="m.zIndex" />
+                    }
+                    @for (m of lodgingMarkers(); track m.title) {
+                      <map-advanced-marker [position]="m.position" [content]="m.content" [title]="m.title" [zIndex]="m.zIndex" />
+                    }
+                    @for (m of restaurantMarkers(); track m.title) {
+                      <map-advanced-marker [position]="m.position" [content]="m.content" [title]="m.title" [zIndex]="m.zIndex" />
+                    }
+                    <map-info-window #mapTabInfo>
+                      @if (selectedMapStop(); as s) {
+                        <div style="min-width:160px;font-family:Roboto,sans-serif;padding:2px">
+                          <strong style="font-size:14px">{{ s.destination?.name ?? ('Stop ' + s.stop_order) }}</strong><br/>
+                          <small style="color:#666">{{ s.destination?.city }}{{ s.destination?.city && s.destination?.state_province ? ', ' : '' }}{{ s.destination?.state_province }}</small>
+                        </div>
+                      }
+                    </map-info-window>
+                  </google-map>
+
+                  <div class="stop-strip">
+                    @for (s of sortedStops(); track s.id) {
+                      <div class="strip-card" [class.active]="selectedMapStop()?.id === s.id" (click)="flyToStop(s)">
+                        <div class="strip-num">Stop {{ s.stop_order }}</div>
+                        <div class="strip-city">{{ s.destination?.city || s.destination?.name || ('Stop ' + s.stop_order) }}</div>
+                        @if (s.arrival_date || s.departure_date) {
+                          <div class="strip-dates">
+                            {{ s.arrival_date ? (s.arrival_date | date:'MMM d') : '' }}
+                            {{ s.arrival_date && s.departure_date ? '→' : '' }}
+                            {{ s.departure_date ? (s.departure_date | date:'MMM d') : '' }}
+                          </div>
+                        }
+                        <span class="status-pill" [style.color]="STOP_STATUS_COLOR[s.status]">{{ s.status }}</span>
+                      </div>
+                    }
+                  </div>
+
+                  <button mat-raised-button class="add-stop-btn" (click)="openAddStop()">
+                    <mat-icon>add_location_alt</mat-icon> Add Stop
+                  </button>
+                </div>
+              </mat-tab>
               <mat-tab label="Expenses"><app-trip-expenses-tab [tripId]="t.id" [budget]="t.total_budget ?? null" /></mat-tab>
               <mat-tab label="Packing"><app-trip-packing-tab [tripId]="t.id" [tripName]="t.name" /></mat-tab>
               <mat-tab label="Journal"><app-trip-journal-tab [tripId]="t.id" /></mat-tab>
@@ -718,6 +795,11 @@ export class TripDetailComponent implements OnInit {
   private mapsSvc    = inject(MapsService);
   private snack      = inject(MatSnackBar);
   private fb         = inject(FormBuilder);
+  private bottomSheet = inject(MatBottomSheet);
+
+  mapTabGmap = viewChild<GoogleMap>('mapTabGmap');
+  mapTabInfo = viewChild<MapInfoWindow>('mapTabInfo');
+  selectedMapStop = signal<TripStop | null>(null);
 
   loading             = signal(true);
   summaryLoading      = signal(false);
@@ -824,6 +906,19 @@ export class TripDetailComponent implements OnInit {
       })),
   );
 
+  restaurantMarkers = computed(() =>
+    this.sortedStops()
+      .flatMap(s => s.restaurants ?? [])
+      .map(tr => tr.restaurant)
+      .filter((r): r is NonNullable<typeof r> => !!r?.latitude && !!r?.longitude)
+      .map(r => ({
+        title:    r.name,
+        position: { lat: Number(r.latitude), lng: Number(r.longitude) },
+        content:  restaurantMarkerEl(),
+        zIndex:   5,
+      })),
+  );
+
   googleMapsUrl = computed(() => {
     const pts = this.sortedStops()
       .map(s => { const c = this.stopCoords(s); return c ? `${c.lat},${c.lng}` : null; })
@@ -901,6 +996,24 @@ export class TripDetailComponent implements OnInit {
   }
 
   recenterMap() { /* mapCenter computed is reactive — bound to map center input */ }
+
+  flyToStop(stop: TripStop) {
+    const coords = this.stopCoords(stop);
+    const map  = this.mapTabGmap()?.googleMap;
+    const info = this.mapTabInfo()?.infoWindow;
+    if (!coords || !map || !info) return;
+    this.selectedMapStop.set(stop);
+    map.panTo(coords);
+    map.setZoom(Math.max(map.getZoom() ?? 9, 10));
+    info.setPosition(coords);
+    info.open(map);
+  }
+
+  openAddStop() {
+    const trip = this.tripSig(); if (!trip) return;
+    this.bottomSheet.open(AddStopSheetComponent, { data: { tripId: trip.id, nextOrder: (trip.stop_count ?? this.sortedStops().length) + 1 } })
+      .afterDismissed().subscribe((added) => { if (added) this.reload(); });
+  }
 
   startEditStop(stop: TripStop) {
     if (this.editingStopId() === stop.id) { this.editingStopId.set(null); return; }
