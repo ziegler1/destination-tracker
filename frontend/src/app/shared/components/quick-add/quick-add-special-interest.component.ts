@@ -13,6 +13,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { of, switchMap } from 'rxjs';
 import { SpecialInterestService } from '../../../core/services/special-interest.service';
 import { PhotoService } from '../../../core/services/photo.service';
+import { KeyboardAwareScrollDirective } from '../../directives/keyboard-aware-scroll.directive';
 
 const CATEGORIES = [
   { value: 'winery_brewery',      label: '🍷 Winery / Brewery' },
@@ -35,10 +36,11 @@ const CATEGORIES = [
     ReactiveFormsModule, FormsModule,
     MatFormFieldModule, MatInputModule, MatSelectModule,
     MatButtonModule, MatSlideToggleModule, MatIconModule,
+    KeyboardAwareScrollDirective,
   ],
   styles: [`
-    .sheet   { padding: 0 16px 24px; max-height: 90vh; overflow-y: auto; }
-    .handle  { width: 40px; height: 4px; background: var(--wp-border); border-radius: 2px; margin: 10px auto 16px; }
+    .sheet   { padding: 0 16px 32px; max-height: calc(100vh - 80px); overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    .handle  { width: 40px; height: 4px; background: var(--wp-border); border-radius: 2px; margin: 10px auto 16px; position: sticky; top: 0; }
     .title   { font-size: 18px; font-weight: 700; margin: 0 0 16px; }
     .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
     .label   { font-size: 13px; color: var(--wp-text-secondary); margin-bottom: 4px; }
@@ -56,7 +58,7 @@ const CATEGORIES = [
     }
   `],
   template: `
-    <div class="sheet">
+    <div class="sheet" appKeyboardAwareScroll>
       <div class="handle"></div>
       <p class="title">🌟 Add Special Interest Place</p>
 

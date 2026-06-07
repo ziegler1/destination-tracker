@@ -84,6 +84,16 @@ body {
 // ─── Utility ──────────────────────────────────────────────────────────────────
 .spacer         { flex: 1 1 auto; }
 .page-container { padding: 24px; max-width: 1200px; margin: 0 auto; }
+
+@media (max-width: 768px) {
+  .page-container { padding: 16px 16px 120px; }
+}
+
+@media (max-width: 768px) {
+  // Extra top/bottom breathing room so page headers don't crowd content and
+  // Save/Cancel buttons stay reachable above the fixed mobile bottom-tab bar.
+  .page-container { padding-top: 16px; padding-bottom: 120px; }
+}
 .loading-wrap   { display:flex; justify-content:center; align-items:center; height:240px; }
 .status-badge {
   display: inline-block;

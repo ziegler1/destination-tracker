@@ -25,7 +25,10 @@ export interface AddToTripData {
     TitleCasePipe, MatButtonModule, MatIconModule, MatProgressSpinnerModule,
   ],
   styles: [`
-    .sheet { padding: 16px 20px 28px; min-width: 300px; max-width: 500px; }
+    .sheet {
+      padding: 16px 20px 32px; min-width: 300px; max-width: 500px;
+      max-height: calc(100vh - 80px); overflow-y: auto; -webkit-overflow-scrolling: touch;
+    }
     .sheet-title { font-size: 17px; font-weight: 700; margin: 0 0 2px; }
     .sheet-sub { font-size: 13px; color: var(--wp-text-secondary); margin: 0 0 16px;
                  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 440px; }

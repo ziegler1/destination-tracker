@@ -14,6 +14,7 @@ import { Trip } from '../../../types/schema.types';
 import {
   PlacesAutocompleteComponent, PlaceSelectedEvent,
 } from '../places-autocomplete/places-autocomplete.component';
+import { KeyboardAwareScrollDirective } from '../../directives/keyboard-aware-scroll.directive';
 
 @Component({
   selector: 'app-quick-add-fuel',
@@ -22,10 +23,11 @@ import {
   imports: [
     ReactiveFormsModule, PlacesAutocompleteComponent,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatButtonModule,
+    KeyboardAwareScrollDirective,
   ],
   styles: [`
-    .sheet   { padding: 0 16px 24px; max-height: 90vh; overflow-y: auto; }
-    .handle  { width: 40px; height: 4px; background: var(--wp-border); border-radius: 2px; margin: 10px auto 16px; }
+    .sheet   { padding: 0 16px 32px; max-height: calc(100vh - 80px); overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    .handle  { width: 40px; height: 4px; background: var(--wp-border); border-radius: 2px; margin: 10px auto 16px; position: sticky; top: 0; }
     .title   { font-size: 18px; font-weight: 700; margin: 0 0 16px; }
     .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
     .empty   { color: var(--wp-text-secondary); font-size: 14px; margin-bottom: 16px; }
@@ -33,7 +35,7 @@ import {
     mat-form-field { width: 100%; }
   `],
   template: `
-    <div class="sheet">
+    <div class="sheet" appKeyboardAwareScroll>
       <div class="handle"></div>
       <h3 class="title">⛽ Quick Add Fuel Stop</h3>
 

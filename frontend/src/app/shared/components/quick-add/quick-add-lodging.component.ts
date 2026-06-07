@@ -20,6 +20,7 @@ import { Trip, TripStop } from '../../../types/schema.types';
 import {
   PlacesAutocompleteComponent, PlaceSelectedEvent,
 } from '../places-autocomplete/places-autocomplete.component';
+import { KeyboardAwareScrollDirective } from '../../directives/keyboard-aware-scroll.directive';
 
 @Component({
   selector: 'app-quick-add-lodging',
@@ -29,10 +30,11 @@ import {
     ReactiveFormsModule, FormsModule, PlacesAutocompleteComponent,
     MatFormFieldModule, MatInputModule, MatSelectModule,
     MatButtonModule, MatSlideToggleModule, MatIconModule,
+    KeyboardAwareScrollDirective,
   ],
   styles: [`
-    .sheet   { padding: 0 16px 24px; max-height: 90vh; overflow-y: auto; }
-    .handle  { width: 40px; height: 4px; background: var(--wp-border); border-radius: 2px; margin: 10px auto 16px; }
+    .sheet   { padding: 0 16px 32px; max-height: calc(100vh - 80px); overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    .handle  { width: 40px; height: 4px; background: var(--wp-border); border-radius: 2px; margin: 10px auto 16px; position: sticky; top: 0; }
     .title   { font-size: 18px; font-weight: 700; margin: 0 0 16px; }
     .label   { font-size: 13px; color: var(--wp-text-secondary); margin-bottom: 4px; }
     .stars   { display: flex; gap: 4px; margin: 4px 0 16px; }
@@ -63,7 +65,7 @@ import {
     }
   `],
   template: `
-    <div class="sheet">
+    <div class="sheet" appKeyboardAwareScroll>
       <div class="handle"></div>
       <h3 class="title">🏨 Quick Add Lodging</h3>
 
