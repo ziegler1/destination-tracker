@@ -23,6 +23,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { TripWizardService } from '../../../core/services/trip-wizard.service';
 import { SettingsService } from '../../../core/services/settings.service';
+import { TripDraftService } from '../../../core/services/trip-draft.service';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 import { MapsService } from '../../../core/services/maps.service';
 import {
@@ -641,6 +642,7 @@ export class TripWizardComponent implements OnInit, OnDestroy {
   private router      = inject(Router);
   private fb          = inject(FormBuilder);
   private settingsSvc = inject(SettingsService);
+  private draftSvc    = inject(TripDraftService);
   private mapsSvc     = inject(MapsService);
 
   // ── Step state ──────────────────────────────────────────────────────
@@ -704,6 +706,12 @@ export class TripWizardComponent implements OnInit, OnDestroy {
   });
 
   ngOnInit() {
+    const draft = this.draftSvc.consume();
+    if (draft) {
+      const label = [draft.city || draft.destination, draft.state_province].filter(Boolean).join(', ');
+      if (label) this.form.patchValue({ destination: label });
+    }
+
     this.settingsSvc.load().subscribe(s => {
       const patch: Record<string, unknown> = {};
       if (s.home_address)      patch['origin']             = s.home_address;

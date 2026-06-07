@@ -11,6 +11,7 @@ import { TripService } from '../../core/services/trip.service';
 import { StatsService } from '../../core/services/stats.service';
 import { RestaurantService } from '../../core/services/restaurant.service';
 import { LodgingService } from '../../core/services/lodging.service';
+import { TripDraftService } from '../../core/services/trip-draft.service';
 import {
   PlacesAutocompleteComponent, PlaceSelectedEvent,
 } from '../../shared/components/places-autocomplete/places-autocomplete.component';
@@ -371,6 +372,7 @@ export class HomeComponent implements OnInit {
   private statsSvc  = inject(StatsService);
   private restSvc   = inject(RestaurantService);
   private lodgeSvc  = inject(LodgingService);
+  private draftSvc  = inject(TripDraftService);
   private router    = inject(Router);
 
   loading       = signal(true);
@@ -453,9 +455,12 @@ export class HomeComponent implements OnInit {
   }
 
   onDestinationSearch(e: PlaceSelectedEvent): void {
-    this.router.navigate(['/trips/new'], {
-      queryParams: { destination: e.name, city: e.city, state: e.state_province },
+    this.draftSvc.set({
+      destination: e.name,
+      city: e.city,
+      state_province: e.state_province,
     });
+    this.router.navigate(['/trips/new']);
   }
 
   tripGradient(index: number): string {
