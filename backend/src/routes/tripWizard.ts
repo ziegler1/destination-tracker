@@ -131,6 +131,18 @@ interface PoiSuggestion {
   approved?: boolean;
 }
 
+interface SpecialInterestMatch {
+  id: number;
+  name: string;
+  city: string;
+  state_province: string;
+  category?: string;
+  rating?: number | null;
+  image_url?: string | null;
+  highlights?: string | null;
+  approved?: boolean;
+}
+
 interface WizardStop {
   stop_order: number;
   stop_type?: 'transit' | 'base' | 'return_transit';
@@ -145,6 +157,7 @@ interface WizardStop {
   lodging_suggestions:    LodgingSuggestion[];
   restaurant_suggestions: RestaurantSuggestion[];
   poi_suggestions:        PoiSuggestion[];
+  special_interest_matches?: SpecialInterestMatch[];
 }
 
 interface WizardTrip {
@@ -367,6 +380,16 @@ Return JSON:
           ? { ...s, google_verified: true,  place_id: e.place_id, formatted_address: e.formatted_address, photo_url: e.photo_url, lat: e.lat, lng: e.lng }
           : { ...s, google_verified: false, place_id: null, formatted_address: null, photo_url: null, lat: null, lng: null };
       });
+
+      // Surface the user's own saved special interest places that fall along this stop's city
+      const { rows: siMatches } = await pool.query<SpecialInterestMatch>(
+        `SELECT id, name, city, state_province, category, rating, image_url, highlights
+         FROM special_interest_places
+         WHERE city ILIKE $1 AND state_province ILIKE $2
+         ORDER BY name`,
+        [city, state],
+      );
+      stop.special_interest_matches = siMatches;
     }),
   );
 
@@ -547,6 +570,15 @@ router.post('/confirm', asyncHandler(async (req, res) => {
             true,
             p.place_id ?? null,
           ],
+        );
+      }
+
+      // 2f. Approved special-interest matches → link to this stop
+      for (const si of (stop.special_interest_matches ?? []).filter((s) => s.approved)) {
+        await client.query(
+          `INSERT INTO trip_special_interests (trip_id, trip_stop_id, special_interest_id)
+           VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`,
+          [tripId, stopId, si.id],
         );
       }
     }

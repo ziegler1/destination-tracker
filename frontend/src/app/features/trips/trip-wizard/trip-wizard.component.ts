@@ -505,6 +505,28 @@ const STOP_TIMINGS = [
                 }
               </div>
 
+              @if (stop.special_interest_matches?.length) {
+                <p class="section-label">✨ From Your Saved Places — click to add</p>
+                <div class="suggestion-grid">
+                  @for (s of stop.special_interest_matches!; track s.id) {
+                    <div class="suggestion-card"
+                         [class.approved]="isSpecialInterestApproved(stop.stop_order, $index)"
+                         (click)="toggleSpecialInterest(stop.stop_order, $index)">
+                      @if (s.image_url) {
+                        <img class="card-photo" [src]="s.image_url" [alt]="s.name" (error)="onImgError($event)" />
+                      } @else {
+                        <div class="card-photo" style="display:flex;align-items:center;justify-content:center;font-size:36px">✨</div>
+                      }
+                      <div class="card-body">
+                        <p class="card-name">{{ s.name }} <span class="google-badge" style="background:#FFB300">SAVED</span></p>
+                        @if (s.category) { <p class="card-meta">{{ s.category.replace('_',' ') | titlecase }}</p> }
+                        @if (s.highlights) { <p class="card-why">{{ s.highlights }}</p> }
+                      </div>
+                    </div>
+                  }
+                </div>
+              }
+
             </mat-expansion-panel>
 
             <!-- Add stop between panels -->
@@ -634,6 +656,7 @@ export class TripWizardComponent implements OnInit, OnDestroy {
   selectedLodging   = signal(new Map<number, number>());
   approvedRests     = signal(new Map<number, Set<number>>());
   approvedPois      = signal(new Map<number, Set<number>>());
+  approvedSpecialInterests = signal(new Map<number, Set<number>>());
   excludedPackItems = signal(new Map<string, Set<string>>());
 
   // ── Step 1 form ─────────────────────────────────────────────────────
@@ -840,14 +863,17 @@ export class TripWizardComponent implements OnInit, OnDestroy {
     const lodgingMap = new Map<number, number>();
     const restMap    = new Map<number, Set<number>>();
     const poiMap     = new Map<number, Set<number>>();
+    const siMap      = new Map<number, Set<number>>();
     for (const stop of stops) {
       if (stop.stop_type !== 'base') lodgingMap.set(stop.stop_order, -1);
       restMap.set(stop.stop_order, new Set());
       poiMap.set(stop.stop_order, new Set());
+      siMap.set(stop.stop_order, new Set());
     }
     this.selectedLodging.set(lodgingMap);
     this.approvedRests.set(restMap);
     this.approvedPois.set(poiMap);
+    this.approvedSpecialInterests.set(siMap);
   }
 
   selectLodging(stopOrder: number, idx: number) {
@@ -870,6 +896,17 @@ export class TripWizardComponent implements OnInit, OnDestroy {
   }
   togglePoi(stopOrder: number, idx: number) {
     this.approvedPois.update(m => {
+      const n = new Map(m); const s = new Set(n.get(stopOrder) ?? []);
+      s.has(idx) ? s.delete(idx) : s.add(idx);
+      n.set(stopOrder, s); return n;
+    });
+  }
+
+  isSpecialInterestApproved(stopOrder: number, idx: number) {
+    return this.approvedSpecialInterests().get(stopOrder)?.has(idx) ?? false;
+  }
+  toggleSpecialInterest(stopOrder: number, idx: number) {
+    this.approvedSpecialInterests.update(m => {
       const n = new Map(m); const s = new Set(n.get(stopOrder) ?? []);
       s.has(idx) ? s.delete(idx) : s.add(idx);
       n.set(stopOrder, s); return n;
@@ -905,6 +942,9 @@ export class TripWizardComponent implements OnInit, OnDestroy {
         })),
         poi_suggestions: stop.poi_suggestions.map((s, i) => ({
           ...s, approved: this.isPoiApproved(stop.stop_order, i),
+        })),
+        special_interest_matches: (stop.special_interest_matches ?? []).map((s, i) => ({
+          ...s, approved: this.isSpecialInterestApproved(stop.stop_order, i),
         })),
       })),
       trip: {

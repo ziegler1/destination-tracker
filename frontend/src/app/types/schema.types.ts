@@ -346,6 +346,18 @@ export interface WizardPoiSuggestion {
   approved?:        boolean;
 }
 
+export interface WizardSpecialInterestMatch {
+  id:              number;
+  name:            string;
+  city:            string;
+  state_province:  string;
+  category?:       SpecialInterestCategory;
+  rating?:         number | null;
+  image_url?:      string | null;
+  highlights?:     string | null;
+  approved?:       boolean;
+}
+
 export type WizardStopType = 'transit' | 'base' | 'return_transit';
 
 export interface WizardStop {
@@ -362,6 +374,7 @@ export interface WizardStop {
   lodging_suggestions:     WizardLodgingSuggestion[];
   restaurant_suggestions:  WizardRestaurantSuggestion[];
   poi_suggestions:         WizardPoiSuggestion[];
+  special_interest_matches?: WizardSpecialInterestMatch[];
 }
 
 export interface WizardTripMeta {
