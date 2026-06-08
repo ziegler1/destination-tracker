@@ -753,7 +753,8 @@ function restaurantMarkerEl(): HTMLElement {
               <mat-tab label="Journal"><app-trip-journal-tab [tripId]="t.id" /></mat-tab>
               <mat-tab label="Fuel"><app-trip-fuel-tab [tripId]="t.id" /></mat-tab>
             </mat-tab-group>
-            </div>
+            </div><!-- /tab-scroll-wrap -->
+          </div><!-- /left-panel -->
 
           <!-- ── RIGHT PANEL: Google Map ── -->
           <div class="right-panel">
