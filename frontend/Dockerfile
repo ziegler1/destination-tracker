@@ -13,7 +13,7 @@ COPY frontend/tsconfig*.json     ./
 COPY frontend/ngsw-config.json   ./
 COPY frontend/src                ./src
 
-RUN npm run build
+RUN npm run build -- --configuration=production
 
 # ─── Serve stage ──────────────────────────────────────────────────────────────
 FROM nginx:1.25-alpine

@@ -57,6 +57,30 @@ export function buildPhotoUrl(photoReference: string, maxWidth = 800): string {
 }
 
 /**
+ * Follow the Places photo redirect and return the permanent CDN URL.
+ * The Places /photo endpoint redirects to a CDN; storing the redirect URL
+ * rather than the API URL means the stored URL doesn't expose the API key
+ * and doesn't require a re-fetch at display time.
+ */
+export async function resolvePhotoUrl(
+  photoReference: string,
+  maxWidth = 800,
+): Promise<string | null> {
+  try {
+    const directUrl = buildPhotoUrl(photoReference, maxWidth);
+    const res = await fetch(directUrl, {
+      redirect: 'follow',
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return null;
+    return res.url;
+  } catch (err) {
+    console.error('[Places] resolvePhotoUrl failed:', err);
+    return null;
+  }
+}
+
+/**
  * Text Search: find a place by name + city + state.
  * Returns the first match or null.
  */
@@ -119,7 +143,7 @@ export async function enrichPlace(
       google_rating:      match.rating             ?? null,
       user_ratings_total: match.user_ratings_total ?? null,
       price_level:        match.price_level        ?? null,
-      photo_url:          photoRef ? buildPhotoUrl(photoRef) : null,
+      photo_url:          photoRef ? await resolvePhotoUrl(photoRef) : null,
       website,
       phone,
       lat:  match.geometry?.location.lat ?? null,

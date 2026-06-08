@@ -158,6 +158,7 @@ interface WizardStop {
   restaurant_suggestions: RestaurantSuggestion[];
   poi_suggestions:        PoiSuggestion[];
   special_interest_matches?: SpecialInterestMatch[];
+  city_photo_url?: string | null;
 }
 
 interface WizardTrip {
@@ -381,6 +382,13 @@ Return JSON:
           : { ...s, google_verified: false, place_id: null, formatted_address: null, photo_url: null, lat: null, lng: null };
       });
 
+      // Use the first available enriched photo as the city-level destination image
+      stop.city_photo_url =
+        stop.lodging_suggestions.find((s) => s.photo_url)?.photo_url ??
+        stop.restaurant_suggestions.find((s) => s.photo_url)?.photo_url ??
+        stop.poi_suggestions.find((s) => s.photo_url)?.photo_url ??
+        null;
+
       // Surface the user's own saved special interest places that fall along this stop's city
       const { rows: siMatches } = await pool.query<SpecialInterestMatch>(
         `SELECT id, name, city, state_province, category, rating, image_url, highlights
@@ -457,12 +465,13 @@ router.post('/confirm', asyncHandler(async (req, res) => {
         }
       } else {
         const { rows: [newDest] } = await client.query<{ id: number }>(
-          `INSERT INTO destinations (name, city, state_province, country, status, latitude, longitude)
-           VALUES ($1, $2, $3, $4, 'want_to_visit', $5, $6)
+          `INSERT INTO destinations (name, city, state_province, country, status, latitude, longitude, image_url)
+           VALUES ($1, $2, $3, $4, 'want_to_visit', $5, $6, $7)
            RETURNING id`,
           [
             stop.city, stop.city, stop.state_province, normalizeCountry(stop.country),
             coords?.lat ?? null, coords?.lon ?? null,
+            stop.city_photo_url ?? null,
           ],
         );
         destinationId = newDest.id;
@@ -478,8 +487,8 @@ router.post('/confirm', asyncHandler(async (req, res) => {
              (name, city, state_province, country, lodging_type,
               address, latitude, longitude,
               price_per_night, website, pet_friendly,
-              suggested_by_ai, google_place_id)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+              suggested_by_ai, google_place_id, image_url)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
            RETURNING id`,
           [
             approvedLodging.name,
@@ -495,6 +504,7 @@ router.post('/confirm', asyncHandler(async (req, res) => {
             false,
             true,
             approvedLodging.place_id ?? null,
+            approvedLodging.photo_url ?? null,
           ],
         );
         lodgingId = savedLodging.id;
@@ -530,8 +540,8 @@ router.post('/confirm', asyncHandler(async (req, res) => {
           `INSERT INTO restaurants
              (name, city, state_province, country, cuisine_type, price_range,
               address, latitude, longitude,
-              website, pet_friendly, suggested_by_ai, google_place_id)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+              website, pet_friendly, suggested_by_ai, google_place_id, image_url)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
            RETURNING id`,
           [
             r.name,
@@ -547,6 +557,7 @@ router.post('/confirm', asyncHandler(async (req, res) => {
             false,
             true,
             r.place_id ?? null,
+            r.photo_url ?? null,
           ],
         );
         await client.query(
@@ -560,8 +571,8 @@ router.post('/confirm', asyncHandler(async (req, res) => {
       for (const p of (stop.poi_suggestions ?? []).filter((s) => s.approved)) {
         await client.query(
           `INSERT INTO points_of_interest
-             (destination_id, name, poi_type, description, suggested_by_ai, google_place_id)
-           VALUES ($1,$2,$3,$4,$5,$6)`,
+             (destination_id, name, poi_type, description, suggested_by_ai, google_place_id, image_url)
+           VALUES ($1,$2,$3,$4,$5,$6,$7)`,
           [
             destinationId,
             p.name,
@@ -569,6 +580,7 @@ router.post('/confirm', asyncHandler(async (req, res) => {
             p.why_recommended ?? null,
             true,
             p.place_id ?? null,
+            p.photo_url ?? null,
           ],
         );
       }
