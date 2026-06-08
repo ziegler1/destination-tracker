@@ -47,6 +47,15 @@ router.get('/:id', asyncHandler(async (req, res) => {
   res.json(rows[0]);
 }));
 
+function haversineMiles(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 3958.8;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 // POST /api/destinations
 router.post('/', asyncHandler(async (req, res) => {
   const {
@@ -66,6 +75,21 @@ router.post('/', asyncHandler(async (req, res) => {
     );
     if (existing[0]) {
       return void res.status(409).json({ duplicate: true, existing: existing[0] });
+    }
+
+    if (latitude != null && longitude != null) {
+      const { rows: settings } = await pool.query(
+        `SELECT key, value FROM app_settings WHERE key = ANY($1)`,
+        [['home_lat', 'home_lng']],
+      );
+      const homeLat = parseFloat(settings.find((r: { key: string }) => r.key === 'home_lat')?.value ?? '');
+      const homeLng = parseFloat(settings.find((r: { key: string }) => r.key === 'home_lng')?.value ?? '');
+      if (!Number.isNaN(homeLat) && !Number.isNaN(homeLng)) {
+        const dist = haversineMiles(homeLat, homeLng, Number(latitude), Number(longitude));
+        if (dist < 25) {
+          return void res.status(409).json({ home_address: true });
+        }
+      }
     }
   }
 

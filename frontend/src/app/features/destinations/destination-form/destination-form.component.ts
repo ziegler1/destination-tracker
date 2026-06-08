@@ -21,6 +21,7 @@ import { DestinationService } from '../../../core/services/destination.service';
 import { GeocodingService } from '../../../core/services/geocoding.service';
 import { PlacesAutocompleteComponent, PlaceSelectedEvent } from '../../../shared/components/places-autocomplete/places-autocomplete.component';
 import { DuplicateDestinationDialogComponent } from '../../../shared/components/duplicate-destination-dialog/duplicate-destination-dialog.component';
+import { HomeAddressDialogComponent } from '../../../shared/components/home-address-dialog/home-address-dialog.component';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 
 const MONTHS = [
@@ -388,6 +389,10 @@ export class DestinationFormComponent implements OnInit {
           this.handleDuplicate(dto, e.error.existing);
           return;
         }
+        if (e.status === 409 && e.error?.home_address) {
+          this.handleHomeAddress(dto);
+          return;
+        }
         this.error.set(e.error?.error ?? 'An error occurred');
         this.saving.set(false);
       },
@@ -400,6 +405,17 @@ export class DestinationFormComponent implements OnInit {
         if (result === 'view') {
           this.router.navigate(['/destinations', existing.id]);
         } else if (result === 'save-anyway') {
+          this.submit(dto, true);
+        } else {
+          this.saving.set(false);
+        }
+      });
+  }
+
+  private handleHomeAddress(dto: Record<string, unknown>): void {
+    this.dialog.open(HomeAddressDialogComponent, { width: '420px' })
+      .afterClosed().subscribe((result) => {
+        if (result === 'add-anyway') {
           this.submit(dto, true);
         } else {
           this.saving.set(false);
