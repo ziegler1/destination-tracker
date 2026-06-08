@@ -99,6 +99,8 @@
 
 ## Phase 3 — Interactive Map ✅
 
+> **Note:** This phase shipped on Leaflet + OpenStreetMap. The map stack was later replaced end-to-end with the Google Maps JS API (`@angular/google-maps`) — see **Phase 7 — App Redesign, Special Interests & Mobile Experience** below. `MapComponent`, `MiniMapComponent`, and the route-drawing logic described here have since been rebuilt on Google Maps; Leaflet is no longer used.
+
 **Map Page** (`MapComponent` — full-screen Leaflet + OSM)
 - [x] Leaflet map centered on contiguous US + Canada (zoom 4)
 - [x] Destination pins — DivIcons colour-coded by status (blue/amber/green), no image assets required
@@ -210,6 +212,45 @@
 - [x] Step 4: confirmed with Open Trip Companion button
 - [x] Two-panel Trip Companion at `/trips/:id` — stop cards left, Leaflet route map right
 - [x] Sidebar: amber "Plan a Trip" CTA button + "My Trips" nav reorder
+
+---
+
+## Phase 7 — App Redesign, Special Interests & Mobile Experience ✅
+
+> Covers the app-shell redesign, the Google Maps migration, the new Special Interests feature, and the mobile-polish/UX-unification passes (commits from `d6b7e12` "App shell redesign" through `0df0bb8` "Add flow unification").
+
+**App Shell Redesign**
+- [x] Replaced the `MatSidenav` hamburger layout with a fixed 280px sidebar (desktop) + bottom tab bar with a "More" sheet (mobile)
+- [x] Home dashboard (`HomeComponent`) — search bar (cross-entity, `routes/search.ts`), upcoming trip card, highlights
+- [x] `TravelsComponent` — combined travel-history view across all entity types
+- [x] `WouldReturnComponent` — filtered cross-entity views at `/would-return` and `/avoid-list`
+- [x] `SettingsComponent` + `app_settings` table (`004_settings.sql`, `009_site_info.sql`) — site info, app preferences
+
+**Google Maps Migration**
+- [x] Replaced Leaflet/OpenStreetMap end-to-end with `@angular/google-maps` (Advanced Markers, Places Autocomplete, route polylines)
+- [x] `MapsService` + `PlacesAutocompleteComponent` — shared Google Places search-and-autofill widget used across all add/quick-add forms
+- [x] `geocode.ts` backend route — address → lat/lon lookup
+- [x] `MiniMapComponent` and full-screen `MapComponent` rebuilt on the new stack
+
+**Special Interests Feature** (wineries, breweries, museums, parks, historic sites, live music, etc.)
+- [x] `005_special_interest_places.sql` — `special_interest_places`, `special_interest_photos`, `trip_special_interests` tables
+- [x] `SpecialInterestService` + `routes/specialInterests.ts` — full CRUD + photo endpoints
+- [x] List page — category filter chips, search, card grid (`special-interests.component.ts`)
+- [x] Detail + add/edit form pages, with category-specific iconography
+- [x] Wired into the AI Trip Wizard and "Add to Trip" flow alongside restaurants/lodging/POIs
+
+**Quick Add Bottom Sheets** (`shared/components/quick-add/`)
+- [x] Streamlined `MatBottomSheet` add forms for Destination, Restaurant, Lodging, Special Interest, and Fuel Stop — each with places-search autocomplete, photo upload, and trip-attach
+- [x] `AddToTripSheetComponent` — attach any entity to a trip stop from anywhere in the app
+- [x] `EmptyStateComponent` extended to support click-emitting CTAs (`(ctaClick)`) alongside `routerLink` CTAs, so empty-list prompts can open a sheet instead of navigating
+
+**Mobile Polish & "Add" Flow Unification** (this pass)
+- [x] General mobile layout polish — responsive card grids (single column < 768px), consistent typography (16px inputs to prevent iOS zoom, ellipsis truncation on card titles), 44×44px touch targets on icon/star buttons, full-width form fields and action buttons, consolidated `.page-container` mobile padding in `styles.scss`
+- [x] Fixed CI production-build failure — `trip-detail.component.ts` exceeded the `anyComponentStyle` budget; raised the budget in `angular.json` from 4kB/8kB to 6kB/12kB (the component legitimately styles 3 distinct view modes: scrapbook, companion layout, full-screen map overlay)
+- [x] Added the missing places-search autocomplete to the Special Interest Quick Add sheet (parity with Restaurant/Lodging)
+- [x] Fixed horizontal overflow ("cut off on the right") on `trip-form`, `lodging-form`, `restaurant-form`, and `special-interest-form` at mobile widths — added `@media (max-width:600px){ .form-grid{grid-template-columns:1fr} }`
+- [x] **Unified the two divergent "add new entity" UX paths**: previously, the global nav "+" opened a streamlined Quick Add sheet, while each entity list page's FAB/"+" routed to the full `/X/new` form page (which was also the one cut off on mobile). Now Lodging, Restaurants, Destinations, and Special Interests list pages all open the *same* Quick Add bottom sheet from both their FAB and empty-state CTA — one consistent, fast, mobile-friendly add flow everywhere
+- [x] Verified against the **production** build config (`ng build`, not `--configuration development` — the dev config doesn't enforce style budgets, which is how the CI failure went undetected initially)
 
 ---
 

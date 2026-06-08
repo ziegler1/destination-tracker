@@ -1,6 +1,6 @@
 # Waypoint
 
-A personal travel companion web app for US and Canada road travel. Track destinations, trips, lodging, restaurants, expenses, packing lists, and journal entries — all in one place.
+A personal travel companion web app for US and Canada road travel. Plan trips with an AI wizard, track destinations, restaurants, lodging, special-interest places (wineries, museums, parks, etc.), expenses, fuel, packing lists, and journal entries — all in one place, as an installable mobile-friendly PWA.
 
 ---
 
@@ -8,16 +8,16 @@ A personal travel companion web app for US and Canada road travel. Track destina
 
 | Layer | Technology |
 |---|---|
-| **Frontend** | Angular 17 (standalone components, lazy-loaded routes, OnPush change detection) |
-| **UI** | Angular Material 17 (M2 theme — teal #00695C primary, amber #FFB300 accent, dark/light toggle) |
+| **Frontend** | Angular 17 (standalone components, lazy-loaded routes, signals, OnPush change detection) |
+| **UI** | Angular Material 17 (M2 theme — teal #00695C primary, amber #FFB300 accent, dark/light toggle), responsive shell — fixed sidebar on desktop, bottom tab bar + Quick Add bottom sheets on mobile |
 | **Backend** | Node.js 20 / Express 4 / TypeScript — compiled with `tsc`, hot-reload with `tsx watch` |
-| **Database** | PostgreSQL 16 — `pg` pool (max 10 connections), auto-migration runner |
-| **AI** | Anthropic Claude (`claude-sonnet-4-5`) via `@anthropic-ai/sdk`, system-prompt caching |
+| **Database** | PostgreSQL 16 — `pg` pool (max 10 connections), auto-migration runner (`backend/db/*.sql`) |
+| **AI** | Anthropic Claude (`claude-sonnet-4-5`) via `@anthropic-ai/sdk`, system-prompt caching — trip wizard, suggestions, summaries, descriptions |
 | **File Storage** | Cloudflare R2 via `@aws-sdk/client-s3` (S3-compatible) |
-| **Maps** | Leaflet.js + OpenStreetMap (no API key required) — Phase 1 |
+| **Maps** | Google Maps JS API (`@angular/google-maps`) — Places Autocomplete, Advanced Markers, route polylines |
 | **Weather** | Open-Meteo API (free, no API key, fetch by lat/lon) |
-| **Charts** | ng2-charts (Chart.js wrapper) — Phase 1 |
-| **PWA** | Angular Service Worker (`@angular/pwa`), app-shell prefetch |
+| **Charts** | ng2-charts (Chart.js wrapper) — stats donuts & bar charts |
+| **PWA** | Angular Service Worker (`@angular/pwa`), app-shell prefetch, install-prompt banner |
 | **Proxy** | nginx 1.25, `envsubst` for `$BACKEND_URL`, gzip + asset caching |
 | **Hosting** | Railway (two services + PostgreSQL plugin), Cloudflare DNS |
 | **Containers** | Multi-stage Dockerfiles, full repo as Docker build context |
@@ -29,8 +29,15 @@ A personal travel companion web app for US and Canada road travel. Track destina
 ```
 waypoint/
 ├── backend/
-│   ├── db/
-│   │   └── 001_init.sql          Full schema (16 tables)
+│   ├── db/                       Auto-applied migrations, run once each (001 → 009)
+│   │   ├── 001_init.sql          Core schema (16 tables: destinations, trips, stops, etc.)
+│   │   ├── 002_ai_fields.sql     suggested_by_ai, google_place_id columns
+│   │   ├── 004_settings.sql      app_settings table
+│   │   ├── 005_special_interest_places.sql  Special-interest places, photos, trip links
+│   │   ├── 006_schema_enhancements.sql
+│   │   ├── 007_trip_origin.sql
+│   │   ├── 008_normalize_states.sql
+│   │   └── 009_site_info.sql
 │   ├── src/
 │   │   ├── index.ts              Express entry point, all routes registered
 │   │   ├── db.ts                 pg Pool (max 10, Railway SSL auto-detected)
@@ -39,6 +46,7 @@ waypoint/
 │   │   ├── lib/
 │   │   │   ├── asyncHandler.ts   Wraps async routes, forwards errors to next()
 │   │   │   ├── r2.ts             Cloudflare R2 upload/delete helpers
+│   │   │   ├── googlePlaces.ts   Text Search + Place Details + photo URL, enrichBatch
 │   │   │   └── weather.ts        Open-Meteo fetch with 1-hour in-memory cache
 │   │   ├── middleware/
 │   │   │   └── errorHandler.ts   Global Express error handler (registered last)
@@ -46,15 +54,21 @@ waypoint/
 │   │       ├── destinations.ts   CRUD + status patch, jsonb_agg for photos & POIs
 │   │       ├── restaurants.ts    CRUD, jsonb_agg for photos
 │   │       ├── lodging.ts        CRUD, jsonb_agg for photos
+│   │       ├── specialInterests.ts  CRUD for special-interest places + photos
 │   │       ├── trips.ts          CRUD + status, single CTE query for full trip detail
+│   │       ├── tripWizard.ts     AI trip generation (/generate, /confirm)
 │   │       ├── stops.ts          Trip stop CRUD + status (mergeParams)
 │   │       ├── expenses.ts       CRUD + /summary endpoint (totals by category)
 │   │       ├── packing.ts        List + item CRUD + is_packed toggle
 │   │       ├── journal.ts        Trip journal entry CRUD
 │   │       ├── fuel.ts           Fuel stop CRUD
 │   │       ├── weather.ts        Proxies lib/weather.ts
+│   │       ├── geocode.ts        Address → lat/lon lookup
+│   │       ├── search.ts         Cross-entity search (home search bar)
+│   │       ├── settings.ts       App settings CRUD (site info, etc.)
+│   │       ├── stats.ts          Aggregate stats endpoint (destinations/trips/expenses/fuel)
 │   │       ├── uploads.ts        Multipart photo upload to R2 (5 MB limit)
-│   │       └── claude.ts         5 AI endpoints with system-prompt caching
+│   │       └── claude.ts         AI endpoints with system-prompt caching
 │   ├── .env.example
 │   ├── Dockerfile
 │   ├── package.json
@@ -68,18 +82,30 @@ waypoint/
 │   │   │   └── schema.types.ts   Mirrors backend/src/types.ts exactly
 │   │   ├── core/
 │   │   │   ├── layout/
-│   │   │   │   └── shell.component.ts  Responsive sidebar (hamburger on mobile)
-│   │   │   └── services/
-│   │   │       ├── theme.service.ts    Dark/light toggle, 19 CSS custom properties
-│   │   │       ├── destination.service.ts
-│   │   │       └── weather.service.ts  WMO code → emoji, calls /api/weather
+│   │   │   │   └── shell.component.ts  Responsive shell — fixed sidebar (desktop) / bottom tabs + "More" sheet (mobile)
+│   │   │   └── services/         theme, destination, restaurant, lodging, special-interest,
+│   │   │                         trip, stop, expense, packing, journal, fuel, weather,
+│   │   │                         maps, settings, stats services
+│   │   ├── shared/
+│   │   │   └── components/
+│   │   │       ├── quick-add/    Bottom-sheet "Quick Add" forms — Destination, Restaurant,
+│   │   │       │                 Lodging, Special Interest, Fuel Stop (places-search + photo + trip-attach)
+│   │   │       ├── places-autocomplete/  Google Places search-and-autofill widget
+│   │   │       ├── add-to-trip-sheet/    Attach an entity to a trip stop from anywhere
+│   │   │       └── empty-state/  Reusable empty-list CTA (routerLink or click-emit)
 │   │   └── features/
-│   │       ├── destinations/     List, detail (weather strip + POIs), add/edit form
-│   │       ├── trips/            Stub — Phase 1
-│   │       ├── restaurants/      Stub — Phase 1
-│   │       ├── lodging/          Stub — Phase 1
-│   │       ├── map/              Stub — Phase 1
-│   │       └── stats/            Stub — Phase 1
+│   │       ├── home/             Dashboard — search bar, upcoming trip, highlights
+│   │       ├── travels/          Combined travel history view
+│   │       ├── trips/            Full CRUD, AI Trip Wizard, Companion view, stop/expense/
+│   │       │                     packing/journal/fuel tabs
+│   │       ├── destinations/     List, detail (weather + POIs + map), add/edit form, AI suggest
+│   │       ├── restaurants/      List, detail (gallery + map + AI description), add/edit form
+│   │       ├── lodging/          List, detail (amenities + gallery + map), add/edit form
+│   │       ├── special-interests/  Wineries/museums/parks/etc. — list, detail, add/edit form
+│   │       ├── lists/            Filtered cross-entity views (would-return, avoid-list)
+│   │       ├── map/              Full-screen Google Map — pins, POIs, trip route polylines
+│   │       ├── stats/            Charts — destinations, trips, spending, road stats
+│   │       └── settings/         App settings, site info
 │   ├── nginx/
 │   │   ├── nginx.conf            Template — $BACKEND_URL envsubst, gzip, SPA fallback
 │   │   └── docker-entrypoint.sh  envsubst '$BACKEND_URL' only (preserves nginx vars)
@@ -88,6 +114,8 @@ waypoint/
 │   ├── proxy.conf.json           /api/* → http://localhost:3000
 │   └── Dockerfile
 ├── docs/
+│   ├── Plan.md                   Phase-by-phase build log and backlog
+│   └── deploy.md                 Railway deployment guide
 └── package.json                  Root scripts: install:all, dev:backend, dev:frontend, build
 ```
 
@@ -95,7 +123,7 @@ waypoint/
 
 ## Database Schema
 
-16 tables managed by the auto-migration runner:
+20 tables managed by the auto-migration runner (`backend/db/001`–`009`):
 
 | Table | Purpose |
 |---|---|
@@ -106,7 +134,10 @@ waypoint/
 | `restaurant_photos` | R2-hosted photos per restaurant |
 | `lodging` | Hotels, motels, Airbnbs, campgrounds |
 | `lodging_photos` | R2-hosted photos per lodging |
-| `trips` | Named road trips with budget and status |
+| `special_interest_places` | Wineries, museums, parks, attractions, etc. |
+| `special_interest_photos` | R2-hosted photos per special-interest place |
+| `trip_special_interests` | Special-interest places attached to a trip/stop |
+| `trips` | Named road trips with budget, origin, and status |
 | `trip_stops` | Ordered stops within a trip (links destination + lodging) |
 | `trip_restaurants` | Restaurants visited at a stop |
 | `trip_expenses` | Categorized expenses per trip/stop |
@@ -114,48 +145,25 @@ waypoint/
 | `packing_items` | Individual items with is_packed toggle |
 | `trip_journal_entries` | Free-text journal entries per trip/stop |
 | `fuel_stops` | Fuel log with price, gallons, odometer |
+| `app_settings` | Key/value app settings (site info, etc.) |
 | `_migrations` | Tracks applied SQL migration files |
 
 ---
 
-## Completed Phases
+## Feature Overview
 
-### Phase 0 — Foundation (complete)
+The app has grown well past its original Phase 0/1 scope — it's now a full travel-planning companion. Highlights:
 
-**Backend**
-- Express app with all 12 route files registered
-- Auto-migration system (runs `db/*.sql` once each, tracked in `_migrations`)
-- Full database schema — 16 tables, all `VARCHAR + CHECK` constraints (no Postgres enums)
-- `asyncHandler` wrapper on every route, `errorHandler` middleware last
-- All list endpoints use a single SQL query with `jsonb_agg + DISTINCT + FILTER` — no N+1 queries
-- Trip detail endpoint returns full trip in one CTE query (stops, expenses, packing, journal)
-- 5 Claude AI endpoints with `cache_control: ephemeral` on system prompts
-- R2 photo upload/delete (multer, 5 MB limit, MIME filter)
-- Open-Meteo weather proxy with 1-hour in-memory cache
-- Expense summary endpoint (totals by category)
-- Packing list item toggle (`is_packed`)
-- Multi-stage Dockerfile with full-repo build context
+- **Destinations, Restaurants, Lodging, Special Interests** — full CRUD with photo galleries (R2), maps, ratings, filters/search, and an AI "suggest" flow for destinations
+- **AI Trip Wizard** — describe a trip, Claude plans the route and Google Places enriches every stop (lodging, restaurants, POIs) into a reviewable preview before anything is saved
+- **Trip Companion view** — two-panel layout with stop timeline + Google Maps route, plus tabs for Expenses (with charts), Packing Lists (AI-suggested), Journal, and Fuel Log
+- **Quick Add bottom sheets** — fast, places-search-powered add forms for every entity type, available from the global "+" nav button *and* every entity list page (unified mobile UX)
+- **Google Maps integration** — full-screen map with status-coded pins, POI markers, trip route polylines, and mini-maps on detail pages
+- **Stats dashboard** — ng2-charts donuts/bars for destinations, trips, spending, and road stats (miles, fuel cost, cost-per-mile)
+- **PWA** — installable, offline-capable shell, service-worker caching, install-prompt banner
+- **Mobile-first responsive shell** — fixed sidebar on desktop, bottom tab bar + "More" sheet + Quick Add sheets on mobile
 
-**Frontend**
-- Angular 17 standalone components, `OnPush` change detection throughout
-- Angular Material M2 theme — teal 800 primary, amber 600 accent, dark theme class
-- ThemeService with signal-based toggle and 19 CSS custom properties
-- Responsive sidebar shell (`MatSidenav`) — side mode on desktop, hamburger overlay on mobile
-- All 6 nav routes lazy-loaded: Trips, Destinations, Restaurants, Lodging, Map, Stats
-- PWA service worker — app-shell prefetch + API freshness cache
-- **Destinations feature (fully working):**
-  - List page — status filter chips, state/province dropdown, search bar, card grid
-  - Detail page — hero photo, 7-day weather strip (Open-Meteo), best-months pills, POI list, photo gallery
-  - Add/Edit form — all fields, month chip autocomplete, date picker, star-click rating
-- Multi-stage Dockerfile (node:20 build → nginx:1.25 serve)
-
-### Phase 1 — Remaining Features (planned)
-
-- Trips: full CRUD, stop management, expense tracker, packing checklist, journal
-- Restaurants: CRUD with map pin, photo gallery, AI description
-- Lodging: CRUD with amenity chips, photo gallery
-- Map view: Leaflet with destination/stop pins, route polyline
-- Stats: ng2-charts — destinations by status, spending by category, miles driven
+For the full phase-by-phase build history and the current backlog, see **[`docs/Plan.md`](docs/Plan.md)**.
 
 ---
 
