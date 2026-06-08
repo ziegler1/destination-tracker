@@ -21,6 +21,7 @@ import wizardRouter   from './routes/tripWizard';
 import searchRouter   from './routes/search';
 import settingsRouter from './routes/settings';
 import specialInterestsRouter from './routes/specialInterests';
+import adminRouter from './routes/admin';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -56,6 +57,7 @@ app.use('/api/trips/wizard',  wizardRouter);
 app.use('/api/search',        searchRouter);
 app.use('/api/settings',          settingsRouter);
 app.use('/api/special-interests', specialInterestsRouter);
+app.use('/api/admin',            adminRouter);
 
 app.use(errorHandler);
 

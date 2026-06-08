@@ -47,6 +47,14 @@ export class SettingsService {
     );
   }
 
+  backfillPhotos() {
+    return this.http.post<{
+      success:       boolean;
+      total_updated: number;
+      results:       Record<string, { updated: number; skipped: number; failed: number }>;
+    }>('/api/admin/backfill-photos', {});
+  }
+
   homeLatLng(): google.maps.LatLngLiteral {
     const s = this.settings();
     return { lat: parseFloat(s.home_lat) || 39.9554, lng: parseFloat(s.home_lng) || -83.2174 };

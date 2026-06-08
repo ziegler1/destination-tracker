@@ -13,6 +13,7 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatCardModule } from '@angular/material/card';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import {
   PlacesAutocompleteComponent, PlaceSelectedEvent,
 } from '../../shared/components/places-autocomplete/places-autocomplete.component';
@@ -50,7 +51,7 @@ function markerEl(): HTMLElement {
     FormsModule, GoogleMap, MapAdvancedMarker,
     MatButtonModule, MatIconModule, MatFormFieldModule,
     MatInputModule, MatSelectModule, MatSliderModule,
-    MatChipsModule, MatDividerModule, MatCardModule,
+    MatChipsModule, MatDividerModule, MatCardModule, MatProgressSpinnerModule,
     PlacesAutocompleteComponent, PageHeaderComponent,
   ],
   styles: [`
@@ -106,6 +107,12 @@ function markerEl(): HTMLElement {
     }
     .home-addr small { display: block; font-size: 11px; color: var(--wp-text-secondary); margin-bottom: 2px; }
     .save-row { display: flex; justify-content: flex-end; margin-top: 12px; }
+    .maint-btn { width: 100%; margin-bottom: 8px; }
+    .maint-hint { font-size: 12px; color: var(--wp-text-secondary); margin-top: 4px; }
+    .maint-running {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 13px; color: var(--wp-text-secondary); margin-top: 8px;
+    }
   `],
   template: `
     <app-page-header title="Settings" backRoute="/" />
@@ -204,6 +211,34 @@ function markerEl(): HTMLElement {
           </div>
         </div>
       </div>
+      <!-- ── DATA & MAINTENANCE ──────────────────────────────────── -->
+      <div class="section">
+        <div class="section-header">🗄️ Data &amp; Maintenance</div>
+        <div class="section-body">
+
+          <div class="field-label">Fetch Missing Photos</div>
+          <div class="field-hint">
+            Searches Google Places for photos on destinations, restaurants, lodging,
+            and special interest records that don't have an image yet.
+          </div>
+
+          <button mat-stroked-button color="primary" class="maint-btn"
+                  [disabled]="backfillRunning()"
+                  (click)="runBackfill()">
+            <mat-icon>image_search</mat-icon>
+            Fetch Missing Photos
+          </button>
+
+          @if (backfillRunning()) {
+            <div class="maint-running">
+              <mat-spinner diameter="18" />
+              Fetching photos from Google Places… This may take a minute.
+            </div>
+          }
+
+        </div>
+      </div>
+
     </div>
   `,
 })
@@ -219,8 +254,9 @@ export class SettingsComponent implements OnInit {
   };
   readonly homePinEl = markerEl();
 
-  homeMarkerPos  = signal<google.maps.LatLngLiteral | null>(null);
-  saving         = signal(false);
+  homeMarkerPos   = signal<google.maps.LatLngLiteral | null>(null);
+  saving          = signal(false);
+  backfillRunning = signal(false);
 
   driveHours       = 6;
   stopMiles        = 200;
@@ -262,6 +298,26 @@ export class SettingsComponent implements OnInit {
   toggleInterest(i: string) {
     if (this.selectedInterests.has(i)) this.selectedInterests.delete(i);
     else this.selectedInterests.add(i);
+  }
+
+  runBackfill() {
+    this.backfillRunning.set(true);
+    this.svc.backfillPhotos().subscribe({
+      next: (r) => {
+        this.backfillRunning.set(false);
+        this.snack.open(
+          `Done — ${r.total_updated} photo${r.total_updated === 1 ? '' : 's'} added across all records`,
+          undefined, { duration: 4000 },
+        );
+      },
+      error: () => {
+        this.backfillRunning.set(false);
+        this.snack.open('Backfill failed — check Railway logs', undefined, {
+          duration: 4000,
+          panelClass: ['snack-error'],
+        });
+      },
+    });
   }
 
   saveDefaults() {
