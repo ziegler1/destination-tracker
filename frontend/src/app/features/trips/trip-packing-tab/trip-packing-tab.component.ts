@@ -309,6 +309,7 @@ export class TripPackingTabComponent implements OnInit {
   }
 
   deleteItem(listId: number, itemId: number) {
+    if (!confirm('Remove this item?')) return;
     this.packSvc.deleteItem(this.tripId(), listId, itemId).subscribe(() => this.load());
   }
 

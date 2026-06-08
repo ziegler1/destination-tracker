@@ -54,7 +54,7 @@ router.delete('/:listId', asyncHandler(async (req, res) => {
     [listId, tripId],
   );
   if (!rowCount) return void res.status(404).json({ error: 'Packing list not found' });
-  res.status(204).send();
+  res.json({ deleted: true, id: +req.params.listId });
 }));
 
 // POST /api/trips/:tripId/packing/:listId/items
@@ -103,7 +103,7 @@ router.delete('/:listId/items/:itemId', asyncHandler(async (req, res) => {
     [itemId, listId],
   );
   if (!rowCount) return void res.status(404).json({ error: 'Item not found' });
-  res.status(204).send();
+  res.json({ deleted: true, id: +req.params.itemId });
 }));
 
 export default router;

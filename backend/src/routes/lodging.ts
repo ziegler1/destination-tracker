@@ -110,7 +110,7 @@ router.patch('/:id/site-info', asyncHandler(async (req, res) => {
 router.delete('/:id', asyncHandler(async (req, res) => {
   const { rowCount } = await pool.query('DELETE FROM lodging WHERE id=$1', [req.params.id]);
   if (!rowCount) return void res.status(404).json({ error: 'Lodging not found' });
-  res.status(204).send();
+  res.json({ deleted: true, id: +req.params.id });
 }));
 
 // ── Photo management ──────────────────────────────────────────────────────────

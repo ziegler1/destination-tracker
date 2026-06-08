@@ -84,14 +84,14 @@ router.put('/:id', asyncHandler(async (req, res) => {
 
 // DELETE /api/special-interests/:id
 router.delete('/:id', asyncHandler(async (req, res) => {
-  // Delete associated photos from R2 first
   const { rows: photos } = await pool.query(
     'SELECT r2_key FROM special_interest_photos WHERE special_interest_id = $1',
     [req.params.id],
   );
-  await Promise.all(photos.map((p: { r2_key: string }) => deleteFile(p.r2_key)));
-  await pool.query('DELETE FROM special_interest_places WHERE id = $1', [req.params.id]);
-  res.status(204).send();
+  const { rowCount } = await pool.query('DELETE FROM special_interest_places WHERE id = $1', [req.params.id]);
+  if (!rowCount) return void res.status(404).json({ error: 'Place not found' });
+  await Promise.all(photos.map((p: { r2_key: string }) => deleteFile(p.r2_key).catch(() => {})));
+  res.json({ deleted: true, id: +req.params.id });
 }));
 
 // GET /api/special-interests/:id/photos

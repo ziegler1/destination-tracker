@@ -59,7 +59,7 @@ router.delete('/:id', asyncHandler(async (req, res) => {
     [id, tripId],
   );
   if (!rowCount) return void res.status(404).json({ error: 'Journal entry not found' });
-  res.status(204).send();
+  res.json({ deleted: true, id: +req.params.id });
 }));
 
 export default router;
