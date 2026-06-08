@@ -258,6 +258,26 @@ function restaurantMarkerEl(): HTMLElement {
     .companion-ai-box { margin-top:10px; padding:12px; border-radius:8px; background:var(--wp-surface-variant);
                border-left:3px solid var(--wp-accent); font-size:14px; line-height:1.7; white-space:pre-wrap; }
     .bottom-tabs { border-top:1px solid var(--wp-border); }
+    /* Allow tab headers to scroll horizontally on narrow screens */
+    .bottom-tabs ::ng-deep .mat-mdc-tab-header,
+    .scrap-tabs  ::ng-deep .mat-mdc-tab-header {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .bottom-tabs ::ng-deep .mat-mdc-tab-header::-webkit-scrollbar,
+    .scrap-tabs  ::ng-deep .mat-mdc-tab-header::-webkit-scrollbar { display: none; }
+    .bottom-tabs ::ng-deep .mat-mdc-tab-list,
+    .scrap-tabs  ::ng-deep .mat-mdc-tab-list { min-width: max-content; overflow: visible !important; }
+    /* Fade gradient indicating more tabs to the right */
+    .tab-scroll-wrap { position: relative; }
+    .tab-scroll-wrap::after {
+      content: ''; pointer-events: none;
+      position: absolute; top: 0; right: 0;
+      width: 32px; height: 48px;
+      background: linear-gradient(to right, transparent, var(--wp-surface));
+      z-index: 2;
+    }
     .geocoding-note { font-size:12px; color:var(--wp-text-hint); text-align:center; padding:8px; }
 
     // Map tab — compact prompt that opens a full-screen map overlay
@@ -488,8 +508,8 @@ function restaurantMarkerEl(): HTMLElement {
           </div>
 
           <!-- Management tabs -->
-          <div class="scrap-tabs">
-            <mat-tab-group animationDuration="150ms">
+          <div class="scrap-tabs tab-scroll-wrap">
+            <mat-tab-group animationDuration="150ms" mat-stretch-tabs="false">
               <mat-tab label="Stops"><app-trip-stops-tab [tripId]="t.id" /></mat-tab>
               <mat-tab label="Expenses"><app-trip-expenses-tab [tripId]="t.id" [budget]="t.total_budget ?? null" /></mat-tab>
               <mat-tab label="Packing"><app-trip-packing-tab [tripId]="t.id" [tripName]="t.name" /></mat-tab>
@@ -716,7 +736,8 @@ function restaurantMarkerEl(): HTMLElement {
             }
 
             <mat-divider style="margin-top:16px" />
-            <mat-tab-group animationDuration="150ms" class="bottom-tabs">
+            <div class="tab-scroll-wrap">
+            <mat-tab-group animationDuration="150ms" class="bottom-tabs" mat-stretch-tabs="false">
               <mat-tab label="Stops"><app-trip-stops-tab [tripId]="t.id" /></mat-tab>
               <mat-tab label="Map">
                 <div class="map-tab-prompt">
@@ -732,7 +753,7 @@ function restaurantMarkerEl(): HTMLElement {
               <mat-tab label="Journal"><app-trip-journal-tab [tripId]="t.id" /></mat-tab>
               <mat-tab label="Fuel"><app-trip-fuel-tab [tripId]="t.id" /></mat-tab>
             </mat-tab-group>
-          </div>
+            </div>
 
           <!-- ── RIGHT PANEL: Google Map ── -->
           <div class="right-panel">

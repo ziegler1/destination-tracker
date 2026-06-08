@@ -65,7 +65,7 @@ import { TripService } from '../../../core/services/trip.service';
 
               <mat-form-field appearance="outline">
                 <mat-label>Total budget ($)</mat-label>
-                <input matInput type="number" step="0.01" formControlName="total_budget" />
+                <input matInput type="number" step="0.01" formControlName="total_budget" placeholder="(optional)" />
               </mat-form-field>
 
               <mat-form-field appearance="outline">

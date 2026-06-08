@@ -49,7 +49,7 @@ type PriceFilter = PriceRange | 'all';
     .card-img { width:100%; height:150px; object-fit:cover; display:block; }
     .card-placeholder {
       width:100%; height:150px;
-      background:linear-gradient(135deg,#e65100,#ff6d00);
+      background:#1E2A35;
       display:flex; align-items:center; justify-content:center; font-size:44px;
     }
     .card-body { padding:14px 16px 12px; }

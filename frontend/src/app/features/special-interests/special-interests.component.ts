@@ -97,7 +97,7 @@ const RATING_CHIPS: Array<{ value: RatingFilter; label: string }> = [
     .card-photo-placeholder {
       width: 100%; height: 140px; display: flex; align-items: center; justify-content: center;
       font-size: 48px;
-      background: linear-gradient(135deg, var(--wp-surface-variant), var(--wp-border));
+      background: #1E2A35;
     }
     .card-body { padding: 14px; }
     .card-name { font-size: 16px; font-weight: 700; margin: 0 0 4px; }

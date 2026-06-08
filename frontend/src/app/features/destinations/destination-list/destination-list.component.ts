@@ -16,6 +16,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { DestinationService } from '../../../core/services/destination.service';
 import { Destination, DestinationStatus } from '../../../types/schema.types';
 import { QuickAddDestinationComponent } from '../../../shared/components/quick-add/quick-add-destination.component';
+import { PhotoPlaceholderComponent } from '../../../shared/components/photo-placeholder/photo-placeholder.component';
 
 type StatusFilter = DestinationStatus | 'all';
 
@@ -28,6 +29,7 @@ type StatusFilter = DestinationStatus | 'all';
     MatCardModule, MatChipsModule, MatFormFieldModule, MatInputModule,
     MatSelectModule, MatIconModule, MatButtonModule,
     MatProgressSpinnerModule, MatTooltipModule, SkeletonGridComponent,
+    PhotoPlaceholderComponent,
   ],
   styles: [`
     .toolbar { display:flex; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:20px; }
@@ -53,11 +55,7 @@ type StatusFilter = DestinationStatus | 'all';
     .card-img {
       width:100%; height:160px; object-fit:cover; display:block;
     }
-    .card-img-placeholder {
-      width:100%; height:160px;
-      background: linear-gradient(135deg, var(--wp-primary) 0%, var(--wp-primary-light) 100%);
-      display:flex; align-items:center; justify-content:center; font-size:48px;
-    }
+    .card-img-placeholder { width:100%; height:160px; display:block; }
     .card-body { padding:14px 16px 12px; }
     .card-name { font-size:16px; font-weight:600; margin:0 0 4px; }
     .card-loc  { font-size:13px; color:var(--wp-text-secondary); margin:0 0 8px; }
@@ -135,7 +133,9 @@ type StatusFilter = DestinationStatus | 'all';
                 @if (primaryPhoto(d)) {
                   <img class="card-img" [src]="primaryPhoto(d)" [alt]="d.name" loading="lazy" />
                 } @else {
-                  <div class="card-img-placeholder">📍</div>
+                  <div class="card-img-placeholder">
+                    <app-photo-placeholder entityType="destination" [name]="d.city" style="height:160px;display:block" />
+                  </div>
                 }
                 <div class="card-body">
                   <p class="card-name">

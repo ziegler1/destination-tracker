@@ -20,6 +20,7 @@ import { MiniMapComponent } from '../../../shared/mini-map/mini-map.component';
 import { PhotoUploaderComponent } from '../../../shared/photo-uploader/photo-uploader.component';
 import { AddToTripSheetComponent } from '../../../shared/components/add-to-trip-sheet/add-to-trip-sheet.component';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
+import { PhotoPlaceholderComponent } from '../../../shared/components/photo-placeholder/photo-placeholder.component';
 import { Destination, WeatherResponse } from '../../../types/schema.types';
 
 interface WeatherDay {
@@ -39,7 +40,7 @@ interface WeatherDay {
     MatCardModule, MatChipsModule, MatIconModule, MatButtonModule,
     MatDividerModule, MatProgressSpinnerModule, MatListModule, MatTooltipModule,
     MatSnackBarModule, MatBottomSheetModule, MiniMapComponent, PhotoUploaderComponent,
-    PageHeaderComponent,
+    PageHeaderComponent, PhotoPlaceholderComponent,
   ],
   styles: [`
     .back-btn { margin-bottom: 16px; }
@@ -47,12 +48,7 @@ interface WeatherDay {
 
     .hero { position:relative; width:100%; max-height:340px; overflow:hidden; border-radius:12px; margin-bottom:24px; }
     .hero img { width:100%; height:340px; object-fit:cover; }
-    .hero-placeholder {
-      width:100%; height:240px;
-      background:linear-gradient(135deg,var(--wp-primary),var(--wp-primary-light));
-      display:flex; align-items:center; justify-content:center; font-size:72px;
-      border-radius:12px; margin-bottom:24px;
-    }
+    .hero-placeholder { width:100%; height:240px; border-radius:12px; margin-bottom:24px; overflow:hidden; }
     .hero-overlay {
       position:absolute; bottom:0; left:0; right:0;
       background:linear-gradient(transparent,rgba(0,0,0,.7));
@@ -120,7 +116,9 @@ interface WeatherDay {
             </div>
           </div>
         } @else {
-          <div class="hero-placeholder">📍</div>
+          <div class="hero-placeholder">
+            <app-photo-placeholder entityType="destination" [name]="dest()!.city" style="height:100%;display:block" />
+          </div>
         }
 
         <!-- Action bar -->
