@@ -36,6 +36,7 @@ const CUISINES = [
     mat-card { max-width:720px; margin:0 auto; padding:24px; }
     .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
     .full { grid-column:1/-1; }
+    @media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } }
     .row { display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-bottom:8px; }
     .actions { display:flex; gap:12px; margin-top:8px; }
     .star-row { display:flex; gap:4px; cursor:pointer; }

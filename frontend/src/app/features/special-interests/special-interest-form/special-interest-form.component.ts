@@ -43,6 +43,7 @@ const CATEGORY_OPTIONS: Array<{ value: string; label: string }> = [
     mat-card { max-width:720px; margin:0 auto; padding:24px; }
     .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
     .full { grid-column:1/-1; }
+    @media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } }
     .actions { display:flex; gap:12px; margin-top:8px; }
     .star-row { display:flex; gap:4px; cursor:pointer; }
     .star-btn { font-size:26px; background:none; border:none; cursor:pointer; padding:0; line-height:1; }

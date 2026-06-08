@@ -2,6 +2,7 @@ import {
   Component, OnInit, ChangeDetectionStrategy, inject, signal, computed,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { MatBottomSheet } from '@angular/material/bottom-sheet';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -14,6 +15,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { RestaurantService } from '../../../core/services/restaurant.service';
 import { Restaurant, PriceRange } from '../../../types/schema.types';
 import { EmptyStateComponent } from '../../../shared/components/empty-state/empty-state.component';
+import { QuickAddRestaurantComponent } from '../../../shared/components/quick-add/quick-add-restaurant.component';
 
 type PriceFilter = PriceRange | 'all';
 
@@ -122,7 +124,7 @@ type PriceFilter = PriceRange | 'all';
       } @else if (restaurants().length === 0) {
         <app-empty-state icon="🍽️" title="Add your favorite restaurants"
           subtitle="Log places you've eaten and rate your experience"
-          ctaLabel="Add Restaurant" ctaRoute="/restaurants/new" />
+          ctaLabel="Add Restaurant" (ctaClick)="openAdd()" />
       } @else if (filtered().length === 0) {
         <div class="empty">
           <span class="empty-icon">🍽️</span>
@@ -177,18 +179,19 @@ type PriceFilter = PriceRange | 'all';
         @if (restaurants().length < 3) {
           <app-empty-state icon="🍽️" title="Add your favorite restaurants"
             subtitle="Log places you've eaten and rate your experience"
-            ctaLabel="Add Restaurant" ctaRoute="/restaurants/new" />
+            ctaLabel="Add Restaurant" (ctaClick)="openAdd()" />
         }
       }
     </div>
 
-    <button mat-fab class="fab" [routerLink]="['/restaurants/new']" matTooltip="Add restaurant">
+    <button mat-fab class="fab" (click)="openAdd()" matTooltip="Add restaurant">
       <mat-icon>add</mat-icon>
     </button>
   `,
 })
 export class RestaurantListComponent implements OnInit {
   private svc = inject(RestaurantService);
+  private bottomSheet = inject(MatBottomSheet);
 
   loading = signal(true);
   restaurants = signal<Restaurant[]>([]);
@@ -220,11 +223,18 @@ export class RestaurantListComponent implements OnInit {
     });
   });
 
-  ngOnInit() {
+  ngOnInit() { this.load(); }
+
+  private load() {
     this.svc.list().subscribe({
       next: (list) => { this.restaurants.set(list); this.loading.set(false); },
       error: () => this.loading.set(false),
     });
+  }
+
+  openAdd() {
+    const ref = this.bottomSheet.open(QuickAddRestaurantComponent);
+    ref.afterDismissed().subscribe(() => this.load());
   }
 
   onSearch(e: Event) {

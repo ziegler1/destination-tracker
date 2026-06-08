@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, Input } from '@angular/core';
+import { Component, ChangeDetectionStrategy, Input, Output, EventEmitter } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 
@@ -26,6 +26,10 @@ import { MatButtonModule } from '@angular/material/button';
         <button mat-stroked-button class="empty-cta" [routerLink]="ctaRoute">
           {{ ctaLabel }}
         </button>
+      } @else if (ctaLabel) {
+        <button mat-stroked-button class="empty-cta" (click)="ctaClick.emit()">
+          {{ ctaLabel }}
+        </button>
       }
     </div>
   `,
@@ -36,4 +40,5 @@ export class EmptyStateComponent {
   @Input() subtitle = '';
   @Input() ctaLabel?: string;
   @Input() ctaRoute?: string;
+  @Output() ctaClick = new EventEmitter<void>();
 }

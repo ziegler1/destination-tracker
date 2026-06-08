@@ -2,6 +2,7 @@ import {
   Component, OnInit, ChangeDetectionStrategy, inject, signal, computed,
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
+import { MatBottomSheet } from '@angular/material/bottom-sheet';
 import { MatCardModule } from '@angular/material/card';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -14,6 +15,7 @@ import { SkeletonGridComponent } from '../../../shared/skeleton-grid/skeleton-gr
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { DestinationService } from '../../../core/services/destination.service';
 import { Destination, DestinationStatus } from '../../../types/schema.types';
+import { QuickAddDestinationComponent } from '../../../shared/components/quick-add/quick-add-destination.component';
 
 type StatusFilter = DestinationStatus | 'all';
 
@@ -173,7 +175,7 @@ type StatusFilter = DestinationStatus | 'all';
             [routerLink]="['/destinations/suggest']" matTooltip="AI suggest">
       <mat-icon>auto_awesome</mat-icon>
     </button>
-    <button mat-fab class="fab" [routerLink]="['/destinations/new']" matTooltip="Add destination">
+    <button mat-fab class="fab" (click)="openAdd()" matTooltip="Add destination">
       <mat-icon>add</mat-icon>
     </button>
   `,
@@ -181,6 +183,7 @@ type StatusFilter = DestinationStatus | 'all';
 export class DestinationListComponent implements OnInit {
   private svc = inject(DestinationService);
   private router = inject(Router);
+  private bottomSheet = inject(MatBottomSheet);
 
   loading = signal(true);
   destinations = signal<Destination[]>([]);
@@ -211,11 +214,18 @@ export class DestinationListComponent implements OnInit {
     });
   });
 
-  ngOnInit(): void {
+  ngOnInit(): void { this.load(); }
+
+  private load(): void {
     this.svc.list().subscribe({
       next: (list) => { this.destinations.set(list); this.loading.set(false); },
       error: () => this.loading.set(false),
     });
+  }
+
+  openAdd(): void {
+    const ref = this.bottomSheet.open(QuickAddDestinationComponent);
+    ref.afterDismissed().subscribe(() => this.load());
   }
 
   onSearch(e: Event): void {

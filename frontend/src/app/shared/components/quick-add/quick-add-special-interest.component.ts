@@ -14,6 +14,9 @@ import { of, switchMap } from 'rxjs';
 import { SpecialInterestService } from '../../../core/services/special-interest.service';
 import { PhotoService } from '../../../core/services/photo.service';
 import { KeyboardAwareScrollDirective } from '../../directives/keyboard-aware-scroll.directive';
+import {
+  PlacesAutocompleteComponent, PlaceSelectedEvent,
+} from '../places-autocomplete/places-autocomplete.component';
 
 const CATEGORIES = [
   { value: 'winery_brewery',      label: '🍷 Winery / Brewery' },
@@ -33,7 +36,7 @@ const CATEGORIES = [
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    ReactiveFormsModule, FormsModule,
+    ReactiveFormsModule, FormsModule, PlacesAutocompleteComponent,
     MatFormFieldModule, MatInputModule, MatSelectModule,
     MatButtonModule, MatSlideToggleModule, MatIconModule,
     KeyboardAwareScrollDirective,
@@ -61,6 +64,11 @@ const CATEGORIES = [
     <div class="sheet" appKeyboardAwareScroll>
       <div class="handle"></div>
       <p class="title">🌟 Add Special Interest Place</p>
+
+      <app-places-autocomplete
+        placeholder="Search place by name + city…"
+        [types]="['establishment']"
+        (placeSelected)="onPlace($event)" />
 
       <form [formGroup]="form">
         <mat-form-field appearance="outline">
@@ -149,15 +157,35 @@ export class QuickAddSpecialInterestComponent {
   photoPreview = signal<string | null>(null);
 
   form = this.fb.group({
-    name:          ['', Validators.required],
-    category:      ['other'],
-    city:          ['', Validators.required],
-    state_province:['', Validators.required],
-    highlights:    [''],
-    notes:         [''],
-    rating:        [null as number | null],
-    would_return:  [false],
+    name:            ['', Validators.required],
+    category:        ['other'],
+    city:            ['', Validators.required],
+    state_province:  ['', Validators.required],
+    address:         [''],
+    latitude:        [null as number | null],
+    longitude:       [null as number | null],
+    google_place_id: [''],
+    phone:           [''],
+    website:         [''],
+    highlights:      [''],
+    notes:           [''],
+    rating:          [null as number | null],
+    would_return:    [false],
   });
+
+  onPlace(e: PlaceSelectedEvent) {
+    this.form.patchValue({
+      name:            e.name,
+      city:            e.city,
+      state_province:  e.state_province,
+      address:         e.formatted_address,
+      latitude:        e.lat,
+      longitude:       e.lng,
+      google_place_id: e.place_id,
+      phone:           e.phone   ?? null,
+      website:         e.website ?? null,
+    });
+  }
 
   onFileChange(e: Event) {
     const file = (e.target as HTMLInputElement).files?.[0];
@@ -174,15 +202,21 @@ export class QuickAddSpecialInterestComponent {
     const v = this.form.getRawValue();
 
     this.svc.create({
-      name:          v.name!,
-      category:      v.category as any,
-      city:          v.city!,
-      state_province:v.state_province!,
-      country:       'USA',
-      highlights:    v.highlights || undefined,
-      notes:         v.notes || undefined,
-      rating:        v.rating ?? undefined,
-      would_return:  v.would_return ?? false,
+      name:            v.name!,
+      category:        v.category as any,
+      city:            v.city!,
+      state_province:  v.state_province!,
+      country:         'USA',
+      address:         v.address         || undefined,
+      latitude:        v.latitude        ?? undefined,
+      longitude:       v.longitude       ?? undefined,
+      google_place_id: v.google_place_id || undefined,
+      phone:           v.phone           || undefined,
+      website:         v.website         || undefined,
+      highlights:      v.highlights      || undefined,
+      notes:           v.notes           || undefined,
+      rating:          v.rating          ?? undefined,
+      would_return:    v.would_return    ?? false,
     }).pipe(
       switchMap(place => {
         if (!this.photoFile()) return of(place);

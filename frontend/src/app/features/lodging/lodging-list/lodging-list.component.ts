@@ -3,6 +3,7 @@ import {
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { CurrencyPipe } from '@angular/common';
+import { MatBottomSheet } from '@angular/material/bottom-sheet';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -14,6 +15,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { LodgingService } from '../../../core/services/lodging.service';
 import { Lodging, LodgingType } from '../../../types/schema.types';
 import { EmptyStateComponent } from '../../../shared/components/empty-state/empty-state.component';
+import { QuickAddLodgingComponent } from '../../../shared/components/quick-add/quick-add-lodging.component';
 
 type TypeFilter = LodgingType | 'all';
 
@@ -108,7 +110,7 @@ const TYPE_LABELS: Record<LodgingType, string> = {
       } @else if (lodgings().length === 0) {
         <app-empty-state icon="🏨" title="Log your stays"
           subtitle="Record hotels and lodging from your travels"
-          ctaLabel="Add Lodging" ctaRoute="/lodging/new" />
+          ctaLabel="Add Lodging" (ctaClick)="openAdd()" />
       } @else if (filtered().length === 0) {
         <div class="empty">
           <span class="empty-icon">🏨</span>
@@ -159,13 +161,14 @@ const TYPE_LABELS: Record<LodgingType, string> = {
       }
     </div>
 
-    <button mat-fab class="fab" [routerLink]="['/lodging/new']" matTooltip="Add lodging">
+    <button mat-fab class="fab" (click)="openAdd()" matTooltip="Add lodging">
       <mat-icon>add</mat-icon>
     </button>
   `,
 })
 export class LodgingListComponent implements OnInit {
   private svc = inject(LodgingService);
+  private bottomSheet = inject(MatBottomSheet);
 
   loading = signal(true);
   lodgings = signal<Lodging[]>([]);
@@ -192,11 +195,18 @@ export class LodgingListComponent implements OnInit {
     });
   });
 
-  ngOnInit() {
+  ngOnInit() { this.load(); }
+
+  private load() {
     this.svc.list().subscribe({
       next: (list) => { this.lodgings.set(list); this.loading.set(false); },
       error: () => this.loading.set(false),
     });
+  }
+
+  openAdd() {
+    const ref = this.bottomSheet.open(QuickAddLodgingComponent);
+    ref.afterDismissed().subscribe(() => this.load());
   }
 
   onSearch(e: Event) { this.searchQuery.set((e.target as HTMLInputElement).value); }
