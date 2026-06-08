@@ -1,0 +1,5 @@
+ALTER TABLE special_interest_places
+  ADD COLUMN IF NOT EXISTS price_range TEXT,
+  ADD COLUMN IF NOT EXISTS visited_at  TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS booking_url TEXT,
+  ADD COLUMN IF NOT EXISTS menu_url    TEXT;

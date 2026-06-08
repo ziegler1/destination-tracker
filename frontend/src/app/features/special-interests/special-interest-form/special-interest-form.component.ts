@@ -158,6 +158,32 @@ const CATEGORY_OPTIONS: Array<{ value: string; label: string }> = [
                 <textarea matInput formControlName="notes" rows="2"></textarea>
               </mat-form-field>
 
+              <mat-form-field appearance="outline">
+                <mat-label>Price Range</mat-label>
+                <mat-select formControlName="price_range">
+                  <mat-option [value]="null">Not specified</mat-option>
+                  <mat-option value="$">$ — Budget</mat-option>
+                  <mat-option value="$$">$$ — Moderate</mat-option>
+                  <mat-option value="$$$">$$$ — Upscale</mat-option>
+                  <mat-option value="$$$$">$$$$ — Fine Dining</mat-option>
+                </mat-select>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Date Visited</mat-label>
+                <input matInput type="date" formControlName="visited_at" />
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="full">
+                <mat-label>Booking / Reservation URL</mat-label>
+                <input matInput formControlName="booking_url" placeholder="https://…" />
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="full">
+                <mat-label>Menu URL</mat-label>
+                <input matInput formControlName="menu_url" placeholder="https://…" />
+              </mat-form-field>
+
               <mat-form-field appearance="outline" class="full">
                 <mat-label>Image URL (fallback)</mat-label>
                 <input matInput formControlName="image_url" />
@@ -211,6 +237,10 @@ export class SpecialInterestFormComponent implements OnInit {
     website:        [''],
     phone:          [''],
     image_url:      [''],
+    price_range:    [null as string | null],
+    visited_at:     [''],
+    booking_url:    [''],
+    menu_url:       [''],
   });
 
   ngOnInit() {
@@ -249,7 +279,13 @@ export class SpecialInterestFormComponent implements OnInit {
   submit() {
     if (this.form.invalid) return;
     this.saving.set(true);
-    const dto = this.form.getRawValue();
+    const raw = this.form.getRawValue();
+    const dto = {
+      ...raw,
+      visited_at:  raw.visited_at  || null,
+      booking_url: raw.booking_url || null,
+      menu_url:    raw.menu_url    || null,
+    };
     const req = this.isEdit()
       ? this.svc.update(this.placeId()!, dto)
       : this.svc.create(dto);

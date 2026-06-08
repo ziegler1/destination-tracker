@@ -2,6 +2,7 @@ import {
   Component, OnInit, ChangeDetectionStrategy, inject, signal,
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { DatePipe } from '@angular/common';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -36,7 +37,7 @@ const CATEGORY_META: Record<string, { icon: string; label: string }> = {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    RouterLink, MatCardModule, MatButtonModule, MatIconModule,
+    RouterLink, DatePipe, MatCardModule, MatButtonModule, MatIconModule,
     MatDividerModule, MatProgressSpinnerModule, MatSnackBarModule, MatBottomSheetModule,
     MiniMapComponent, PhotoUploaderComponent, PageHeaderComponent,
   ],
@@ -113,9 +114,21 @@ const CATEGORY_META: Record<string, { icon: string; label: string }> = {
               </span>
             </div>
           }
+          @if (p.price_range) {
+            <div class="info-item">
+              <label>Price range</label>
+              <span>{{ p.price_range }}</span>
+            </div>
+          }
+          @if (p.visited_at) {
+            <div class="info-item">
+              <label>Visited</label>
+              <span>{{ p.visited_at | date:'mediumDate' }}</span>
+            </div>
+          }
         </div>
 
-        @if (p.address || p.phone || p.website) {
+        @if (p.address || p.phone || p.website || p.booking_url || p.menu_url) {
           <mat-divider style="margin:16px 0" />
           <div class="link-row">
             @if (p.address) {
@@ -126,6 +139,16 @@ const CATEGORY_META: Record<string, { icon: string; label: string }> = {
             @if (p.website) {
               <a [href]="p.website" target="_blank" rel="noopener">
                 <button mat-stroked-button><mat-icon>language</mat-icon> Website</button>
+              </a>
+            }
+            @if (p.booking_url) {
+              <a [href]="p.booking_url" target="_blank" rel="noopener">
+                <button mat-stroked-button color="primary"><mat-icon>event_available</mat-icon> Book / Reserve</button>
+              </a>
+            }
+            @if (p.menu_url) {
+              <a [href]="p.menu_url" target="_blank" rel="noopener">
+                <button mat-stroked-button><mat-icon>menu_book</mat-icon> Menu</button>
               </a>
             }
             @if (p.phone) {

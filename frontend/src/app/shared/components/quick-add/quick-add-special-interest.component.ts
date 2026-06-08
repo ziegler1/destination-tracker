@@ -116,6 +116,24 @@ const CATEGORIES = [
           }
         </div>
 
+        <div class="two-col">
+          <mat-form-field appearance="outline">
+            <mat-label>Price Range</mat-label>
+            <mat-select formControlName="price_range">
+              <mat-option [value]="null">Not specified</mat-option>
+              <mat-option value="$">$</mat-option>
+              <mat-option value="$$">$$</mat-option>
+              <mat-option value="$$$">$$$</mat-option>
+              <mat-option value="$$$$">$$$$</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Date Visited</mat-label>
+            <input matInput type="date" formControlName="visited_at" />
+          </mat-form-field>
+        </div>
+
         <mat-slide-toggle formControlName="would_return" style="margin-bottom:16px">
           Would return
         </mat-slide-toggle>
@@ -171,6 +189,8 @@ export class QuickAddSpecialInterestComponent {
     notes:           [''],
     rating:          [null as number | null],
     would_return:    [false],
+    price_range:     [null as string | null],
+    visited_at:      [''],
   });
 
   onPlace(e: PlaceSelectedEvent) {
@@ -217,6 +237,8 @@ export class QuickAddSpecialInterestComponent {
       notes:           v.notes           || undefined,
       rating:          v.rating          ?? undefined,
       would_return:    v.would_return    ?? false,
+      price_range:     v.price_range     || undefined,
+      visited_at:      v.visited_at      || undefined,
     }).pipe(
       switchMap(place => {
         if (!this.photoFile()) return of(place);

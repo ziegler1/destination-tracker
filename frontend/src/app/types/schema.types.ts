@@ -313,6 +313,10 @@ export interface SpecialInterestPlace {
   highlights?: string;
   notes?: string;
   image_url?: string;
+  price_range?: string;
+  visited_at?: string;
+  booking_url?: string;
+  menu_url?: string;
   suggested_by_ai?: boolean;
   google_place_id?: string;
   created_at: string;
