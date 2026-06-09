@@ -7,13 +7,11 @@ import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
-import { MatChipsModule, MatChipInputEvent } from '@angular/material/chips';
-import { MatAutocompleteModule, MatAutocompleteSelectedEvent } from '@angular/material/autocomplete';
+import { MonthPickerComponent } from '../../../shared/components/month-picker/month-picker.component';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDatepickerModule } from '@angular/material/datepicker';
-import { COMMA, ENTER } from '@angular/cdk/keycodes';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
 import { PhotoUploaderComponent } from '../../../shared/photo-uploader/photo-uploader.component';
@@ -26,10 +24,6 @@ import { DuplicateDestinationDialogComponent } from '../../../shared/components/
 import { HomeAddressDialogComponent } from '../../../shared/components/home-address-dialog/home-address-dialog.component';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 
-const MONTHS = [
-  'January','February','March','April','May','June',
-  'July','August','September','October','November','December',
-];
 
 @Component({
   selector: 'app-destination-form',
@@ -37,9 +31,8 @@ const MONTHS = [
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     RouterLink, ReactiveFormsModule, PlacesAutocompleteComponent, PhotoUploaderComponent,
-    MatCardModule, MatFormFieldModule, MatInputModule, MatSelectModule,
-    MatChipsModule, MatAutocompleteModule, MatIconModule, MatButtonModule,
-    MatProgressSpinnerModule, MatDatepickerModule, MatSnackBarModule,
+    MonthPickerComponent, MatCardModule, MatFormFieldModule, MatInputModule, MatSelectModule,
+    MatIconModule, MatButtonModule, MatProgressSpinnerModule, MatDatepickerModule, MatSnackBarModule,
     PageHeaderComponent,
   ],
   styles: [`
@@ -173,28 +166,10 @@ const MONTHS = [
 
             <!-- Best months -->
             <p class="section">Best Months to Visit</p>
-            <mat-form-field appearance="outline" style="width:100%">
-              <mat-label>Best months</mat-label>
-              <mat-chip-grid #chipGrid>
-                @for (m of selectedMonths(); track m) {
-                  <mat-chip (removed)="removeMonth(m)">
-                    {{ m }}
-                    <button matChipRemove><mat-icon>cancel</mat-icon></button>
-                  </mat-chip>
-                }
-              </mat-chip-grid>
-              <input placeholder="Add month…"
-                     [matChipInputFor]="chipGrid"
-                     [matChipInputSeparatorKeyCodes]="separatorKeys"
-                     [matAutocomplete]="monthAuto"
-                     (matChipInputTokenEnd)="addMonth($event)"
-                     #monthInput />
-              <mat-autocomplete #monthAuto (optionSelected)="selectMonth($event); monthInput.value = ''">
-                @for (m of filteredMonths(); track m) {
-                  <mat-option [value]="m">{{ m }}</mat-option>
-                }
-              </mat-autocomplete>
-            </mat-form-field>
+            <app-month-picker
+              [value]="selectedMonths()"
+              (valueChange)="selectedMonths.set($event)"
+              style="display:block;margin-bottom:16px" />
 
             <!-- Notes & image -->
             <p class="section">Content</p>
@@ -259,11 +234,6 @@ export class DestinationFormComponent implements OnInit {
   selectedMonths = signal<string[]>([]);
   photos = signal<EntityPhoto[]>([]);
 
-  readonly separatorKeys = [ENTER, COMMA];
-  readonly allMonths = MONTHS;
-
-  filteredMonths = signal<string[]>(MONTHS);
-
   form = this.fb.group({
     name:           ['', Validators.required],
     city:           ['', Validators.required],
@@ -295,7 +265,6 @@ export class DestinationFormComponent implements OnInit {
         });
         this.selectedMonths.set(d.best_months ?? []);
         this.photos.set((d.photos ?? []) as EntityPhoto[]);
-        this.updateFilteredMonths();
       });
     } else {
       // Pre-fill from query params (e.g. coming from /destinations/suggest)
@@ -309,7 +278,6 @@ export class DestinationFormComponent implements OnInit {
         });
         const months = qp.get('best_months')?.split(',').filter(Boolean) ?? [];
         this.selectedMonths.set(months);
-        this.updateFilteredMonths();
       }
     }
   }
@@ -351,32 +319,6 @@ export class DestinationFormComponent implements OnInit {
           this.snack.open('Location not found — enter coordinates manually', 'Dismiss', { duration: 4000 });
         }
       });
-  }
-
-  addMonth(event: MatChipInputEvent): void {
-    const val = (event.value ?? '').trim();
-    if (val && !this.selectedMonths().includes(val)) {
-      this.selectedMonths.update((m) => [...m, val]);
-      this.updateFilteredMonths();
-    }
-    event.chipInput?.clear();
-  }
-
-  selectMonth(event: MatAutocompleteSelectedEvent): void {
-    const val = event.option.value as string;
-    if (!this.selectedMonths().includes(val)) {
-      this.selectedMonths.update((m) => [...m, val]);
-      this.updateFilteredMonths();
-    }
-  }
-
-  removeMonth(month: string): void {
-    this.selectedMonths.update((m) => m.filter((x) => x !== month));
-    this.updateFilteredMonths();
-  }
-
-  private updateFilteredMonths(): void {
-    this.filteredMonths.set(this.allMonths.filter((m) => !this.selectedMonths().includes(m)));
   }
 
   save(): void {
