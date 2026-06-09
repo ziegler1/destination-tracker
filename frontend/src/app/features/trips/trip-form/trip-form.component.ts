@@ -14,13 +14,14 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { TripService } from '../../../core/services/trip.service';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
+import { KeyboardAwareScrollDirective } from '../../../shared/directives/keyboard-aware-scroll.directive';
 
 @Component({
   selector: 'app-trip-form',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    RouterLink, ReactiveFormsModule, PageHeaderComponent,
+    RouterLink, ReactiveFormsModule, PageHeaderComponent, KeyboardAwareScrollDirective,
     MatCardModule, MatFormFieldModule, MatInputModule, MatSelectModule,
     MatDatepickerModule, MatButtonModule, MatIconModule,
     MatProgressSpinnerModule, MatSnackBarModule,
@@ -29,7 +30,10 @@ import { PageHeaderComponent } from '../../../shared/components/page-header/page
     mat-card { max-width:640px; margin:0 auto; padding:24px; }
     .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
     .full { grid-column:1/-1; }
-    @media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } }
+    @media (max-width: 600px) {
+      .form-grid { grid-template-columns: 1fr; }
+      mat-card { padding: 16px; padding-bottom: 120px; }
+    }
     .actions { display:flex; gap:12px; margin-top:8px; }
     h2 { margin:0 0 20px; font-size:20px; font-weight:600; }
   `],
@@ -43,7 +47,7 @@ import { PageHeaderComponent } from '../../../shared/components/page-header/page
         <mat-card>
           <h2>{{ isEdit() ? 'Edit Trip' : 'Plan a Trip' }}</h2>
 
-          <form [formGroup]="form" (ngSubmit)="submit()">
+          <form [formGroup]="form" (ngSubmit)="submit()" appKeyboardAwareScroll>
             <div class="form-grid">
 
               <mat-form-field appearance="outline" class="full">

@@ -12,6 +12,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { DestinationService } from '../../../core/services/destination.service';
 import { StopService } from '../../../core/services/stop.service';
 import { PlacesAutocompleteComponent, PlaceSelectedEvent } from '../places-autocomplete/places-autocomplete.component';
+import { KeyboardAwareScrollDirective } from '../../directives/keyboard-aware-scroll.directive';
 
 export interface AddStopSheetData {
   tripId: number;
@@ -24,7 +25,8 @@ export interface AddStopSheetData {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     ReactiveFormsModule, MatButtonModule, MatIconModule, MatFormFieldModule,
-    MatInputModule, MatDatepickerModule, MatProgressSpinnerModule, PlacesAutocompleteComponent,
+    MatInputModule, MatDatepickerModule, MatProgressSpinnerModule,
+    PlacesAutocompleteComponent, KeyboardAwareScrollDirective,
   ],
   styles: [`
     .sheet {
@@ -41,7 +43,7 @@ export interface AddStopSheetData {
     .spinner-wrap { display: flex; justify-content: center; padding: 24px 0; }
   `],
   template: `
-    <div class="sheet">
+    <div class="sheet" appKeyboardAwareScroll>
       @if (done()) {
         <div class="done">
           <mat-icon class="check">check_circle</mat-icon>

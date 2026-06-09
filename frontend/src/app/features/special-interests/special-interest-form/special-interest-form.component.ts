@@ -15,6 +15,7 @@ import { SpecialInterestService } from '../../../core/services/special-interest.
 import { GeocodingService } from '../../../core/services/geocoding.service';
 import { ClaudeService } from '../../../core/services/claude.service';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
+import { KeyboardAwareScrollDirective } from '../../../shared/directives/keyboard-aware-scroll.directive';
 import { PlacesAutocompleteComponent, PlaceSelectedEvent } from '../../../shared/components/places-autocomplete/places-autocomplete.component';
 import { PhotoUploaderComponent } from '../../../shared/photo-uploader/photo-uploader.component';
 import { EntityPhoto } from '../../../core/services/photo.service';
@@ -39,6 +40,7 @@ const CATEGORY_OPTIONS: Array<{ value: string; label: string }> = [
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     RouterLink, ReactiveFormsModule, PlacesAutocompleteComponent, PhotoUploaderComponent,
+    KeyboardAwareScrollDirective,
     MatCardModule, MatFormFieldModule, MatInputModule, MatSelectModule,
     MatButtonModule, MatIconModule, MatProgressSpinnerModule, MatSnackBarModule,
     PageHeaderComponent,
@@ -86,7 +88,7 @@ const CATEGORY_OPTIONS: Array<{ value: string; label: string }> = [
             (placeSelected)="onPlace($event)"
             style="display:block;margin-bottom:12px" />
 
-          <form [formGroup]="form" (ngSubmit)="submit()">
+          <form [formGroup]="form" (ngSubmit)="submit()" appKeyboardAwareScroll>
             <div class="form-grid">
 
               <!-- Section: Basics -->

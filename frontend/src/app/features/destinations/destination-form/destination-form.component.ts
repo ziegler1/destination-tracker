@@ -23,6 +23,7 @@ import { PlacesAutocompleteComponent, PlaceSelectedEvent } from '../../../shared
 import { DuplicateDestinationDialogComponent } from '../../../shared/components/duplicate-destination-dialog/duplicate-destination-dialog.component';
 import { HomeAddressDialogComponent } from '../../../shared/components/home-address-dialog/home-address-dialog.component';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
+import { KeyboardAwareScrollDirective } from '../../../shared/directives/keyboard-aware-scroll.directive';
 
 
 @Component({
@@ -31,7 +32,8 @@ import { PageHeaderComponent } from '../../../shared/components/page-header/page
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     RouterLink, ReactiveFormsModule, PlacesAutocompleteComponent, PhotoUploaderComponent,
-    MonthPickerComponent, MatCardModule, MatFormFieldModule, MatInputModule, MatSelectModule,
+    MonthPickerComponent, KeyboardAwareScrollDirective,
+    MatCardModule, MatFormFieldModule, MatInputModule, MatSelectModule,
     MatIconModule, MatButtonModule, MatProgressSpinnerModule, MatDatepickerModule, MatSnackBarModule,
     PageHeaderComponent,
   ],
@@ -78,7 +80,7 @@ import { PageHeaderComponent } from '../../../shared/components/page-header/page
             (placeSelected)="onPlaceSelected($event)"
             style="display:block;margin-bottom:8px" />
 
-          <form [formGroup]="form" (ngSubmit)="save()">
+          <form [formGroup]="form" (ngSubmit)="save()" appKeyboardAwareScroll>
 
             <!-- Basic info -->
             <mat-form-field appearance="outline">
