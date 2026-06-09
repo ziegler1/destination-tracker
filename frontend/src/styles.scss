@@ -87,7 +87,7 @@ body {
 
 @media (max-width: 768px) {
   // Page container: 16px side padding + 120px bottom so Save/Cancel stays above the bottom tab bar
-  .page-container { padding: 16px 16px 120px; }
+  .page-container { padding: 16px 16px 120px; overflow-x: hidden; }
 
   // Typography scale
   h1 { font-size: 22px; }

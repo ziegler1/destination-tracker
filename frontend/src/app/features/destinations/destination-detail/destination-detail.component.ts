@@ -63,15 +63,24 @@ interface WeatherDay {
     .hero-sub   { color:rgba(255,255,255,.85); margin:4px 0 0; font-size:15px; }
 
     .layout { display:grid; grid-template-columns:1fr 320px; gap:20px; }
+    /* min-width:0 prevents grid children from overflowing their column */
+    .layout > * { min-width: 0; }
     @media(max-width:768px){ .layout { grid-template-columns:1fr; } }
 
-    .info-card { background:var(--wp-surface); border-radius:12px; padding:20px; }
+    .info-card {
+      background:var(--wp-surface); border-radius:12px; padding:20px;
+      /* overflow:hidden contains the weather strip scroll track inside the card */
+      overflow:hidden;
+    }
+    @media(max-width:768px){ .info-card { padding:14px; } }
+
     .section-title { font-size:14px; font-weight:600; text-transform:uppercase;
                      letter-spacing:.8px; color:var(--wp-text-secondary); margin:24px 0 12px; }
+    @media(max-width:768px){ .section-title { margin:14px 0 8px; } }
 
-    .meta-row  { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
-    .meta-icon { color:var(--wp-primary); }
-    .meta-val  { font-size:14px; color:var(--wp-text-primary); }
+    .meta-row  { display:flex; align-items:flex-start; gap:10px; margin-bottom:10px; }
+    .meta-icon { color:var(--wp-primary); flex-shrink:0; }
+    .meta-val  { font-size:14px; color:var(--wp-text-primary); overflow-wrap:break-word; word-break:break-word; min-width:0; }
 
     .months-wrap { display:flex; flex-wrap:wrap; gap:8px; margin-top:6px; }
     .month-chip  {
@@ -82,7 +91,8 @@ interface WeatherDay {
     .photo-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:16px; }
     .photo-thumb { width:100%; aspect-ratio:1; object-fit:cover; border-radius:8px; cursor:pointer; }
 
-    .weather-strip { display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; }
+    /* Weather strip scrolls horizontally inside the card */
+    .weather-strip { display:flex; gap:8px; overflow-x:auto; padding-bottom:8px; -webkit-overflow-scrolling:touch; }
     .weather-day {
       flex:0 0 auto; text-align:center; padding:10px 12px;
       background:var(--wp-surface-variant); border-radius:10px; min-width:72px;
@@ -94,12 +104,19 @@ interface WeatherDay {
 
     .poi-item { padding:8px 0; border-bottom:1px solid var(--wp-divider); }
     .poi-item:last-child { border:none; }
-    .poi-name { font-weight:500; font-size:14px; }
+    .poi-name { font-weight:500; font-size:14px; overflow-wrap:break-word; }
     .poi-type { font-size:12px; color:var(--wp-text-secondary); text-transform:capitalize; }
-    .poi-desc { font-size:13px; color:var(--wp-text-secondary); margin-top:2px; }
+    .poi-desc { font-size:13px; color:var(--wp-text-secondary); margin-top:2px; overflow-wrap:break-word; }
 
     .stars { color:#FFB300; }
-    .notes { font-size:14px; color:var(--wp-text-secondary); line-height:1.6; white-space:pre-wrap; }
+    /* pre-wrap preserves newlines but long unbroken words need break-word */
+    .notes { font-size:14px; color:var(--wp-text-secondary); line-height:1.6; white-space:pre-wrap; overflow-wrap:break-word; word-break:break-word; }
+
+    /* Hero overlay text: clamp font size on small screens */
+    @media(max-width:768px){
+      .hero-title { font-size:20px; }
+      .hero-sub   { font-size:13px; }
+    }
 
     .status-rating { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
     .action-grid { display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; align-items:center; }
