@@ -14,6 +14,7 @@ import { RestaurantService } from '../../core/services/restaurant.service';
 import { LodgingService } from '../../core/services/lodging.service';
 import { DestinationService } from '../../core/services/destination.service';
 import { Restaurant, Lodging, Destination } from '../../types/schema.types';
+import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 
 export type ListMode = 'would_return' | 'avoid';
 
@@ -22,7 +23,7 @@ export type ListMode = 'would_return' | 'avoid';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    RouterLink, TitleCasePipe,
+    RouterLink, TitleCasePipe, PageHeaderComponent,
     MatTabsModule, MatIconModule, MatButtonModule,
     MatProgressSpinnerModule, MatFormFieldModule, MatInputModule,
   ],
@@ -85,6 +86,7 @@ export type ListMode = 'would_return' | 'avoid';
     .empty-icon { font-size:48px; display:block; margin-bottom:8px; }
   `],
   template: `
+    <app-page-header [title]="mode === 'would_return' ? 'Would Return' : 'Avoid List'" backRoute="/" />
     <div class="page-container">
       <div class="header">
         <h1 class="page-title">

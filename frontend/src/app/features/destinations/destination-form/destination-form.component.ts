@@ -59,7 +59,8 @@ import { PageHeaderComponent } from '../../../shared/components/page-header/page
     .err { font-size:12px; color:#c62828; margin-bottom:4px; }
   `],
   template: `
-    <app-page-header [title]="isEdit() ? 'Edit Destination' : 'Add Destination'" backRoute="/destinations" />
+    <app-page-header [title]="isEdit() ? 'Edit Destination' : 'Add Destination'"
+                     [backRoute]="isEdit() ? '/destinations/' + destId : '/destinations'" />
     <div class="page-container">
       <button mat-stroked-button class="back-row" routerLink="/destinations" style="margin-bottom:16px">
         <mat-icon>arrow_back</mat-icon> Destinations

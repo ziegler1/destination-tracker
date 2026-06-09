@@ -13,13 +13,14 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { TripService } from '../../../core/services/trip.service';
+import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 
 @Component({
   selector: 'app-trip-form',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    RouterLink, ReactiveFormsModule,
+    RouterLink, ReactiveFormsModule, PageHeaderComponent,
     MatCardModule, MatFormFieldModule, MatInputModule, MatSelectModule,
     MatDatepickerModule, MatButtonModule, MatIconModule,
     MatProgressSpinnerModule, MatSnackBarModule,
@@ -33,6 +34,8 @@ import { TripService } from '../../../core/services/trip.service';
     h2 { margin:0 0 20px; font-size:20px; font-weight:600; }
   `],
   template: `
+    <app-page-header [title]="isEdit() ? 'Edit Trip' : 'Plan a Trip'"
+                     [backRoute]="isEdit() ? '/trips/' + tripId() : '/trips'" />
     @if (loading()) {
       <div class="loading-wrap"><mat-spinner diameter="48" /></div>
     } @else {
