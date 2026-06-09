@@ -211,6 +211,35 @@ const TRIP_COLORS = ['#00695C', '#1565C0', '#6A1B9A', '#B71C1C', '#E65100', '#2E
           </div>
         }
 
+        <!-- ════ Planned / Upcoming Trips ════ -->
+        @if (planningTrips().length > 0) {
+          <div class="section">
+            <div class="section-header">
+              <h2 class="section-title">🗓️ Upcoming Trips</h2>
+              <a class="section-link" [routerLink]="['/trips']">View All →</a>
+            </div>
+            <div class="trips-row">
+              @for (trip of planningTrips(); track trip.id; let i = $index) {
+                <a class="trip-card" [routerLink]="['/trips', trip.id]">
+                  <div class="trip-card-top" [style.background]="tripGradient(i + 2)">
+                    <div class="trip-card-name">{{ trip.name }}</div>
+                  </div>
+                  <div class="trip-card-body">
+                    <div class="trip-card-dates">
+                      @if (trip.start_date) {
+                        {{ trip.start_date | date:'MMM d' }}@if (trip.end_date) { – {{ trip.end_date | date:'MMM d, y' }}}
+                      } @else {
+                        Dates TBD
+                      }
+                    </div>
+                    <div class="trip-card-meta">{{ trip.stop_count ?? 0 }} stops · Planning</div>
+                  </div>
+                </a>
+              }
+            </div>
+          </div>
+        }
+
         <!-- ════ STATE B — No active trip ════ -->
         @if (!activeTrip()) {
           <div class="search-hero">
@@ -375,9 +404,10 @@ export class HomeComponent implements OnInit {
   private draftSvc  = inject(TripDraftService);
   private router    = inject(Router);
 
-  loading       = signal(true);
-  activeTrip    = signal<Trip | null>(null);
-  recentTrips   = signal<Trip[]>([]);
+  loading        = signal(true);
+  activeTrip     = signal<Trip | null>(null);
+  planningTrips  = signal<Trip[]>([]);
+  recentTrips    = signal<Trip[]>([]);
   topRestaurants = signal<Restaurant[]>([]);
   topLodging    = signal<Lodging[]>([]);
   stats         = signal<{ statesVisited:number; tripsTotal:number; restaurantsTotal:number; nightsAway:number } | null>(null);
@@ -412,6 +442,11 @@ export class HomeComponent implements OnInit {
     this.tripSvc.list().pipe(
       switchMap(trips => {
         const active  = trips.find(t => t.status === 'active') ?? null;
+        const planning = trips
+          .filter(t => t.status === 'planning')
+          .sort((a, b) => (a.start_date ?? '').localeCompare(b.start_date ?? ''))
+          .slice(0, 5);
+        this.planningTrips.set(planning);
         const recent  = trips
           .filter(t => t.status === 'completed')
           .sort((a, b) => (b.end_date ?? '').localeCompare(a.end_date ?? ''))

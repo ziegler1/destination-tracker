@@ -13,6 +13,10 @@ export class SpecialInterestService {
   update(id: number, body: Partial<SpecialInterestPlace> | Record<string, unknown>) { return this.http.put<SpecialInterestPlace>(`${this.base}/${id}`, body); }
   delete(id: number)   { return this.http.delete<void>(`${this.base}/${id}`); }
 
+  logVisit(id: number) {
+    return this.http.patch<{ visit_count: number }>(`${this.base}/${id}/visit`, {});
+  }
+
   saveSiteInfo(id: number, site_info: ScrapedSiteInfo | null) {
     return this.http.patch<SpecialInterestPlace>(`${this.base}/${id}/site-info`, { site_info });
   }

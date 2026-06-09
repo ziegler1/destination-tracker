@@ -1,0 +1,2 @@
+ALTER TABLE special_interest_places
+  ADD COLUMN IF NOT EXISTS visit_count INTEGER NOT NULL DEFAULT 0;

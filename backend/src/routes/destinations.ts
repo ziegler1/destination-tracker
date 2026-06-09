@@ -110,7 +110,7 @@ router.put('/:id', asyncHandler(async (req, res) => {
   const {
     name, city, state_province, country, region, description,
     latitude, longitude, status, best_months, visited_at,
-    rating, notes, image_url, travel_tips,
+    rating, notes, image_url, travel_tips, highlights,
   } = req.body;
   const normalizedState = state_province ? normalizeState(state_province) : state_province;
   const { rows } = await pool.query(`
@@ -118,12 +118,12 @@ router.put('/:id', asyncHandler(async (req, res) => {
       name=$1, city=$2, state_province=$3, country=$4, region=$5,
       description=$6, latitude=$7, longitude=$8, status=$9,
       best_months=$10, visited_at=$11, rating=$12, notes=$13, image_url=$14,
-      travel_tips=$15, updated_at=NOW()
-    WHERE id=$16
+      travel_tips=$15, highlights=$16, updated_at=NOW()
+    WHERE id=$17
     RETURNING *
   `, [name, city, normalizedState, country, region, description,
       latitude, longitude, status, best_months ?? null, visited_at,
-      rating, notes, image_url, travel_tips ?? null, req.params.id]);
+      rating, notes, image_url, travel_tips ?? null, highlights ?? null, req.params.id]);
   if (!rows[0]) return void res.status(404).json({ error: 'Destination not found' });
   res.json(rows[0]);
 }));

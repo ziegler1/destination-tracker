@@ -17,7 +17,10 @@ import { MatDividerModule } from '@angular/material/divider';
 import { DestinationService } from '../../core/services/destination.service';
 import { TripService } from '../../core/services/trip.service';
 import { MapsService } from '../../core/services/maps.service';
-import { Destination, DestinationStatus, Trip } from '../../types/schema.types';
+import { RestaurantService } from '../../core/services/restaurant.service';
+import { LodgingService } from '../../core/services/lodging.service';
+import { SpecialInterestService } from '../../core/services/special-interest.service';
+import { Destination, DestinationStatus, Trip, Restaurant, Lodging, SpecialInterestPlace } from '../../types/schema.types';
 import { forkJoin } from 'rxjs';
 
 const STATUS_COLORS: Record<DestinationStatus, string> = {
@@ -61,6 +64,41 @@ function stopMarkerEl(n: number): HTMLElement {
           fill="white" text-anchor="middle">${n}</text>
   </svg>`;
   return el.firstElementChild as HTMLElement;
+}
+
+function restaurantMarkerEl(): HTMLElement {
+  const el = document.createElement('div');
+  el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16">
+    <circle cx="8" cy="8" r="6" fill="#E65100" stroke="white" stroke-width="2"/>
+  </svg>`;
+  return el.firstElementChild as HTMLElement;
+}
+
+function lodgingMarkerEl(): HTMLElement {
+  const el = document.createElement('div');
+  el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16">
+    <circle cx="8" cy="8" r="6" fill="#0277BD" stroke="white" stroke-width="2"/>
+  </svg>`;
+  return el.firstElementChild as HTMLElement;
+}
+
+function siMarkerEl(): HTMLElement {
+  const el = document.createElement('div');
+  el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16">
+    <circle cx="8" cy="8" r="6" fill="#7B1FA2" stroke="white" stroke-width="2"/>
+  </svg>`;
+  return el.firstElementChild as HTMLElement;
+}
+
+interface ActiveMarker {
+  type: 'destination' | 'restaurant' | 'lodging' | 'si';
+  id: number;
+  name: string;
+  city: string;
+  state: string;
+  sub?: string;
+  rating?: number;
+  route: string[];
 }
 
 @Component({
@@ -123,6 +161,42 @@ function stopMarkerEl(n: number): HTMLElement {
         }
       }
 
+      <!-- Restaurant markers -->
+      @if (showRestaurants) {
+        @for (r of restaurantMarkers(); track r.id) {
+          <map-advanced-marker
+            [position]="r.position"
+            [content]="r.content"
+            [title]="r.name"
+            (mapClick)="openRestInfo(r.item, restMarker)"
+            #restMarker="mapAdvancedMarker" />
+        }
+      }
+
+      <!-- Lodging markers -->
+      @if (showLodging) {
+        @for (l of lodgingMarkers(); track l.id) {
+          <map-advanced-marker
+            [position]="l.position"
+            [content]="l.content"
+            [title]="l.name"
+            (mapClick)="openLodgeInfo(l.item, lodgeMarker)"
+            #lodgeMarker="mapAdvancedMarker" />
+        }
+      }
+
+      <!-- Special Interest markers -->
+      @if (showSI) {
+        @for (si of siMarkers(); track si.id) {
+          <map-advanced-marker
+            [position]="si.position"
+            [content]="si.content"
+            [title]="si.name"
+            (mapClick)="openSIInfo(si.item, siAdvMarker)"
+            #siAdvMarker="mapAdvancedMarker" />
+        }
+      }
+
       <!-- Trip route polyline -->
       @if (directionsResult()) {
         <map-directions-renderer
@@ -136,14 +210,16 @@ function stopMarkerEl(n: number): HTMLElement {
       }
 
       <map-info-window #infoWindow>
-        @if (selectedDest()) {
+        @if (activeMarker(); as m) {
           <div style="min-width:160px;font-family:Roboto,sans-serif;padding:4px">
-            <strong style="font-size:14px">{{ selectedDest()!.name }}</strong><br/>
-            <small style="color:#666">{{ selectedDest()!.city }}, {{ selectedDest()!.state_province }}</small><br/>
-            <span style="font-size:12px;text-transform:capitalize;color:#888">
-              {{ selectedDest()!.status.replace('_',' ') }}
-            </span><br/>
-            <button (click)="router.navigate(['/destinations', selectedDest()!.id])"
+            <strong style="font-size:14px">{{ m.name }}</strong><br/>
+            <small style="color:#666">{{ m.city }}, {{ m.state }}</small><br/>
+            <span style="font-size:12px;text-transform:capitalize;color:#888">{{ m.sub }}</span>
+            @if (m.rating) {
+              <span style="font-size:12px;color:#f57f17;margin-left:6px">★ {{ m.rating }}</span>
+            }
+            <br/>
+            <button (click)="router.navigate(m.route)"
               style="margin-top:8px;padding:4px 12px;background:#00695C;color:white;border:none;
                      border-radius:4px;cursor:pointer;font-size:12px">
               View →
@@ -159,6 +235,21 @@ function stopMarkerEl(n: number): HTMLElement {
       <div class="ctrl-row">
         <mat-checkbox [(ngModel)]="showDestinations">
           Destinations ({{ validDests().length }})
+        </mat-checkbox>
+      </div>
+      <div class="ctrl-row">
+        <mat-checkbox [(ngModel)]="showRestaurants">
+          Restaurants ({{ validRestaurants().length }})
+        </mat-checkbox>
+      </div>
+      <div class="ctrl-row">
+        <mat-checkbox [(ngModel)]="showLodging">
+          Lodging ({{ validLodging().length }})
+        </mat-checkbox>
+      </div>
+      <div class="ctrl-row">
+        <mat-checkbox [(ngModel)]="showSI">
+          Special Interest ({{ validSI().length }})
         </mat-checkbox>
       </div>
       <div class="ctrl-row">
@@ -182,6 +273,9 @@ function stopMarkerEl(n: number): HTMLElement {
       <div class="leg-row"><div class="leg-dot" style="background:#1565c0"></div> Want to Visit</div>
       <div class="leg-row"><div class="leg-dot" style="background:#f57f17"></div> Planned</div>
       <div class="leg-row"><div class="leg-dot" style="background:#2e7d32"></div> Visited</div>
+      <div class="leg-row"><div class="leg-dot" style="background:#E65100"></div> Restaurant</div>
+      <div class="leg-row"><div class="leg-dot" style="background:#0277BD"></div> Lodging</div>
+      <div class="leg-row"><div class="leg-dot" style="background:#7B1FA2"></div> Special Interest</div>
       @if (visitedStates().size > 0) {
         <div class="leg-row"><div class="leg-rect"></div> Visited States ({{ visitedStates().size }})</div>
       }
@@ -189,22 +283,31 @@ function stopMarkerEl(n: number): HTMLElement {
   `,
 })
 export class MapComponent implements OnInit, AfterViewInit {
-  protected router = inject(Router);
-  private destSvc  = inject(DestinationService);
-  private tripSvc  = inject(TripService);
-  private mapsSvc  = inject(MapsService);
+  protected router  = inject(Router);
+  private destSvc   = inject(DestinationService);
+  private tripSvc   = inject(TripService);
+  private mapsSvc   = inject(MapsService);
+  private restSvc   = inject(RestaurantService);
+  private lodgeSvc  = inject(LodgingService);
+  private siSvc     = inject(SpecialInterestService);
 
   @ViewChild(MapInfoWindow) infoWindow!: MapInfoWindow;
   @ViewChild(GoogleMap)     gmap!: GoogleMap;
 
   loading        = signal(true);
   destinations   = signal<Destination[]>([]);
+  restaurants    = signal<Restaurant[]>([]);
+  lodging        = signal<Lodging[]>([]);
+  specialInterests = signal<SpecialInterestPlace[]>([]);
   trips          = signal<Trip[]>([]);
-  selectedDest   = signal<Destination | null>(null);
+  activeMarker   = signal<ActiveMarker | null>(null);
   visitedStates  = signal<Set<string>>(new Set());
 
-  showDestinations = true;
-  showStateFill    = true;
+  showDestinations  = true;
+  showRestaurants   = true;
+  showLodging       = true;
+  showSI            = true;
+  showStateFill     = true;
   selectedTripId: number | null = null;
 
   directionsResult = signal<google.maps.DirectionsResult | null>(null);
@@ -228,6 +331,45 @@ export class MapComponent implements OnInit, AfterViewInit {
     })),
   );
 
+  validRestaurants = computed(() =>
+    this.restaurants().filter(r => r.latitude != null && r.longitude != null),
+  );
+  restaurantMarkers = computed(() =>
+    this.validRestaurants().map(r => ({
+      id:       r.id,
+      name:     r.name,
+      position: { lat: Number(r.latitude), lng: Number(r.longitude) } as google.maps.LatLngLiteral,
+      content:  restaurantMarkerEl(),
+      item:     r,
+    })),
+  );
+
+  validLodging = computed(() =>
+    this.lodging().filter(l => l.latitude != null && l.longitude != null),
+  );
+  lodgingMarkers = computed(() =>
+    this.validLodging().map(l => ({
+      id:       l.id,
+      name:     l.name,
+      position: { lat: Number(l.latitude), lng: Number(l.longitude) } as google.maps.LatLngLiteral,
+      content:  lodgingMarkerEl(),
+      item:     l,
+    })),
+  );
+
+  validSI = computed(() =>
+    this.specialInterests().filter(si => si.latitude != null && si.longitude != null),
+  );
+  siMarkers = computed(() =>
+    this.validSI().map(si => ({
+      id:       si.id,
+      name:     si.name,
+      position: { lat: Number(si.latitude), lng: Number(si.longitude) } as google.maps.LatLngLiteral,
+      content:  siMarkerEl(),
+      item:     si,
+    })),
+  );
+
   readonly mapCenter: google.maps.LatLngLiteral = { lat: 39.5, lng: -98.35 };
   readonly mapOptions: google.maps.MapOptions = {
     mapId: 'DEMO_MAP_ID',
@@ -244,11 +386,17 @@ export class MapComponent implements OnInit, AfterViewInit {
     forkJoin([
       this.destSvc.list(),
       this.tripSvc.list(),
+      this.restSvc.list(),
+      this.lodgeSvc.list(),
+      this.siSvc.list(),
       fetch(US_STATES_GEOJSON_URL).then(r => r.json()).catch(() => null),
     ]).subscribe({
-      next: ([dests, trips, geojson]) => {
+      next: ([dests, trips, rests, lodging, sis, geojson]) => {
         this.destinations.set(dests);
         this.trips.set(trips);
+        this.restaurants.set(rests);
+        this.lodging.set(lodging);
+        this.specialInterests.set(sis);
         this.loading.set(false);
         this.computeVisitedStates(dests);
         this.statesGeoJson = geojson as object | null;
@@ -337,7 +485,45 @@ export class MapComponent implements OnInit, AfterViewInit {
   }
 
   openDestInfo(d: Destination, marker: MapAdvancedMarker) {
-    this.selectedDest.set(d);
+    this.activeMarker.set({
+      type: 'destination', id: d.id, name: d.name,
+      city: d.city, state: d.state_province,
+      sub: d.status.replace(/_/g, ' '),
+      route: ['/destinations', String(d.id)],
+    });
+    this.infoWindow.open(marker);
+  }
+
+  openRestInfo(r: Restaurant, marker: MapAdvancedMarker) {
+    this.activeMarker.set({
+      type: 'restaurant', id: r.id, name: r.name,
+      city: r.city, state: r.state_province,
+      sub: r.cuisine_type ?? 'Restaurant',
+      rating: r.rating,
+      route: ['/restaurants', String(r.id)],
+    });
+    this.infoWindow.open(marker);
+  }
+
+  openLodgeInfo(l: Lodging, marker: MapAdvancedMarker) {
+    this.activeMarker.set({
+      type: 'lodging', id: l.id, name: l.name,
+      city: l.city, state: l.state_province,
+      sub: l.lodging_type,
+      rating: l.room_quality,
+      route: ['/lodging', String(l.id)],
+    });
+    this.infoWindow.open(marker);
+  }
+
+  openSIInfo(si: SpecialInterestPlace, marker: MapAdvancedMarker) {
+    this.activeMarker.set({
+      type: 'si', id: si.id, name: si.name,
+      city: si.city, state: si.state_province,
+      sub: si.category ?? 'Special Interest',
+      rating: si.rating,
+      route: ['/special-interests', String(si.id)],
+    });
     this.infoWindow.open(marker);
   }
 

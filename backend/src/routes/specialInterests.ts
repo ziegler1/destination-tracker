@@ -126,6 +126,16 @@ router.post('/:id/photos', asyncHandler(async (req, res) => {
   res.status(201).json(rows[0]);
 }));
 
+// PATCH /api/special-interests/:id/visit
+router.patch('/:id/visit', asyncHandler(async (req, res) => {
+  const { rows } = await pool.query(
+    'UPDATE special_interest_places SET visit_count = visit_count + 1, updated_at=NOW() WHERE id=$1 RETURNING visit_count',
+    [req.params.id],
+  );
+  if (!rows[0]) return void res.status(404).json({ error: 'Not found' });
+  res.json(rows[0]);
+}));
+
 // PATCH /api/special-interests/:id/site-info — persist scraped "Fetch Info" results
 router.patch('/:id/site-info', asyncHandler(async (req, res) => {
   const { site_info } = req.body;

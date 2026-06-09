@@ -20,6 +20,7 @@ export interface Destination {
   notes?: string;
   image_url?: string;
   travel_tips?: string;
+  highlights?: string;
   visit_count?: number;
   created_at: string;
   updated_at: string;
@@ -314,6 +315,7 @@ export interface SpecialInterestPlace {
   visited_at?: string;
   booking_url?: string;
   menu_url?: string;
+  visit_count?: number;
   suggested_by_ai?: boolean;
   google_place_id?: string;
   site_info?: ScrapedSiteInfo | null;

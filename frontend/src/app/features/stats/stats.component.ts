@@ -10,8 +10,13 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatButtonModule } from '@angular/material/button';
 import { BaseChartDirective } from 'ng2-charts';
 import { ChartData, ChartOptions } from 'chart.js';
+import { forkJoin } from 'rxjs';
 import { StatsService, StatsResponse } from '../../core/services/stats.service';
 import { ClaudeService } from '../../core/services/claude.service';
+import { RestaurantService } from '../../core/services/restaurant.service';
+import { LodgingService } from '../../core/services/lodging.service';
+import { SpecialInterestService } from '../../core/services/special-interest.service';
+import { Restaurant, Lodging, SpecialInterestPlace } from '../../types/schema.types';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 
@@ -237,6 +242,96 @@ interface InsightCard { icon: string; headline: string; detail: string; }
               <p class="empty-note" style="margin-top:16px">Log fuel stops to track road stats</p>
             }
           </mat-card>
+
+          <!-- Restaurants -->
+          @if (restaurantStats(); as rs) {
+            <mat-card class="panel">
+              <p class="panel-title"><mat-icon color="primary">restaurant</mat-icon> Restaurants</p>
+              <div class="stat-row">
+                <div class="stat-box">
+                  <div class="stat-val">{{ rs.total }}</div>
+                  <div class="stat-label">Logged</div>
+                </div>
+                <div class="stat-box">
+                  <div class="stat-val" style="color:#2e7d32">{{ rs.wouldReturn }}</div>
+                  <div class="stat-label">Would Return</div>
+                </div>
+                @if (rs.avgRating > 0) {
+                  <div class="stat-box">
+                    <div class="stat-val" style="color:#f57f17">{{ rs.avgRating | number:'1.1-1' }}</div>
+                    <div class="stat-label">Avg Rating</div>
+                  </div>
+                }
+                @if (rs.cuisines > 0) {
+                  <div class="stat-box">
+                    <div class="stat-val" style="color:#6a1b9a">{{ rs.cuisines }}</div>
+                    <div class="stat-label">Cuisines</div>
+                  </div>
+                }
+              </div>
+              @if (rs.total === 0) {
+                <p class="empty-note">Log restaurants to see stats here</p>
+              }
+            </mat-card>
+          }
+
+          <!-- Lodging -->
+          @if (lodgingStats(); as ls) {
+            <mat-card class="panel">
+              <p class="panel-title"><mat-icon color="primary">hotel</mat-icon> Lodging</p>
+              <div class="stat-row">
+                <div class="stat-box">
+                  <div class="stat-val">{{ ls.total }}</div>
+                  <div class="stat-label">Stays</div>
+                </div>
+                <div class="stat-box">
+                  <div class="stat-val" style="color:#2e7d32">{{ ls.wouldReturn }}</div>
+                  <div class="stat-label">Would Return</div>
+                </div>
+                @if (ls.avgQuality > 0) {
+                  <div class="stat-box">
+                    <div class="stat-val" style="color:#f57f17">{{ ls.avgQuality | number:'1.1-1' }}</div>
+                    <div class="stat-label">Avg Quality</div>
+                  </div>
+                }
+              </div>
+              @if (ls.topType) {
+                <p style="font-size:13px;color:var(--wp-text-secondary);margin:0">Most common: <strong>{{ ls.topType }}</strong></p>
+              }
+              @if (ls.total === 0) {
+                <p class="empty-note">Log lodging stays to see stats here</p>
+              }
+            </mat-card>
+          }
+
+          <!-- Special Interests -->
+          @if (siStats(); as sis) {
+            <mat-card class="panel">
+              <p class="panel-title"><mat-icon color="primary">star</mat-icon> Special Interests</p>
+              <div class="stat-row">
+                <div class="stat-box">
+                  <div class="stat-val">{{ sis.total }}</div>
+                  <div class="stat-label">Places</div>
+                </div>
+                <div class="stat-box">
+                  <div class="stat-val" style="color:#2e7d32">{{ sis.wouldReturn }}</div>
+                  <div class="stat-label">Would Return</div>
+                </div>
+                @if (sis.avgRating > 0) {
+                  <div class="stat-box">
+                    <div class="stat-val" style="color:#f57f17">{{ sis.avgRating | number:'1.1-1' }}</div>
+                    <div class="stat-label">Avg Rating</div>
+                  </div>
+                }
+              </div>
+              @if (sis.topCat) {
+                <p style="font-size:13px;color:var(--wp-text-secondary);margin:0">Top category: <strong>{{ sis.topCat }}</strong></p>
+              }
+              @if (sis.total === 0) {
+                <p class="empty-note">Log special interest places to see stats here</p>
+              }
+            </mat-card>
+          }
         </div>
 
         <!-- ════ Personal Records ════ -->
@@ -365,11 +460,17 @@ interface InsightCard { icon: string; headline: string; detail: string; }
 export class StatsComponent implements OnInit {
   private svc       = inject(StatsService);
   private claudeSvc = inject(ClaudeService);
+  private restSvc   = inject(RestaurantService);
+  private lodgeSvc  = inject(LodgingService);
+  private siSvc     = inject(SpecialInterestService);
 
   loading         = signal(true);
   insightsLoading = signal(false);
-  private statsSig = signal<StatsResponse | null>(null);
-  insights         = signal<InsightCard[]>([]);
+  private statsSig   = signal<StatsResponse | null>(null);
+  private restaurants = signal<Restaurant[]>([]);
+  private lodging     = signal<Lodging[]>([]);
+  private si          = signal<SpecialInterestPlace[]>([]);
+  insights            = signal<InsightCard[]>([]);
 
   s = computed(() => this.statsSig());
 
@@ -443,9 +544,54 @@ export class StatsComponent implements OnInit {
     return !!(r.longest_trip_name || r.most_visited_state || r.top_restaurant_name || r.top_lodging_name || r.most_expensive_trip_name);
   });
 
+  restaurantStats = computed(() => {
+    const rs = this.restaurants();
+    if (!rs.length) return null;
+    const wouldReturn = rs.filter(r => r.would_return).length;
+    const rated = rs.filter(r => r.rating);
+    const avgRating = rated.length ? rated.reduce((s, r) => s + (r.rating ?? 0), 0) / rated.length : 0;
+    const cuisines = [...new Set(rs.map(r => r.cuisine_type).filter(Boolean))].length;
+    return { total: rs.length, wouldReturn, avgRating, cuisines };
+  });
+
+  lodgingStats = computed(() => {
+    const ls = this.lodging();
+    if (!ls.length) return null;
+    const wouldReturn = ls.filter(l => l.would_return).length;
+    const rated = ls.filter(l => l.room_quality);
+    const avgQuality = rated.length ? rated.reduce((s, l) => s + (l.room_quality ?? 0), 0) / rated.length : 0;
+    const typeCounts: Record<string, number> = {};
+    ls.forEach(l => { typeCounts[l.lodging_type] = (typeCounts[l.lodging_type] ?? 0) + 1; });
+    const topType = Object.entries(typeCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+    return { total: ls.length, wouldReturn, avgQuality, topType };
+  });
+
+  siStats = computed(() => {
+    const sis = this.si();
+    if (!sis.length) return null;
+    const wouldReturn = sis.filter(s => s.would_return).length;
+    const rated = sis.filter(s => s.rating);
+    const avgRating = rated.length ? rated.reduce((s, si) => s + (si.rating ?? 0), 0) / rated.length : 0;
+    const cats: Record<string, number> = {};
+    sis.forEach(s => { if (s.category) cats[s.category] = (cats[s.category] ?? 0) + 1; });
+    const topCat = Object.entries(cats).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+    return { total: sis.length, wouldReturn, avgRating, topCat };
+  });
+
   ngOnInit() {
-    this.svc.get().subscribe({
-      next: s => { this.statsSig.set(s); this.loading.set(false); },
+    forkJoin({
+      stats:       this.svc.get(),
+      restaurants: this.restSvc.list(),
+      lodging:     this.lodgeSvc.list(),
+      si:          this.siSvc.list(),
+    }).subscribe({
+      next: ({ stats, restaurants, lodging, si }) => {
+        this.statsSig.set(stats);
+        this.restaurants.set(restaurants);
+        this.lodging.set(lodging);
+        this.si.set(si);
+        this.loading.set(false);
+      },
       error: () => this.loading.set(false),
     });
   }

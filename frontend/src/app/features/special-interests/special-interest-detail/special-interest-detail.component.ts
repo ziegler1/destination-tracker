@@ -69,7 +69,6 @@ import { SiCategoryService } from '../../../core/services/si-category.service';
       .header-row { flex-direction:column; }
       .actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; width:100%; }
       .actions button { width:100%; }
-      .actions button:last-child { grid-column:1 / -1; }
     }
     .info-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:12px; margin:16px 0; }
     .info-item label { font-size:11px; text-transform:uppercase; letter-spacing:.8px; color:var(--wp-text-hint); display:block; }
@@ -127,6 +126,11 @@ import { SiCategoryService } from '../../../core/services/si-category.service';
             <p class="subtitle">{{ p.city }}, {{ p.state_province }} · {{ categoryLabel(p.category) }}</p>
           </div>
           <div class="actions">
+            <button mat-raised-button color="primary" (click)="logVisit(p)" [disabled]="visitLogging()">
+              <mat-icon>add_location_alt</mat-icon>
+              {{ visitLogging() ? 'Logged!' : 'Log a Visit' }}
+              @if ((p.visit_count ?? 0) > 0) { &nbsp;({{ p.visit_count }}x) }
+            </button>
             <button mat-stroked-button color="accent" (click)="openAddToTrip(p)">
               <mat-icon>add_road</mat-icon> Add to Trip
             </button>
@@ -288,8 +292,9 @@ export class SpecialInterestDetailComponent implements OnInit {
   private snack       = inject(MatSnackBar);
   private bottomSheet = inject(MatBottomSheet);
 
-  loading = signal(true);
-  place   = signal<SpecialInterestPlace | null>(null);
+  loading      = signal(true);
+  visitLogging = signal(false);
+  place        = signal<SpecialInterestPlace | null>(null);
   protected get p(): SpecialInterestPlace | null { return this.place(); }
 
   aiLoading = signal(false);
@@ -372,6 +377,18 @@ export class SpecialInterestDetailComponent implements OnInit {
     this.svc.update(p.id, { ...p, highlights: this.aiResult()! }).subscribe((updated) => {
       this.place.update((cur) => cur ? { ...cur, highlights: updated.highlights } : cur);
       this.snack.open('Highlights saved!', 'OK', { duration: 2000 });
+    });
+  }
+
+  logVisit(p: SpecialInterestPlace) {
+    this.visitLogging.set(true);
+    this.svc.logVisit(p.id).subscribe({
+      next: ({ visit_count }) => {
+        this.place.update(cur => cur ? { ...cur, visit_count } : cur);
+        this.snack.open('Visit logged!', 'OK', { duration: 2000 });
+        setTimeout(() => this.visitLogging.set(false), 1500);
+      },
+      error: () => { this.snack.open('Failed to log visit', 'Dismiss', { duration: 3000 }); this.visitLogging.set(false); },
     });
   }
 

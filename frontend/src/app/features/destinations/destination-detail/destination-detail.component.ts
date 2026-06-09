@@ -141,6 +141,13 @@ interface WeatherDay {
     @media (max-width:768px) {
       .action-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
       .action-grid button { width:100%; }
+      .action-grid > a { grid-column:1/-1; display:block; }
+      .action-grid > a button { width:100%; }
+    }
+    .ai-box {
+      margin-top:12px; padding:14px; border-radius:8px;
+      background:var(--wp-surface-variant); font-size:14px;
+      line-height:1.6; color:var(--wp-text-secondary);
     }
   `],
   template: `
@@ -207,6 +214,11 @@ interface WeatherDay {
           <button mat-stroked-button color="warn" (click)="confirmDelete()">
             <mat-icon>delete</mat-icon> Delete
           </button>
+          <a [href]="mapsUrl(dest()!)" target="_blank" rel="noopener" style="text-decoration:none">
+            <button mat-stroked-button style="width:100%">
+              <mat-icon>map</mat-icon> View on Maps
+            </button>
+          </a>
         </div>
 
         <div class="layout">
@@ -268,6 +280,24 @@ interface WeatherDay {
                 <p class="notes">{{ dest()!.travel_tips }}</p>
               </div>
             }
+
+            <!-- Highlights -->
+            <div class="info-card" style="margin-bottom:16px">
+              <p class="section-title">Highlights</p>
+              <button mat-stroked-button (click)="generateHighlights()" [disabled]="aiHighlightsLoading()">
+                <mat-icon>auto_awesome</mat-icon>
+                {{ aiHighlightsLoading() ? 'Generating…' : 'Generate Highlights' }}
+              </button>
+              @if (aiHighlightsResult(); as result) {
+                <div class="ai-box">{{ result }}</div>
+                <button mat-stroked-button color="primary" style="margin-top:8px" (click)="saveHighlights()">
+                  <mat-icon>save</mat-icon> Save to Entry
+                </button>
+              }
+              @if (dest()!.highlights) {
+                <p style="color:var(--wp-text-secondary);line-height:1.6;margin-top:10px">{{ dest()!.highlights }}</p>
+              }
+            </div>
 
             <!-- POIs -->
             @if (dest()!.pois?.length) {
@@ -407,6 +437,10 @@ export class DestinationDetailComponent implements OnInit {
   btLoading     = signal(false);
   btResult      = signal<{ best_months: string[]; summary: string; seasons: Record<string, string> } | null>(null);
 
+  // AI Highlights
+  aiHighlightsLoading = signal(false);
+  aiHighlightsResult  = signal<string | null>(null);
+
   // Photos
   protected get entityId(): number { return this.dest()?.id ?? 0; }
 
@@ -488,6 +522,33 @@ export class DestinationDetailComponent implements OnInit {
     this.destSvc.update(d.id, { ...d, best_months: months }).subscribe((updated) => {
       this.dest.update((cur) => cur ? { ...cur, best_months: updated.best_months } : cur);
     });
+  }
+
+  generateHighlights(): void {
+    const d = this.dest();
+    if (!d) return;
+    this.aiHighlightsLoading.set(true);
+    this.aiHighlightsResult.set(null);
+    this.claudeSvc.generateHighlights({
+      type: 'destination', name: d.name, city: d.city, state: d.state_province,
+    }).subscribe({
+      next: (res) => { this.aiHighlightsResult.set(res.result); this.aiHighlightsLoading.set(false); },
+      error: () => { this.snack.open('AI generation failed', 'Dismiss', { duration: 3000 }); this.aiHighlightsLoading.set(false); },
+    });
+  }
+
+  saveHighlights(): void {
+    const d = this.dest();
+    if (!d || !this.aiHighlightsResult()) return;
+    this.destSvc.update(d.id, { ...d, highlights: this.aiHighlightsResult()! }).subscribe((updated) => {
+      this.dest.update((cur) => cur ? { ...cur, highlights: updated.highlights } : cur);
+      this.snack.open('Highlights saved!', 'OK', { duration: 2000 });
+    });
+  }
+
+  mapsUrl(d: Destination): string {
+    if (d.latitude && d.longitude) return `https://www.google.com/maps?q=${d.latitude},${d.longitude}`;
+    return `https://www.google.com/maps?q=${encodeURIComponent(`${d.city}, ${d.state_province}`)}`;
   }
 
   logVisit(): void {
