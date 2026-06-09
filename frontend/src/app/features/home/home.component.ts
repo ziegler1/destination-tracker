@@ -477,7 +477,7 @@ export class HomeComponent implements OnInit {
         this.topLodging.set(topLodg);
 
         this.stats.set({
-          statesVisited:    stats.destinations.top_states.length,
+          statesVisited:    stats.destinations.visited_states_count,
           tripsTotal:       stats.trips.total,
           restaurantsTotal: restaurants.length,
           nightsAway:       Math.round(stats.trips.total_days),

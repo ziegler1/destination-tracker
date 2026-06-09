@@ -143,4 +143,8 @@ export class PlacesAutocompleteComponent implements AfterViewInit, OnDestroy {
     if (this.element) (this.element as unknown as { value: string }).value = '';
     this.cleared.emit();
   }
+
+  setValue(v: string) {
+    if (this.element) (this.element as unknown as { value: string }).value = v;
+  }
 }

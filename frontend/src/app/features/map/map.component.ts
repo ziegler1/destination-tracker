@@ -98,7 +98,14 @@ interface ActiveMarker {
   state: string;
   sub?: string;
   rating?: number;
+  photoUrl?: string;
   route: string[];
+}
+
+function primaryPhotoUrl(
+  item: { photos?: Array<{ url: string; is_primary: boolean }>; image_url?: string }
+): string | undefined {
+  return item.photos?.find(p => p.is_primary)?.url ?? item.photos?.[0]?.url ?? item.image_url ?? undefined;
 }
 
 @Component({
@@ -112,21 +119,35 @@ interface ActiveMarker {
   ],
   styles: [`
     :host { display:block; position:relative; height:calc(100vh - 56px); }
+
+    /* Toggle button — always visible */
+    .layers-toggle {
+      position:absolute; top:12px; right:12px; z-index:1002;
+      background:var(--wp-surface); border:none; border-radius:10px;
+      padding:8px 12px; cursor:pointer; box-shadow:0 2px 8px var(--wp-shadow);
+      display:flex; align-items:center; gap:6px;
+      font-size:13px; font-weight:600; color:var(--wp-text-primary);
+    }
+    .layers-toggle mat-icon { font-size:18px; width:18px; height:18px; }
+
     .controls {
-      position:absolute; top:16px; right:16px; z-index:1001; width:220px;
+      position:absolute; top:52px; right:12px; z-index:1001; width:220px;
       padding:14px; border-radius:12px;
       background:var(--wp-surface); box-shadow:0 4px 16px var(--wp-shadow);
+      max-height:calc(100vh - 120px); overflow-y:auto;
+    }
+    @media (max-width:768px) {
+      .controls {
+        top:auto; bottom:0; right:0; left:0; width:auto;
+        border-radius:16px 16px 0 0; max-height:70vh;
+      }
+      .layers-toggle { top:12px; right:12px; }
     }
     .ctrl-title {
       font-size:11px; font-weight:600; text-transform:uppercase;
       letter-spacing:.8px; color:var(--wp-text-hint); margin-bottom:8px;
     }
     .ctrl-row { display:flex; align-items:center; gap:8px; margin-bottom:6px; font-size:13px; }
-    .legend {
-      position:absolute; bottom:32px; left:16px; z-index:1001;
-      padding:10px 14px; border-radius:10px;
-      background:var(--wp-surface); box-shadow:0 2px 8px var(--wp-shadow);
-    }
     .leg-row { display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:4px; }
     .leg-dot { width:11px; height:11px; border-radius:50%; flex-shrink:0; }
     .leg-rect {
@@ -211,75 +232,88 @@ interface ActiveMarker {
 
       <map-info-window #infoWindow>
         @if (activeMarker(); as m) {
-          <div style="min-width:160px;font-family:Roboto,sans-serif;padding:4px">
-            <strong style="font-size:14px">{{ m.name }}</strong><br/>
-            <small style="color:#666">{{ m.city }}, {{ m.state }}</small><br/>
-            <span style="font-size:12px;text-transform:capitalize;color:#888">{{ m.sub }}</span>
-            @if (m.rating) {
-              <span style="font-size:12px;color:#f57f17;margin-left:6px">★ {{ m.rating }}</span>
+          <div style="min-width:180px;max-width:220px;font-family:Roboto,sans-serif;overflow:hidden">
+            @if (m.photoUrl) {
+              <img [src]="m.photoUrl" style="width:100%;height:110px;object-fit:cover;display:block"
+                   (error)="$any($event.target).style.display='none'" />
             }
-            <br/>
-            <button (click)="router.navigate(m.route)"
-              style="margin-top:8px;padding:4px 12px;background:#00695C;color:white;border:none;
-                     border-radius:4px;cursor:pointer;font-size:12px">
-              View →
-            </button>
+            <div style="padding:8px">
+              <strong style="font-size:14px;display:block;margin-bottom:2px">{{ m.name }}</strong>
+              <small style="color:#666">{{ m.city }}, {{ m.state }}</small><br/>
+              <span style="font-size:12px;text-transform:capitalize;color:#888">{{ m.sub }}</span>
+              @if (m.rating) {
+                <span style="font-size:12px;color:#f57f17;margin-left:6px">★ {{ m.rating }}</span>
+              }
+              <br/>
+              <button (click)="router.navigate(m.route)"
+                style="margin-top:8px;padding:4px 12px;background:#00695C;color:white;border:none;
+                       border-radius:4px;cursor:pointer;font-size:12px">
+                View →
+              </button>
+            </div>
           </div>
         }
       </map-info-window>
     </google-map>
 
-    <!-- Controls panel -->
-    <div class="controls">
-      <div class="ctrl-title">Layers</div>
-      <div class="ctrl-row">
-        <mat-checkbox [(ngModel)]="showDestinations">
-          Destinations ({{ validDests().length }})
-        </mat-checkbox>
-      </div>
-      <div class="ctrl-row">
-        <mat-checkbox [(ngModel)]="showRestaurants">
-          Restaurants ({{ validRestaurants().length }})
-        </mat-checkbox>
-      </div>
-      <div class="ctrl-row">
-        <mat-checkbox [(ngModel)]="showLodging">
-          Lodging ({{ validLodging().length }})
-        </mat-checkbox>
-      </div>
-      <div class="ctrl-row">
-        <mat-checkbox [(ngModel)]="showSI">
-          Special Interest ({{ validSI().length }})
-        </mat-checkbox>
-      </div>
-      <div class="ctrl-row">
-        <mat-checkbox [(ngModel)]="showStateFill" (ngModelChange)="toggleStateFill($event)">
-          Visited States
-        </mat-checkbox>
-      </div>
-      <mat-divider style="margin:10px 0" />
-      <div class="ctrl-title">Trip Route</div>
-      <mat-select [(ngModel)]="selectedTripId" (selectionChange)="onTripSelect($event.value)"
-                  placeholder="Select a trip" style="width:100%;font-size:13px">
-        <mat-option [value]="null">— None —</mat-option>
-        @for (t of trips(); track t.id) {
-          <mat-option [value]="t.id">{{ t.name }}</mat-option>
-        }
-      </mat-select>
-    </div>
+    <!-- Layers toggle button -->
+    <button class="layers-toggle" (click)="showControls = !showControls">
+      <mat-icon>layers</mat-icon>
+      Layers
+      @if (showControls) { <mat-icon>expand_more</mat-icon> } @else { <mat-icon>chevron_right</mat-icon> }
+    </button>
 
-    <!-- Legend -->
-    <div class="legend">
-      <div class="leg-row"><div class="leg-dot" style="background:#1565c0"></div> Want to Visit</div>
-      <div class="leg-row"><div class="leg-dot" style="background:#f57f17"></div> Planned</div>
-      <div class="leg-row"><div class="leg-dot" style="background:#2e7d32"></div> Visited</div>
-      <div class="leg-row"><div class="leg-dot" style="background:#E65100"></div> Restaurant</div>
-      <div class="leg-row"><div class="leg-dot" style="background:#0277BD"></div> Lodging</div>
-      <div class="leg-row"><div class="leg-dot" style="background:#7B1FA2"></div> Special Interest</div>
-      @if (visitedStates().size > 0) {
-        <div class="leg-row"><div class="leg-rect"></div> Visited States ({{ visitedStates().size }})</div>
-      }
-    </div>
+    <!-- Controls + legend panel -->
+    @if (showControls) {
+      <div class="controls">
+        <div class="ctrl-title">Layers</div>
+        <div class="ctrl-row">
+          <mat-checkbox [(ngModel)]="showDestinations">
+            Destinations ({{ validDests().length }})
+          </mat-checkbox>
+        </div>
+        <div class="ctrl-row">
+          <mat-checkbox [(ngModel)]="showRestaurants">
+            Restaurants ({{ validRestaurants().length }})
+          </mat-checkbox>
+        </div>
+        <div class="ctrl-row">
+          <mat-checkbox [(ngModel)]="showLodging">
+            Lodging ({{ validLodging().length }})
+          </mat-checkbox>
+        </div>
+        <div class="ctrl-row">
+          <mat-checkbox [(ngModel)]="showSI">
+            Special Interest ({{ validSI().length }})
+          </mat-checkbox>
+        </div>
+        <div class="ctrl-row">
+          <mat-checkbox [(ngModel)]="showStateFill" (ngModelChange)="toggleStateFill($event)">
+            Visited States
+          </mat-checkbox>
+        </div>
+        <mat-divider style="margin:10px 0" />
+        <div class="ctrl-title">Trip Route</div>
+        <mat-select [(ngModel)]="selectedTripId" (selectionChange)="onTripSelect($event.value)"
+                    placeholder="Select a trip" style="width:100%;font-size:13px">
+          <mat-option [value]="null">— None —</mat-option>
+          @for (t of trips(); track t.id) {
+            <mat-option [value]="t.id">{{ t.name }}</mat-option>
+          }
+        </mat-select>
+        <mat-divider style="margin:10px 0" />
+        <div class="ctrl-title">Legend</div>
+        <div class="leg-row"><div class="leg-dot" style="background:#1565c0"></div> Want to Visit</div>
+        <div class="leg-row"><div class="leg-dot" style="background:#f57f17"></div> Planned</div>
+        <div class="leg-row"><div class="leg-dot" style="background:#2e7d32"></div> Visited (Dest.)</div>
+        <div class="leg-row"><div class="leg-dot" style="background:#E65100"></div> Restaurant</div>
+        <div class="leg-row"><div class="leg-dot" style="background:#0277BD"></div> Lodging</div>
+        <div class="leg-row"><div class="leg-dot" style="background:#7B1FA2"></div> Special Interest</div>
+        @if (visitedStates().size > 0) {
+          <div class="leg-row"><div class="leg-rect"></div> Visited States ({{ visitedStates().size }})</div>
+        }
+      </div>
+    }
   `,
 })
 export class MapComponent implements OnInit, AfterViewInit {
@@ -308,6 +342,7 @@ export class MapComponent implements OnInit, AfterViewInit {
   showLodging       = true;
   showSI            = true;
   showStateFill     = true;
+  showControls      = false;
   selectedTripId: number | null = null;
 
   directionsResult = signal<google.maps.DirectionsResult | null>(null);
@@ -489,6 +524,7 @@ export class MapComponent implements OnInit, AfterViewInit {
       type: 'destination', id: d.id, name: d.name,
       city: d.city, state: d.state_province,
       sub: d.status.replace(/_/g, ' '),
+      photoUrl: primaryPhotoUrl(d),
       route: ['/destinations', String(d.id)],
     });
     this.infoWindow.open(marker);
@@ -500,6 +536,7 @@ export class MapComponent implements OnInit, AfterViewInit {
       city: r.city, state: r.state_province,
       sub: r.cuisine_type ?? 'Restaurant',
       rating: r.rating,
+      photoUrl: primaryPhotoUrl(r),
       route: ['/restaurants', String(r.id)],
     });
     this.infoWindow.open(marker);
@@ -511,6 +548,7 @@ export class MapComponent implements OnInit, AfterViewInit {
       city: l.city, state: l.state_province,
       sub: l.lodging_type,
       rating: l.room_quality,
+      photoUrl: primaryPhotoUrl(l),
       route: ['/lodging', String(l.id)],
     });
     this.infoWindow.open(marker);
@@ -522,6 +560,7 @@ export class MapComponent implements OnInit, AfterViewInit {
       city: si.city, state: si.state_province,
       sub: si.category ?? 'Special Interest',
       rating: si.rating,
+      photoUrl: primaryPhotoUrl(si),
       route: ['/special-interests', String(si.id)],
     });
     this.infoWindow.open(marker);

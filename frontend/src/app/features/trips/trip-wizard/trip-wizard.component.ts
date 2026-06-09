@@ -1,6 +1,6 @@
 import {
   Component, OnInit, OnDestroy, ChangeDetectionStrategy,
-  inject, signal, computed,
+  inject, signal, computed, ViewChild,
 } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, FormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -26,6 +26,9 @@ import { SettingsService } from '../../../core/services/settings.service';
 import { TripDraftService } from '../../../core/services/trip-draft.service';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 import { MapsService } from '../../../core/services/maps.service';
+import {
+  PlacesAutocompleteComponent, PlaceSelectedEvent,
+} from '../../../shared/components/places-autocomplete/places-autocomplete.component';
 import {
   WizardPlan, WizardStop, WizardGenerateRequest, TripType,
 } from '../../../types/schema.types';
@@ -67,6 +70,7 @@ const STOP_TIMINGS = [
     MatDatepickerModule, MatButtonModule, MatIconModule, MatSlideToggleModule,
     MatSliderModule, MatProgressSpinnerModule, MatDividerModule, MatCheckboxModule,
     MatExpansionModule, MatSnackBarModule, MatTooltipModule, PageHeaderComponent,
+    PlacesAutocompleteComponent,
   ],
   styles: [`
     .wizard-wrap { max-width:900px; margin:0 auto; padding:24px; }
@@ -203,6 +207,21 @@ const STOP_TIMINGS = [
     /* Step 4 */
     .confirmed { text-align:center; padding:60px 20px; }
     .confirmed-icon { font-size:72px; display:block; margin-bottom:16px; }
+
+    /* Origin/destination autocomplete display */
+    .place-field { margin-bottom:12px; }
+    .place-label { font-size:12px; font-weight:600; margin:0 0 4px; color:var(--wp-text-secondary); }
+    .place-selected { font-size:12px; color:var(--wp-primary); margin:4px 0 0;
+                      display:flex; align-items:center; gap:4px; }
+
+    /* Mobile responsive */
+    @media (max-width:768px) {
+      .wizard-wrap { padding:16px 16px 100px; }
+      .basics-grid { grid-template-columns:1fr; }
+      .trip-type-grid { grid-template-columns:1fr; }
+      .suggestion-grid { grid-template-columns:1fr; }
+      .route-map { height:220px; }
+    }
   `],
   template: `
     <app-page-header title="Plan a Trip" backRoute="/trips" />
@@ -235,24 +254,32 @@ const STOP_TIMINGS = [
                 <input matInput formControlName="name" placeholder="e.g. Nashville Summer Run" />
               </mat-form-field>
 
-              <div>
-                <mat-form-field appearance="outline" style="width:100%">
-                  <mat-label>Starting from *</mat-label>
-                  <input matInput formControlName="origin" placeholder="Address or city" />
-                </mat-form-field>
-                @if (!form.value.origin) {
-                  <button type="button" mat-stroked-button style="margin-top:-8px;margin-bottom:8px;font-size:12px"
-                          (click)="useHome()">
-                    <mat-icon style="font-size:16px;width:16px;height:16px">home</mat-icon>
-                    Use My Home
-                  </button>
+              <div class="place-field">
+                <p class="place-label">Starting from *</p>
+                <app-places-autocomplete
+                  #originAC
+                  placeholder="Search starting city or address…"
+                  (placeSelected)="onOriginSelected($event)" />
+                @if (originDisplay()) {
+                  <p class="place-selected"><mat-icon style="font-size:14px;width:14px;height:14px">place</mat-icon> {{ originDisplay() }}</p>
                 }
+                <button type="button" mat-stroked-button style="margin-top:6px;font-size:12px"
+                        (click)="useHome()">
+                  <mat-icon style="font-size:16px;width:16px;height:16px">home</mat-icon>
+                  Use My Home
+                </button>
               </div>
 
-              <mat-form-field appearance="outline">
-                <mat-label>Destination *</mat-label>
-                <input matInput formControlName="destination" placeholder="Nashville, TN or full address" />
-              </mat-form-field>
+              <div class="place-field">
+                <p class="place-label">Destination *</p>
+                <app-places-autocomplete
+                  #destAC
+                  placeholder="Search destination city or address…"
+                  (placeSelected)="onDestSelected($event)" />
+                @if (destDisplay()) {
+                  <p class="place-selected"><mat-icon style="font-size:14px;width:14px;height:14px">place</mat-icon> {{ destDisplay() }}</p>
+                }
+              </div>
 
               <mat-form-field appearance="outline">
                 <mat-label>Start date *</mat-label>
@@ -645,6 +672,12 @@ export class TripWizardComponent implements OnInit, OnDestroy {
   private draftSvc    = inject(TripDraftService);
   private mapsSvc     = inject(MapsService);
 
+  @ViewChild('originAC') originAC?: PlacesAutocompleteComponent;
+  @ViewChild('destAC')   destAC?:   PlacesAutocompleteComponent;
+
+  originDisplay = signal('');
+  destDisplay   = signal('');
+
   // ── Step state ──────────────────────────────────────────────────────
   step        = signal(1);
   plan        = signal<WizardPlan | null>(null);
@@ -709,20 +742,42 @@ export class TripWizardComponent implements OnInit, OnDestroy {
     const draft = this.draftSvc.consume();
     if (draft) {
       const label = [draft.city || draft.destination, draft.state_province].filter(Boolean).join(', ');
-      if (label) this.form.patchValue({ destination: label });
+      if (label) {
+        this.form.patchValue({ destination: label });
+        this.destDisplay.set(label);
+        setTimeout(() => this.destAC?.setValue(label));
+      }
     }
 
     this.settingsSvc.load().subscribe(s => {
       const patch: Record<string, unknown> = {};
-      if (s.home_address)      patch['origin']             = s.home_address;
+      if (s.home_address) {
+        patch['origin'] = s.home_address;
+        this.originDisplay.set(s.home_address);
+        setTimeout(() => this.originAC?.setValue(s.home_address));
+      }
       if (s.drive_hours_per_day) patch['drive_hours_per_day'] = Number(s.drive_hours_per_day);
       this.form.patchValue(patch);
     });
   }
 
+  onOriginSelected(e: PlaceSelectedEvent) {
+    this.form.patchValue({ origin: e.formatted_address });
+    this.originDisplay.set(e.formatted_address);
+  }
+
+  onDestSelected(e: PlaceSelectedEvent) {
+    this.form.patchValue({ destination: e.formatted_address });
+    this.destDisplay.set(e.formatted_address);
+  }
+
   useHome() {
     const s = this.settingsSvc.settings();
-    this.form.patchValue({ origin: s.home_address || '8404 Union Drive, Galloway, Ohio 43119' });
+    const addr = s.home_address || '';
+    if (!addr) return;
+    this.form.patchValue({ origin: addr });
+    this.originDisplay.set(addr);
+    setTimeout(() => this.originAC?.setValue(addr));
   }
 
   // ── Progress ticker ─────────────────────────────────────────────────

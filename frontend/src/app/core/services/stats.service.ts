@@ -25,6 +25,7 @@ export interface StatsResponse {
     want_to_visit: number;
     planned: number;
     visited: number;
+    visited_states_count: number;
     top_states: { state_province: string; count: number }[];
   };
   trips: {

@@ -12,17 +12,19 @@ router.get('/', asyncHandler(async (_req, res) => {
       // Destination counts by status
       pool.query(`
         SELECT
-          COUNT(*)::int                                               AS total,
-          COUNT(*) FILTER (WHERE status='want_to_visit')::int        AS want_to_visit,
-          COUNT(*) FILTER (WHERE status='planned')::int              AS planned,
-          COUNT(*) FILTER (WHERE status='visited')::int              AS visited
+          COUNT(*)::int                                                              AS total,
+          COUNT(*) FILTER (WHERE status='want_to_visit')::int                       AS want_to_visit,
+          COUNT(*) FILTER (WHERE status='planned')::int                             AS planned,
+          COUNT(*) FILTER (WHERE status='visited')::int                             AS visited,
+          COUNT(DISTINCT state_province) FILTER (WHERE status='visited')::int       AS visited_states_count
         FROM destinations
       `),
 
-      // Top 5 states by destination count
+      // Top 5 visited states by destination count
       pool.query(`
         SELECT state_province, COUNT(*)::int AS count
         FROM destinations
+        WHERE status = 'visited'
         GROUP BY state_province
         ORDER BY count DESC
         LIMIT 5
