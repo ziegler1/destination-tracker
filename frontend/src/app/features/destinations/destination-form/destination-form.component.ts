@@ -17,7 +17,7 @@ import { COMMA, ENTER } from '@angular/cdk/keycodes';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
 import { PhotoUploaderComponent } from '../../../shared/photo-uploader/photo-uploader.component';
-import { Destination } from '../../../types/schema.types';
+import { EntityPhoto } from '../../../core/services/photo.service';
 import { HttpErrorResponse } from '@angular/common/http';
 import { DestinationService } from '../../../core/services/destination.service';
 import { GeocodingService } from '../../../core/services/geocoding.service';
@@ -257,7 +257,7 @@ export class DestinationFormComponent implements OnInit {
   geoLoading = signal(false);
   error      = signal('');
   selectedMonths = signal<string[]>([]);
-  photos = signal<Destination['photos']>([]);
+  photos = signal<EntityPhoto[]>([]);
 
   readonly separatorKeys = [ENTER, COMMA];
   readonly allMonths = MONTHS;
@@ -281,7 +281,7 @@ export class DestinationFormComponent implements OnInit {
     travel_tips:    [''],
   });
 
-  private destId?: number;
+  destId?: number;
 
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
@@ -294,7 +294,7 @@ export class DestinationFormComponent implements OnInit {
           visited_at: d.visited_at ? new Date(d.visited_at) : null,
         });
         this.selectedMonths.set(d.best_months ?? []);
-        this.photos.set(d.photos ?? []);
+        this.photos.set((d.photos ?? []) as EntityPhoto[]);
         this.updateFilteredMonths();
       });
     } else {

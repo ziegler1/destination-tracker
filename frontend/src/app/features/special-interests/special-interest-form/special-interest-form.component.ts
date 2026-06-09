@@ -17,7 +17,7 @@ import { ClaudeService } from '../../../core/services/claude.service';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 import { PlacesAutocompleteComponent, PlaceSelectedEvent } from '../../../shared/components/places-autocomplete/places-autocomplete.component';
 import { PhotoUploaderComponent } from '../../../shared/photo-uploader/photo-uploader.component';
-import { SpecialInterestPlace } from '../../../types/schema.types';
+import { EntityPhoto } from '../../../core/services/photo.service';
 
 const CATEGORY_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'winery_brewery',      label: 'Winery / Brewery' },
@@ -282,7 +282,7 @@ export class SpecialInterestFormComponent implements OnInit {
   loading    = signal(false);
   saving     = signal(false);
   placeId    = signal<number | null>(null);
-  photos     = signal<SpecialInterestPlace['photos']>([]);
+  photos     = signal<EntityPhoto[]>([]);
 
   readonly categoryOptions = CATEGORY_OPTIONS;
 
@@ -317,7 +317,7 @@ export class SpecialInterestFormComponent implements OnInit {
       this.svc.get(+id).subscribe({
         next: (p) => {
           this.form.patchValue(p);
-          this.photos.set(p.photos ?? []);
+          this.photos.set((p.photos ?? []) as EntityPhoto[]);
           this.loading.set(false);
         },
         error: () => this.router.navigate(['/special-interests']),
@@ -364,7 +364,7 @@ export class SpecialInterestFormComponent implements OnInit {
   reloadPhotos() {
     const id = this.placeId();
     if (!id) return;
-    this.svc.get(id).subscribe((p) => this.photos.set(p.photos ?? []));
+    this.svc.get(id).subscribe((p) => this.photos.set((p.photos ?? []) as EntityPhoto[]));
   }
 
   lookupCoords() {

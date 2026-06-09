@@ -18,7 +18,7 @@ import { ClaudeService } from '../../../core/services/claude.service';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 import { PlacesAutocompleteComponent, PlaceSelectedEvent } from '../../../shared/components/places-autocomplete/places-autocomplete.component';
 import { PhotoUploaderComponent } from '../../../shared/photo-uploader/photo-uploader.component';
-import { Restaurant } from '../../../types/schema.types';
+import { EntityPhoto } from '../../../core/services/photo.service';
 
 const CUISINES = [
   'American', 'BBQ', 'Bakery / Cafe', 'Breakfast', 'Burgers', 'Chinese',
@@ -273,7 +273,7 @@ export class RestaurantFormComponent implements OnInit {
   loading = signal(false);
   saving = signal(false);
   restaurantId = signal<number | null>(null);
-  photos = signal<Restaurant['photos']>([]);
+  photos = signal<EntityPhoto[]>([]);
 
   readonly cuisines = CUISINES;
 
@@ -307,7 +307,7 @@ export class RestaurantFormComponent implements OnInit {
       this.svc.get(+id).subscribe({
         next: (r) => {
           this.form.patchValue({ ...r, price_range: r.price_range ?? '' });
-          this.photos.set(r.photos ?? []);
+          this.photos.set((r.photos ?? []) as EntityPhoto[]);
           this.loading.set(false);
         },
         error: () => this.router.navigate(['/restaurants']),
@@ -356,7 +356,7 @@ export class RestaurantFormComponent implements OnInit {
   reloadPhotos() {
     const id = this.restaurantId();
     if (!id) return;
-    this.svc.get(id).subscribe((r) => this.photos.set(r.photos ?? []));
+    this.svc.get(id).subscribe((r) => this.photos.set((r.photos ?? []) as EntityPhoto[]));
   }
 
   lookupCoords() {

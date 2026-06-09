@@ -20,7 +20,7 @@ import { ClaudeService } from '../../../core/services/claude.service';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 import { PlacesAutocompleteComponent, PlaceSelectedEvent } from '../../../shared/components/places-autocomplete/places-autocomplete.component';
 import { PhotoUploaderComponent } from '../../../shared/photo-uploader/photo-uploader.component';
-import { Lodging } from '../../../types/schema.types';
+import { EntityPhoto } from '../../../core/services/photo.service';
 
 const AMENITY_SUGGESTIONS = [
   'AC', 'Breakfast', 'EV Charging', 'Fireplace', 'Fitness Center', 'Hot Tub',
@@ -320,7 +320,7 @@ export class LodgingFormComponent implements OnInit {
   saving = signal(false);
   lodgingId = signal<number | null>(null);
   amenities = signal<string[]>([]);
-  photos = signal<Lodging['photos']>([]);
+  photos = signal<EntityPhoto[]>([]);
 
   readonly separatorKeys = [ENTER, COMMA];
   readonly amenitySuggestions = AMENITY_SUGGESTIONS;
@@ -357,7 +357,7 @@ export class LodgingFormComponent implements OnInit {
         next: (l) => {
           this.form.patchValue(l);
           this.amenities.set(l.amenities ?? []);
-          this.photos.set(l.photos ?? []);
+          this.photos.set((l.photos ?? []) as EntityPhoto[]);
           this.loading.set(false);
         },
         error: () => this.router.navigate(['/lodging']),
@@ -414,7 +414,7 @@ export class LodgingFormComponent implements OnInit {
   reloadPhotos() {
     const id = this.lodgingId();
     if (!id) return;
-    this.svc.get(id).subscribe((l) => this.photos.set(l.photos ?? []));
+    this.svc.get(id).subscribe((l) => this.photos.set((l.photos ?? []) as EntityPhoto[]));
   }
 
   lookupCoords() {
