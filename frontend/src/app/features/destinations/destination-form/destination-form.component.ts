@@ -16,6 +16,8 @@ import { MatDatepickerModule } from '@angular/material/datepicker';
 import { COMMA, ENTER } from '@angular/cdk/keycodes';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
+import { PhotoUploaderComponent } from '../../../shared/photo-uploader/photo-uploader.component';
+import { Destination } from '../../../types/schema.types';
 import { HttpErrorResponse } from '@angular/common/http';
 import { DestinationService } from '../../../core/services/destination.service';
 import { GeocodingService } from '../../../core/services/geocoding.service';
@@ -34,7 +36,7 @@ const MONTHS = [
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    RouterLink, ReactiveFormsModule, PlacesAutocompleteComponent,
+    RouterLink, ReactiveFormsModule, PlacesAutocompleteComponent, PhotoUploaderComponent,
     MatCardModule, MatFormFieldModule, MatInputModule, MatSelectModule,
     MatChipsModule, MatAutocompleteModule, MatIconModule, MatButtonModule,
     MatProgressSpinnerModule, MatDatepickerModule, MatSnackBarModule,
@@ -46,14 +48,21 @@ const MONTHS = [
     .form-card { max-width: 720px; margin: 0 auto; }
     .form-title { font-size:22px; font-weight:700; margin-bottom:20px; }
     .row { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
-    @media(max-width:600px){ .row { grid-template-columns:1fr; } }
+    @media(max-width:600px){
+      .row { grid-template-columns:1fr; }
+      mat-card-content { padding-bottom: 140px; }
+    }
     mat-form-field { width:100%; margin-bottom:4px; }
     .section { margin:16px 0 8px; font-size:13px; font-weight:600;
                 text-transform:uppercase; letter-spacing:.7px; color:var(--wp-text-secondary); }
     .star-row { display:flex; gap:4px; margin:8px 0 16px; }
     .star-btn  { cursor:pointer; font-size:28px; color:var(--wp-border); transition:color .15s; }
     .star-btn.active { color:#FFB300; }
-    .actions { display:flex; gap:12px; justify-content:flex-end; margin-top:8px; }
+    .actions {
+      display:flex; gap:12px; justify-content:flex-end; margin-top:8px;
+      position:sticky; bottom:0; background:var(--wp-surface);
+      padding:12px 0 8px; border-top:1px solid var(--wp-border); z-index:10;
+    }
     .err { font-size:12px; color:#c62828; margin-bottom:4px; }
   `],
   template: `
@@ -219,6 +228,16 @@ const MONTHS = [
               </button>
             </div>
           </form>
+
+          <!-- Rule 3: Photo upload in edit mode -->
+          @if (isEdit()) {
+            <p class="section" style="margin-top:24px">Photos</p>
+            <app-photo-uploader
+              entityType="destinations"
+              [entityId]="destId!"
+              [photos]="photos()"
+              (changed)="reloadPhotos()" />
+          }
         </mat-card-content>
       </mat-card>
     </div>
@@ -236,8 +255,9 @@ export class DestinationFormComponent implements OnInit {
   isEdit     = signal(false);
   saving     = signal(false);
   geoLoading = signal(false);
-  error = signal('');
+  error      = signal('');
   selectedMonths = signal<string[]>([]);
+  photos = signal<Destination['photos']>([]);
 
   readonly separatorKeys = [ENTER, COMMA];
   readonly allMonths = MONTHS;
@@ -274,6 +294,7 @@ export class DestinationFormComponent implements OnInit {
           visited_at: d.visited_at ? new Date(d.visited_at) : null,
         });
         this.selectedMonths.set(d.best_months ?? []);
+        this.photos.set(d.photos ?? []);
         this.updateFilteredMonths();
       });
     } else {
@@ -294,6 +315,11 @@ export class DestinationFormComponent implements OnInit {
   }
 
   setRating(n: number): void { this.form.patchValue({ rating: n }); }
+
+  reloadPhotos(): void {
+    if (!this.destId) return;
+    this.svc.get(this.destId).subscribe((d) => this.photos.set(d.photos ?? []));
+  }
 
   /** Called when the Places Autocomplete emits a selection — auto-fills all location fields. */
   onPlaceSelected(place: PlaceSelectedEvent): void {

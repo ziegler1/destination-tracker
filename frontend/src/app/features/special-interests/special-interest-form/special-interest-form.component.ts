@@ -13,7 +13,11 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { SpecialInterestService } from '../../../core/services/special-interest.service';
 import { GeocodingService } from '../../../core/services/geocoding.service';
+import { ClaudeService } from '../../../core/services/claude.service';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
+import { PlacesAutocompleteComponent, PlaceSelectedEvent } from '../../../shared/components/places-autocomplete/places-autocomplete.component';
+import { PhotoUploaderComponent } from '../../../shared/photo-uploader/photo-uploader.component';
+import { SpecialInterestPlace } from '../../../types/schema.types';
 
 const CATEGORY_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'winery_brewery',      label: 'Winery / Brewery' },
@@ -34,7 +38,7 @@ const CATEGORY_OPTIONS: Array<{ value: string; label: string }> = [
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    RouterLink, ReactiveFormsModule,
+    RouterLink, ReactiveFormsModule, PlacesAutocompleteComponent, PhotoUploaderComponent,
     MatCardModule, MatFormFieldModule, MatInputModule, MatSelectModule,
     MatButtonModule, MatIconModule, MatProgressSpinnerModule, MatSnackBarModule,
     PageHeaderComponent,
@@ -43,11 +47,26 @@ const CATEGORY_OPTIONS: Array<{ value: string; label: string }> = [
     mat-card { max-width:720px; margin:0 auto; padding:24px; }
     .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
     .full { grid-column:1/-1; }
-    @media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } }
-    .actions { display:flex; gap:12px; margin-top:8px; }
+    @media (max-width: 600px) {
+      .form-grid { grid-template-columns: 1fr; }
+      mat-card { padding: 16px; padding-bottom: 140px; }
+    }
+    .section {
+      grid-column:1/-1; font-size:12px; font-weight:600; text-transform:uppercase;
+      letter-spacing:.7px; color:var(--wp-text-secondary); margin:12px 0 0;
+      padding-bottom:6px; border-bottom:1px solid var(--wp-border);
+    }
+    .actions {
+      position:sticky; bottom:0; background:var(--wp-surface);
+      padding:12px 0 8px; margin-top:16px;
+      border-top:1px solid var(--wp-border); z-index:10;
+      display:flex; gap:12px;
+    }
     .star-row { display:flex; gap:4px; cursor:pointer; }
     .star-btn { font-size:26px; background:none; border:none; cursor:pointer; padding:0; line-height:1; }
     .rating-label { font-size:13px; color:var(--wp-text-secondary); margin-bottom:4px; }
+    .ai-row { display:flex; gap:8px; align-items:flex-start; }
+    .ai-row mat-form-field { flex:1; }
     h2 { margin:0 0 20px; font-size:20px; font-weight:600; }
   `],
   template: `
@@ -60,8 +79,18 @@ const CATEGORY_OPTIONS: Array<{ value: string; label: string }> = [
         <mat-card>
           <h2>{{ isEdit() ? 'Edit Place' : 'Add Place' }}</h2>
 
+          <!-- Rule 1: Search-first -->
+          <app-places-autocomplete
+            placeholder="Search place by name + city…"
+            [types]="['establishment']"
+            (placeSelected)="onPlace($event)"
+            style="display:block;margin-bottom:12px" />
+
           <form [formGroup]="form" (ngSubmit)="submit()">
             <div class="form-grid">
+
+              <!-- Section: Basics -->
+              <p class="section">Basics</p>
 
               <mat-form-field appearance="outline">
                 <mat-label>Name *</mat-label>
@@ -76,6 +105,25 @@ const CATEGORY_OPTIONS: Array<{ value: string; label: string }> = [
                   }
                 </mat-select>
               </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Price Range</mat-label>
+                <mat-select formControlName="price_range">
+                  <mat-option [value]="null">Not specified</mat-option>
+                  <mat-option value="$">$ — Budget</mat-option>
+                  <mat-option value="$$">$$ — Moderate</mat-option>
+                  <mat-option value="$$$">$$$ — Upscale</mat-option>
+                  <mat-option value="$$$$">$$$$ — Fine Dining</mat-option>
+                </mat-select>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Date Visited</mat-label>
+                <input matInput type="date" formControlName="visited_at" />
+              </mat-form-field>
+
+              <!-- Section: Location -->
+              <p class="section">Location</p>
 
               <mat-form-field appearance="outline">
                 <mat-label>City *</mat-label>
@@ -116,6 +164,9 @@ const CATEGORY_OPTIONS: Array<{ value: string; label: string }> = [
                 <input matInput type="number" step="any" formControlName="longitude" />
               </mat-form-field>
 
+              <!-- Section: Contact -->
+              <p class="section">Contact &amp; Links</p>
+
               <mat-form-field appearance="outline">
                 <mat-label>Phone</mat-label>
                 <input matInput formControlName="phone" />
@@ -124,54 +175,6 @@ const CATEGORY_OPTIONS: Array<{ value: string; label: string }> = [
               <mat-form-field appearance="outline">
                 <mat-label>Website</mat-label>
                 <input matInput formControlName="website" />
-              </mat-form-field>
-
-              <!-- Rating -->
-              <div>
-                <p class="rating-label">Rating</p>
-                <div class="star-row">
-                  @for (i of [1,2,3,4,5]; track i) {
-                    <button type="button" class="star-btn" (click)="form.patchValue({rating:i})">
-                      {{ i <= (form.value.rating ?? 0) ? '⭐' : '☆' }}
-                    </button>
-                  }
-                </div>
-              </div>
-
-              <!-- Would return -->
-              <mat-form-field appearance="outline">
-                <mat-label>Would return?</mat-label>
-                <mat-select formControlName="would_return">
-                  <mat-option [value]="null">Not rated</mat-option>
-                  <mat-option [value]="true">Yes ✓</mat-option>
-                  <mat-option [value]="false">No ✗</mat-option>
-                </mat-select>
-              </mat-form-field>
-
-              <mat-form-field appearance="outline" class="full">
-                <mat-label>Highlights</mat-label>
-                <textarea matInput formControlName="highlights" rows="2"></textarea>
-              </mat-form-field>
-
-              <mat-form-field appearance="outline" class="full">
-                <mat-label>Notes</mat-label>
-                <textarea matInput formControlName="notes" rows="2"></textarea>
-              </mat-form-field>
-
-              <mat-form-field appearance="outline">
-                <mat-label>Price Range</mat-label>
-                <mat-select formControlName="price_range">
-                  <mat-option [value]="null">Not specified</mat-option>
-                  <mat-option value="$">$ — Budget</mat-option>
-                  <mat-option value="$$">$$ — Moderate</mat-option>
-                  <mat-option value="$$$">$$$ — Upscale</mat-option>
-                  <mat-option value="$$$$">$$$$ — Fine Dining</mat-option>
-                </mat-select>
-              </mat-form-field>
-
-              <mat-form-field appearance="outline">
-                <mat-label>Date Visited</mat-label>
-                <input matInput type="date" formControlName="visited_at" />
               </mat-form-field>
 
               <mat-form-field appearance="outline" class="full">
@@ -184,6 +187,52 @@ const CATEGORY_OPTIONS: Array<{ value: string; label: string }> = [
                 <input matInput formControlName="menu_url" placeholder="https://…" />
               </mat-form-field>
 
+              <!-- Section: Your Experience -->
+              <p class="section">Your Experience</p>
+
+              <div>
+                <p class="rating-label">Rating</p>
+                <div class="star-row">
+                  @for (i of [1,2,3,4,5]; track i) {
+                    <button type="button" class="star-btn" (click)="form.patchValue({rating:i})">
+                      {{ i <= (form.value.rating ?? 0) ? '⭐' : '☆' }}
+                    </button>
+                  }
+                </div>
+              </div>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Would return?</mat-label>
+                <mat-select formControlName="would_return">
+                  <mat-option [value]="null">Not rated</mat-option>
+                  <mat-option [value]="true">Yes ✓</mat-option>
+                  <mat-option [value]="false">No ✗</mat-option>
+                </mat-select>
+              </mat-form-field>
+
+              <!-- Section: Notes & Highlights -->
+              <p class="section">Notes &amp; Highlights</p>
+
+              <!-- Rule 4: Highlights + AI button -->
+              <div class="full ai-row">
+                <mat-form-field appearance="outline">
+                  <mat-label>Highlights</mat-label>
+                  <textarea matInput formControlName="highlights" rows="2"></textarea>
+                </mat-form-field>
+                <button type="button" mat-stroked-button (click)="generateHighlights()"
+                        [disabled]="aiLoading() || !form.value.name"
+                        style="margin-top:4px;white-space:nowrap">
+                  @if (aiLoading()) { <mat-spinner diameter="16" style="display:inline-block" /> }
+                  @else { <mat-icon>auto_awesome</mat-icon> }
+                  AI
+                </button>
+              </div>
+
+              <mat-form-field appearance="outline" class="full">
+                <mat-label>Notes</mat-label>
+                <textarea matInput formControlName="notes" rows="2"></textarea>
+              </mat-form-field>
+
               <mat-form-field appearance="outline" class="full">
                 <mat-label>Image URL (fallback)</mat-label>
                 <input matInput formControlName="image_url" />
@@ -191,6 +240,19 @@ const CATEGORY_OPTIONS: Array<{ value: string; label: string }> = [
 
             </div>
 
+            <!-- Rule 3: Photo upload in edit mode -->
+            @if (isEdit()) {
+              <p style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.7px;
+                         color:var(--wp-text-secondary);margin:20px 0 12px;padding-bottom:6px;
+                         border-bottom:1px solid var(--wp-border)">Photos</p>
+              <app-photo-uploader
+                entityType="special-interests"
+                [entityId]="placeId()!"
+                [photos]="photos()"
+                (changed)="reloadPhotos()" />
+            }
+
+            <!-- Rule 5: Sticky actions -->
             <div class="actions">
               <button mat-raised-button color="primary" type="submit" [disabled]="form.invalid || saving()">
                 {{ saving() ? 'Saving…' : (isEdit() ? 'Update' : 'Add Place') }}
@@ -206,18 +268,21 @@ const CATEGORY_OPTIONS: Array<{ value: string; label: string }> = [
   `,
 })
 export class SpecialInterestFormComponent implements OnInit {
-  private route = inject(ActivatedRoute);
-  private router = inject(Router);
-  private svc = inject(SpecialInterestService);
-  private geoSvc = inject(GeocodingService);
-  private snack  = inject(MatSnackBar);
-  private fb     = inject(FormBuilder);
+  private route     = inject(ActivatedRoute);
+  private router    = inject(Router);
+  private svc       = inject(SpecialInterestService);
+  private geoSvc    = inject(GeocodingService);
+  private claudeSvc = inject(ClaudeService);
+  private snack     = inject(MatSnackBar);
+  private fb        = inject(FormBuilder);
 
   isEdit     = signal(false);
   geoLoading = signal(false);
-  loading = signal(false);
-  saving = signal(false);
-  placeId = signal<number | null>(null);
+  aiLoading  = signal(false);
+  loading    = signal(false);
+  saving     = signal(false);
+  placeId    = signal<number | null>(null);
+  photos     = signal<SpecialInterestPlace['photos']>([]);
 
   readonly categoryOptions = CATEGORY_OPTIONS;
 
@@ -252,11 +317,54 @@ export class SpecialInterestFormComponent implements OnInit {
       this.svc.get(+id).subscribe({
         next: (p) => {
           this.form.patchValue(p);
+          this.photos.set(p.photos ?? []);
           this.loading.set(false);
         },
         error: () => this.router.navigate(['/special-interests']),
       });
     }
+  }
+
+  onPlace(e: PlaceSelectedEvent) {
+    this.form.patchValue({
+      name:           e.name || this.form.value.name,
+      city:           e.city,
+      state_province: e.state_province,
+      country:        e.country,
+      address:        e.formatted_address,
+      latitude:       e.lat,
+      longitude:      e.lng,
+      phone:          e.phone   ?? this.form.value.phone,
+      website:        e.website ?? this.form.value.website,
+    });
+  }
+
+  generateHighlights() {
+    const v = this.form.getRawValue();
+    if (!v.name) return;
+    this.aiLoading.set(true);
+    this.claudeSvc.generateHighlights({
+      type: 'special_interest',
+      name: v.name,
+      city: v.city ?? '',
+      state: v.state_province ?? '',
+      details: v.category ?? undefined,
+    }).subscribe({
+      next: (res) => {
+        this.form.patchValue({ highlights: res.result });
+        this.aiLoading.set(false);
+      },
+      error: () => {
+        this.snack.open('AI generation failed', 'Dismiss', { duration: 3000 });
+        this.aiLoading.set(false);
+      },
+    });
+  }
+
+  reloadPhotos() {
+    const id = this.placeId();
+    if (!id) return;
+    this.svc.get(id).subscribe((p) => this.photos.set(p.photos ?? []));
   }
 
   lookupCoords() {
