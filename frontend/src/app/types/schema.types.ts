@@ -316,6 +316,8 @@ export interface SpecialInterestPlace {
   menu_url?: string;
   suggested_by_ai?: boolean;
   google_place_id?: string;
+  site_info?: ScrapedSiteInfo | null;
+  site_info_fetched_at?: string | null;
   created_at: string;
   updated_at: string;
   photos?: SpecialInterestPhoto[];

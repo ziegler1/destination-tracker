@@ -29,12 +29,35 @@ import { Restaurant } from '../../../types/schema.types';
     MiniMapComponent, PhotoUploaderComponent, PageHeaderComponent,
   ],
   styles: [`
-    .hero { width:100%; max-height:340px; object-fit:cover; border-radius:12px; margin-bottom:20px; }
+    .hero-wrap {
+      position:relative; width:100%; border-radius:12px; overflow:hidden;
+      margin-bottom:20px; background:#000;
+    }
+    .hero-wrap img { width:100%; max-height:340px; height:340px; object-fit:cover; display:block; }
+    @media(max-width:768px) { .hero-wrap img { max-height:220px; height:220px; } }
     .hero-placeholder {
       width:100%; height:220px; border-radius:12px; margin-bottom:20px;
       background:linear-gradient(135deg,#e65100,#ff6d00);
       display:flex; align-items:center; justify-content:center; font-size:64px;
     }
+    .carousel-btn {
+      position:absolute; top:50%; transform:translateY(-50%);
+      background:rgba(0,0,0,.45); color:#fff; border:none; border-radius:50%;
+      width:36px; height:36px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+      padding:0;
+    }
+    .carousel-btn:disabled { opacity:.3; cursor:default; }
+    .carousel-btn-prev { left:10px; }
+    .carousel-btn-next { right:10px; }
+    .carousel-dots {
+      position:absolute; bottom:10px; left:50%; transform:translateX(-50%);
+      display:flex; gap:6px;
+    }
+    .carousel-dot {
+      width:8px; height:8px; border-radius:50%; border:none; padding:0; cursor:pointer;
+      background:rgba(255,255,255,.5); transition:background .2s;
+    }
+    .carousel-dot.active { background:#fff; }
     .header-row { display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:16px; }
     .title { font-size:26px; font-weight:700; margin:0; }
     .subtitle { font-size:14px; color:var(--wp-text-secondary); margin:4px 0 0; }
@@ -80,8 +103,23 @@ import { Restaurant } from '../../../types/schema.types';
       <app-page-header [title]="r.name" backRoute="/restaurants" />
       <div class="page-container">
 
-        @if (heroPhoto(r)) {
-          <img class="hero" [src]="heroPhoto(r)!" [alt]="r.name" />
+        @if (photoUrls(r).length > 0) {
+          <div class="hero-wrap">
+            <img [src]="photoUrls(r)[photoIdx()]" [alt]="r.name" />
+            @if (photoUrls(r).length > 1) {
+              <button class="carousel-btn carousel-btn-prev" (click)="photoIdx.set(photoIdx()-1)" [disabled]="photoIdx()===0">
+                <mat-icon>chevron_left</mat-icon>
+              </button>
+              <button class="carousel-btn carousel-btn-next" (click)="photoIdx.set(photoIdx()+1)" [disabled]="photoIdx()===photoUrls(r).length-1">
+                <mat-icon>chevron_right</mat-icon>
+              </button>
+              <div class="carousel-dots">
+                @for (url of photoUrls(r); track url; let i = $index) {
+                  <button class="carousel-dot" [class.active]="photoIdx()===i" (click)="photoIdx.set(i)"></button>
+                }
+              </div>
+            }
+          </div>
         } @else {
           <div class="hero-placeholder">🍽️</div>
         }
@@ -262,6 +300,7 @@ export class RestaurantDetailComponent implements OnInit {
   aiDescription = signal('');
   siteInfoLoading = signal(false);
   siteInfo     = signal<ScrapedSiteInfo | null>(null);
+  photoIdx     = signal(0);
 
   ngOnInit() {
     const id = Number(this.route.snapshot.paramMap.get('id'));
@@ -271,9 +310,13 @@ export class RestaurantDetailComponent implements OnInit {
     });
   }
 
-  heroPhoto(r: Restaurant): string | null {
-    const p = r.photos?.find((ph) => ph.is_primary) ?? r.photos?.[0];
-    return p?.url ?? r.image_url ?? null;
+  photoUrls(r: Restaurant): string[] {
+    const fromPhotos = (r.photos ?? [])
+      .slice()
+      .sort((a, b) => (b.is_primary ? 1 : 0) - (a.is_primary ? 1 : 0))
+      .map(p => p.url)
+      .filter(Boolean) as string[];
+    return fromPhotos.length > 0 ? fromPhotos : r.image_url ? [r.image_url] : [];
   }
 
   stars(rating?: number): boolean[] {
@@ -332,7 +375,7 @@ export class RestaurantDetailComponent implements OnInit {
   reloadRestaurant() {
     const r = this.restaurant();
     if (!r) return;
-    this.svc.get(r.id).subscribe((updated) => this.restaurant.set(updated));
+    this.svc.get(r.id).subscribe((updated) => { this.restaurant.set(updated); this.photoIdx.set(0); });
   }
 
   logVisit(id: number) {

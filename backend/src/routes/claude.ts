@@ -245,7 +245,10 @@ router.post('/scrape-website', asyncHandler(async (req, res) => {
   }
   if (!text) return void res.status(502).json({ error: 'That website returned no readable content' });
 
-  const kind = entityType === 'lodging' ? 'lodging (hotel/motel/resort/etc.)' : 'restaurant';
+  const kind =
+    entityType === 'lodging'           ? 'lodging (hotel/motel/resort/etc.)' :
+    entityType === 'special_interest'  ? 'point of interest or attraction (e.g. museum, winery, park, landmark)' :
+    'restaurant';
   const msg = await anthropic.messages.create({
     model: MODEL,
     max_tokens: 1024,

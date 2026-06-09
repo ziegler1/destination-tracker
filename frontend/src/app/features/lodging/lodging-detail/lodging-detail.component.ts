@@ -34,18 +34,40 @@ const TYPE_LABELS: Record<LodgingType, string> = {
     MiniMapComponent, PhotoUploaderComponent, PageHeaderComponent,
   ],
   styles: [`
-    .hero { width:100%; max-height:320px; object-fit:cover; border-radius:12px; margin-bottom:20px; }
+    .hero-wrap {
+      position:relative; width:100%; border-radius:12px; overflow:hidden;
+      margin-bottom:20px; background:#000;
+    }
+    .hero-wrap img { width:100%; max-height:320px; height:320px; object-fit:cover; display:block; }
+    @media(max-width:768px) { .hero-wrap img { max-height:220px; height:220px; } }
     .hero-placeholder {
       width:100%; height:220px; border-radius:12px; margin-bottom:20px;
       background:linear-gradient(135deg,#004d40,#00897b);
       display:flex; align-items:center; justify-content:center; font-size:64px;
     }
+    .carousel-btn {
+      position:absolute; top:50%; transform:translateY(-50%);
+      background:rgba(0,0,0,.45); color:#fff; border:none; border-radius:50%;
+      width:36px; height:36px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+      padding:0;
+    }
+    .carousel-btn:disabled { opacity:.3; cursor:default; }
+    .carousel-btn-prev { left:10px; }
+    .carousel-btn-next { right:10px; }
+    .carousel-dots {
+      position:absolute; bottom:10px; left:50%; transform:translateX(-50%);
+      display:flex; gap:6px;
+    }
+    .carousel-dot {
+      width:8px; height:8px; border-radius:50%; border:none; padding:0; cursor:pointer;
+      background:rgba(255,255,255,.5); transition:background .2s;
+    }
+    .carousel-dot.active { background:#fff; }
     .header-row { display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:16px; }
     .title { font-size:26px; font-weight:700; margin:0; }
     .subtitle { font-size:14px; color:var(--wp-text-secondary); margin:4px 0 0; }
     .actions { display:flex; gap:8px; }
     @media (max-width:768px) {
-      .hero { max-height:220px; }
       .header-row { flex-direction:column; }
       .actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; width:100%; }
       .actions button { width:100%; }
@@ -82,8 +104,23 @@ const TYPE_LABELS: Record<LodgingType, string> = {
       <app-page-header [title]="l.name" backRoute="/lodging" />
       <div class="page-container">
 
-        @if (heroPhoto(l)) {
-          <img class="hero" [src]="heroPhoto(l)!" [alt]="l.name" />
+        @if (photoUrls(l).length > 0) {
+          <div class="hero-wrap">
+            <img [src]="photoUrls(l)[photoIdx()]" [alt]="l.name" />
+            @if (photoUrls(l).length > 1) {
+              <button class="carousel-btn carousel-btn-prev" (click)="photoIdx.set(photoIdx()-1)" [disabled]="photoIdx()===0">
+                <mat-icon>chevron_left</mat-icon>
+              </button>
+              <button class="carousel-btn carousel-btn-next" (click)="photoIdx.set(photoIdx()+1)" [disabled]="photoIdx()===photoUrls(l).length-1">
+                <mat-icon>chevron_right</mat-icon>
+              </button>
+              <div class="carousel-dots">
+                @for (url of photoUrls(l); track url; let i = $index) {
+                  <button class="carousel-dot" [class.active]="photoIdx()===i" (click)="photoIdx.set(i)"></button>
+                }
+              </div>
+            }
+          </div>
         } @else {
           <div class="hero-placeholder">🏨</div>
         }
@@ -272,6 +309,7 @@ export class LodgingDetailComponent implements OnInit {
   visitLogging = signal(false);
   lodging      = signal<Lodging | null>(null);
   protected get l(): Lodging | null { return this.lodging(); }
+  photoIdx     = signal(0);
   siteInfoLoading = signal(false);
   siteInfo     = signal<ScrapedSiteInfo | null>(null);
   aiLoading    = signal(false);
@@ -285,8 +323,13 @@ export class LodgingDetailComponent implements OnInit {
     });
   }
 
-  heroPhoto(l: Lodging): string | null {
-    return l.photos?.find((p) => p.is_primary)?.url ?? l.photos?.[0]?.url ?? l.image_url ?? null;
+  photoUrls(l: Lodging): string[] {
+    const fromPhotos = (l.photos ?? [])
+      .slice()
+      .sort((a, b) => (b.is_primary ? 1 : 0) - (a.is_primary ? 1 : 0))
+      .map(p => p.url)
+      .filter(Boolean) as string[];
+    return fromPhotos.length > 0 ? fromPhotos : l.image_url ? [l.image_url] : [];
   }
   stars(n?: number): boolean[] { return Array.from({ length: 5 }, (_, i) => i < (n ?? 0)); }
   typeLabel(t: LodgingType): string { return TYPE_LABELS[t] ?? t; }
@@ -297,6 +340,7 @@ export class LodgingDetailComponent implements OnInit {
   reloadLodging() {
     const l = this.lodging();
     if (!l) return;
+    this.photoIdx.set(0);
     this.svc.get(l.id).subscribe((updated) => this.lodging.set(updated));
   }
 

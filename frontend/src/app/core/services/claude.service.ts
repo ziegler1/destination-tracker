@@ -50,7 +50,7 @@ export class ClaudeService {
     return this.http.post<ClaudeResult>('/api/claude/travel-insights', payload);
   }
 
-  scrapeWebsite(url: string, name: string, entityType: 'restaurant' | 'lodging') {
+  scrapeWebsite(url: string, name: string, entityType: 'restaurant' | 'lodging' | 'special_interest') {
     return this.http.post<ClaudeResult>('/api/claude/scrape-website', { url, name, entityType });
   }
 }

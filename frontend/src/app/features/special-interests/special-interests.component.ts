@@ -118,11 +118,11 @@ const RATING_CHIPS: Array<{ value: RatingFilter; label: string }> = [
         <mat-form-field appearance="outline">
           <mat-label>Search</mat-label>
           <mat-icon matPrefix>search</mat-icon>
-          <input matInput [(ngModel)]="searchQuery" placeholder="Name or city…" />
+          <input matInput [ngModel]="searchQuery()" (ngModelChange)="searchQuery.set($event)" placeholder="Name or city…" />
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Category</mat-label>
-          <mat-select [(ngModel)]="filterCategory">
+          <mat-select [ngModel]="filterCategory()" (ngModelChange)="filterCategory.set($event)">
             <mat-option value="">All categories</mat-option>
             @for (c of catSvc.all(); track c.value) {
               <mat-option [value]="c.value">{{ c.icon }} {{ c.label }}</mat-option>
@@ -190,16 +190,16 @@ export class SpecialInterestsComponent implements OnInit {
   private bottomSheet = inject(MatBottomSheet);
   readonly catSvc     = inject(SiCategoryService);
 
-  places        = signal<SpecialInterestPlace[]>([]);
-  searchQuery   = '';
-  filterCategory: SpecialInterestCategory | '' = '';
-  ratingFilter  = signal<RatingFilter>('all');
+  places         = signal<SpecialInterestPlace[]>([]);
+  searchQuery    = signal('');
+  filterCategory = signal<SpecialInterestCategory | ''>('');
+  ratingFilter   = signal<RatingFilter>('all');
 
   readonly ratingChips  = RATING_CHIPS;
 
   filtered = computed(() => {
-    const q      = this.searchQuery.toLowerCase();
-    const cat    = this.filterCategory;
+    const q      = this.searchQuery().toLowerCase();
+    const cat    = this.filterCategory();
     const rating = this.ratingFilter();
     return this.places().filter(p =>
       (!q || p.name.toLowerCase().includes(q) || p.city.toLowerCase().includes(q)) &&

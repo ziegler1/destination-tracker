@@ -61,6 +61,24 @@ interface WeatherDay {
     }
     .hero-title { color:#fff; font-size:28px; font-weight:700; margin:0; }
     .hero-sub   { color:rgba(255,255,255,.85); margin:4px 0 0; font-size:15px; }
+    .carousel-btn {
+      position:absolute; top:50%; transform:translateY(-50%);
+      background:rgba(0,0,0,.45); color:#fff; border:none; border-radius:50%;
+      width:36px; height:36px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+      padding:0;
+    }
+    .carousel-btn:disabled { opacity:.3; cursor:default; }
+    .carousel-btn-prev { left:10px; }
+    .carousel-btn-next { right:10px; }
+    .carousel-dots {
+      position:absolute; bottom:52px; left:50%; transform:translateX(-50%);
+      display:flex; gap:6px;
+    }
+    .carousel-dot {
+      width:8px; height:8px; border-radius:50%; border:none; padding:0; cursor:pointer;
+      background:rgba(255,255,255,.5); transition:background .2s;
+    }
+    .carousel-dot.active { background:#fff; }
 
     .layout { display:grid; grid-template-columns:1fr 320px; gap:20px; }
     /* min-width:0 prevents grid children from overflowing their column */
@@ -135,14 +153,27 @@ interface WeatherDay {
       @if (loading()) {
         <div class="loading-wrap"><mat-spinner diameter="48" /></div>
       } @else if (dest()) {
-        <!-- Hero photo -->
-        @if (heroPic(); as url) {
+        <!-- Hero photo / carousel -->
+        @if (destPhotoUrls().length > 0) {
           <div class="hero">
-            <img [src]="url" [alt]="dest()!.name" />
+            <img [src]="destPhotoUrls()[photoIdx()]" [alt]="dest()!.name" />
             <div class="hero-overlay">
               <p class="hero-title">{{ dest()!.name }}</p>
               <p class="hero-sub">{{ dest()!.city }}, {{ dest()!.state_province }} · {{ dest()!.country }}</p>
             </div>
+            @if (destPhotoUrls().length > 1) {
+              <button class="carousel-btn carousel-btn-prev" (click)="photoIdx.set(photoIdx()-1)" [disabled]="photoIdx()===0">
+                <mat-icon>chevron_left</mat-icon>
+              </button>
+              <button class="carousel-btn carousel-btn-next" (click)="photoIdx.set(photoIdx()+1)" [disabled]="photoIdx()===destPhotoUrls().length-1">
+                <mat-icon>chevron_right</mat-icon>
+              </button>
+              <div class="carousel-dots">
+                @for (url of destPhotoUrls(); track url; let i = $index) {
+                  <button class="carousel-dot" [class.active]="photoIdx()===i" (click)="photoIdx.set(i)"></button>
+                }
+              </div>
+            }
           </div>
         } @else {
           <div class="hero-placeholder">
@@ -369,6 +400,7 @@ export class DestinationDetailComponent implements OnInit {
   visitLogging   = signal(false);
   weatherLoading = signal(false);
   dest           = signal<Destination | null>(null);
+  photoIdx       = signal(0);
   weatherDays    = signal<WeatherDay[]>([]);
 
   // Best Time to Visit
@@ -412,10 +444,15 @@ export class DestinationDetailComponent implements OnInit {
     }));
   }
 
-  heroPic(): string | null {
+  destPhotoUrls(): string[] {
     const d = this.dest();
-    if (!d) return null;
-    return d.photos?.find((p) => p.is_primary)?.url ?? d.photos?.[0]?.url ?? d.image_url ?? null;
+    if (!d) return [];
+    const fromPhotos = (d.photos ?? [])
+      .slice()
+      .sort((a, b) => (b.is_primary ? 1 : 0) - (a.is_primary ? 1 : 0))
+      .map(p => p.url)
+      .filter(Boolean) as string[];
+    return fromPhotos.length > 0 ? fromPhotos : d.image_url ? [d.image_url] : [];
   }
 
   stars(rating?: number): boolean[] {
@@ -485,6 +522,6 @@ export class DestinationDetailComponent implements OnInit {
   onPhotosChanged(): void {
     const d = this.dest();
     if (!d) return;
-    this.destSvc.get(d.id).subscribe((updated) => this.dest.set(updated));
+    this.destSvc.get(d.id).subscribe((updated) => { this.dest.set(updated); this.photoIdx.set(0); });
   }
 }

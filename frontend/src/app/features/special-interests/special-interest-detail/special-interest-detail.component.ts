@@ -11,7 +11,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatBottomSheet, MatBottomSheetModule } from '@angular/material/bottom-sheet';
 import { SpecialInterestService } from '../../../core/services/special-interest.service';
-import { ClaudeService } from '../../../core/services/claude.service';
+import { ClaudeService, ScrapedSiteInfo } from '../../../core/services/claude.service';
 import { MiniMapComponent } from '../../../shared/mini-map/mini-map.component';
 import { PhotoUploaderComponent } from '../../../shared/photo-uploader/photo-uploader.component';
 import { AddToTripSheetComponent } from '../../../shared/components/add-to-trip-sheet/add-to-trip-sheet.component';
@@ -29,18 +29,43 @@ import { SiCategoryService } from '../../../core/services/si-category.service';
     MiniMapComponent, PhotoUploaderComponent, PageHeaderComponent,
   ],
   styles: [`
-    .hero { width:100%; max-height:320px; object-fit:cover; border-radius:12px; margin-bottom:20px; }
+    /* ── Hero / carousel ───────────────────────────────────── */
+    .hero-wrap {
+      position:relative; width:100%; border-radius:12px; overflow:hidden;
+      margin-bottom:20px; background:#000;
+    }
+    .hero-wrap img { width:100%; max-height:320px; height:320px; object-fit:cover; display:block; }
+    @media(max-width:768px) { .hero-wrap img { max-height:220px; height:220px; } }
     .hero-placeholder {
       width:100%; height:220px; border-radius:12px; margin-bottom:20px;
       background:linear-gradient(135deg,#4a148c,#7b1fa2);
       display:flex; align-items:center; justify-content:center; font-size:64px;
     }
+    .carousel-btn {
+      position:absolute; top:50%; transform:translateY(-50%);
+      background:rgba(0,0,0,.45); color:#fff; border:none; border-radius:50%;
+      width:36px; height:36px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+      padding:0; line-height:1;
+    }
+    .carousel-btn:disabled { opacity:.3; cursor:default; }
+    .carousel-btn-prev { left:10px; }
+    .carousel-btn-next { right:10px; }
+    .carousel-dots {
+      position:absolute; bottom:10px; left:50%; transform:translateX(-50%);
+      display:flex; gap:6px;
+    }
+    .carousel-dot {
+      width:8px; height:8px; border-radius:50%; border:none; padding:0; cursor:pointer;
+      background:rgba(255,255,255,.5); transition:background .2s;
+    }
+    .carousel-dot.active { background:#fff; }
+
+    /* ── Layout ───────────────────────────────────────────── */
     .header-row { display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:16px; }
     .title { font-size:26px; font-weight:700; margin:0; }
     .subtitle { font-size:14px; color:var(--wp-text-secondary); margin:4px 0 0; }
     .actions { display:flex; gap:8px; }
     @media (max-width:768px) {
-      .hero { max-height:220px; }
       .header-row { flex-direction:column; }
       .actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; width:100%; }
       .actions button { width:100%; }
@@ -56,6 +81,17 @@ import { SiCategoryService } from '../../../core/services/si-category.service';
     .stars { display:flex; align-items:center; gap:2px; }
     .link-row { display:flex; gap:12px; flex-wrap:wrap; margin-top:12px; }
     .ai-box { margin-top:10px; padding:14px 16px; border-radius:8px; background:var(--wp-surface-variant); border-left:3px solid var(--wp-primary); line-height:1.6; }
+
+    /* ── Fetch Info / site-info box ───────────────────────── */
+    .site-info-box { margin-top:16px; padding:16px; border-radius:8px; background:var(--wp-surface-variant); border-left:3px solid var(--wp-primary); }
+    .site-info-updated { margin:0 0 8px; font-size:12px; color:var(--wp-text-hint); text-transform:uppercase; letter-spacing:.04em; }
+    .site-info-meta { display:flex; gap:16px; flex-wrap:wrap; margin-top:10px; font-size:13px; color:var(--wp-text-secondary); }
+    .site-info-meta span { display:inline-flex; align-items:center; gap:4px; }
+    .site-info-meta mat-icon { font-size:16px; height:16px; width:16px; }
+    .highlight-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:10px; margin-top:10px; }
+    .highlight-card { padding:10px 12px; border-radius:8px; background:var(--wp-surface); border:1px solid var(--wp-border); }
+    .hl-name { font-size:14px; font-weight:600; margin:0 0 2px; }
+    .hl-detail { font-size:12px; color:var(--wp-text-secondary); margin:0; }
   `],
   template: `
     @if (loading()) {
@@ -64,8 +100,23 @@ import { SiCategoryService } from '../../../core/services/si-category.service';
       <app-page-header [title]="p.name" backRoute="/special-interests" />
       <div class="page-container">
 
-        @if (heroPhoto(p)) {
-          <img class="hero" [src]="heroPhoto(p)!" [alt]="p.name" />
+        @if (photoUrls(p).length > 0) {
+          <div class="hero-wrap">
+            <img [src]="photoUrls(p)[photoIdx()]" [alt]="p.name" />
+            @if (photoUrls(p).length > 1) {
+              <button class="carousel-btn carousel-btn-prev" (click)="photoIdx.set(photoIdx()-1)" [disabled]="photoIdx()===0">
+                <mat-icon>chevron_left</mat-icon>
+              </button>
+              <button class="carousel-btn carousel-btn-next" (click)="photoIdx.set(photoIdx()+1)" [disabled]="photoIdx()===photoUrls(p).length-1">
+                <mat-icon>chevron_right</mat-icon>
+              </button>
+              <div class="carousel-dots">
+                @for (url of photoUrls(p); track url; let i = $index) {
+                  <button class="carousel-dot" [class.active]="photoIdx()===i" (click)="photoIdx.set(i)"></button>
+                }
+              </div>
+            }
+          </div>
         } @else {
           <div class="hero-placeholder">{{ categoryIcon(p.category) }}</div>
         }
@@ -150,6 +201,41 @@ import { SiCategoryService } from '../../../core/services/si-category.service';
                 <button mat-stroked-button><mat-icon>phone</mat-icon> {{ p.phone }}</button>
               </a>
             }
+            @if (p.website) {
+              <button mat-stroked-button (click)="fetchSiteInfo(p)" [disabled]="siteInfoLoading()">
+                <mat-icon>travel_explore</mat-icon>
+                {{ siteInfoLoading() ? (siteInfo() ? 'Refreshing…' : 'Fetching…') : (siteInfo() ? 'Refresh Info' : 'Fetch Info') }}
+              </button>
+            }
+          </div>
+        }
+
+        @if (siteInfo(); as info) {
+          <div class="site-info-box">
+            @if (p.site_info_fetched_at) {
+              <p class="site-info-updated">Updated {{ p.site_info_fetched_at | date:'MMM d, y, h:mm a' }}</p>
+            }
+            @if (info.description) {
+              <p style="margin:0">{{ info.description }}</p>
+            }
+            @if (info.hours || info.phone || info.address) {
+              <div class="site-info-meta">
+                @if (info.hours)   { <span><mat-icon>schedule</mat-icon> {{ info.hours }}</span> }
+                @if (info.phone)   { <span><mat-icon>phone</mat-icon> {{ info.phone }}</span> }
+                @if (info.address) { <span><mat-icon>place</mat-icon> {{ info.address }}</span> }
+              </div>
+            }
+            @if (info.highlights?.length) {
+              <p class="section-title" style="margin:14px 0 0">Highlights</p>
+              <div class="highlight-grid">
+                @for (h of info.highlights!; track h.name) {
+                  <div class="highlight-card">
+                    <p class="hl-name">{{ h.name }}</p>
+                    @if (h.detail) { <p class="hl-detail">{{ h.detail }}</p> }
+                  </div>
+                }
+              </div>
+            }
           </div>
         }
 
@@ -209,16 +295,26 @@ export class SpecialInterestDetailComponent implements OnInit {
   aiLoading = signal(false);
   aiResult  = signal<string | null>(null);
 
+  photoIdx        = signal(0);
+  siteInfoLoading = signal(false);
+  siteInfo        = signal<ScrapedSiteInfo | null>(null);
+
   ngOnInit() {
     const id = Number(this.route.snapshot.paramMap.get('id'));
     this.svc.get(id).subscribe({
-      next: (p) => { this.place.set(p); this.loading.set(false); },
+      next: (p) => { this.place.set(p); this.siteInfo.set(p.site_info ?? null); this.loading.set(false); },
       error: () => { this.loading.set(false); this.router.navigate(['/special-interests']); },
     });
   }
 
-  heroPhoto(p: SpecialInterestPlace): string | null {
-    return p.photos?.find((ph) => ph.is_primary)?.url ?? p.photos?.[0]?.url ?? p.image_url ?? null;
+  photoUrls(p: SpecialInterestPlace): string[] {
+    const fromPhotos = (p.photos ?? [])
+      .slice()
+      .sort((a, b) => (b.is_primary ? 1 : 0) - (a.is_primary ? 1 : 0))
+      .map(ph => ph.url)
+      .filter(Boolean) as string[];
+    if (fromPhotos.length > 0) return fromPhotos;
+    return p.image_url ? [p.image_url] : [];
   }
   stars(n?: number): boolean[] { return Array.from({ length: 5 }, (_, i) => i < (n ?? 0)); }
   categoryLabel(c?: SpecialInterestCategory): string { return c ? this.catSvc.label(c) : 'Special Interest'; }
@@ -230,7 +326,30 @@ export class SpecialInterestDetailComponent implements OnInit {
   reload() {
     const p = this.place();
     if (!p) return;
-    this.svc.get(p.id).subscribe((updated) => this.place.set(updated));
+    this.svc.get(p.id).subscribe((updated) => { this.place.set(updated); this.photoIdx.set(0); });
+  }
+
+  fetchSiteInfo(p: SpecialInterestPlace) {
+    if (!p.website) return;
+    this.siteInfoLoading.set(true);
+    this.claudeSvc.scrapeWebsite(p.website, p.name, 'special_interest').subscribe({
+      next: (res) => {
+        try {
+          const info = JSON.parse(res.result) as ScrapedSiteInfo;
+          this.siteInfo.set(info);
+          this.svc.saveSiteInfo(p.id, info).subscribe((updated) => {
+            this.place.update((cur) => cur ? { ...cur, site_info: updated.site_info, site_info_fetched_at: updated.site_info_fetched_at } : cur);
+          });
+        } catch {
+          this.snack.open('Could not parse site info — try again', 'Dismiss', { duration: 3000 });
+        }
+        this.siteInfoLoading.set(false);
+      },
+      error: () => {
+        this.snack.open('Fetch Info failed — the site may be unreachable', 'Dismiss', { duration: 3000 });
+        this.siteInfoLoading.set(false);
+      },
+    });
   }
 
   generateHighlights(p: SpecialInterestPlace) {
