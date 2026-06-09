@@ -17,20 +17,7 @@ import { PhotoUploaderComponent } from '../../../shared/photo-uploader/photo-upl
 import { AddToTripSheetComponent } from '../../../shared/components/add-to-trip-sheet/add-to-trip-sheet.component';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 import { SpecialInterestPlace, SpecialInterestCategory } from '../../../types/schema.types';
-
-const CATEGORY_META: Record<string, { icon: string; label: string }> = {
-  winery_brewery:      { icon: '🍷', label: 'Winery / Brewery' },
-  bourbon_distillery:  { icon: '🥃', label: 'Bourbon Distillery' },
-  museum:              { icon: '🏛️', label: 'Museum' },
-  historic_site:       { icon: '🏛️', label: 'Historic Site' },
-  state_park:          { icon: '🌲', label: 'State Park' },
-  national_park:       { icon: '⛰️', label: 'National Park' },
-  live_music:          { icon: '🎵', label: 'Live Music' },
-  scenic:              { icon: '🌅', label: 'Scenic' },
-  roadside_attraction: { icon: '🗿', label: 'Roadside Attraction' },
-  shopping:            { icon: '🛍️', label: 'Shopping' },
-  other:               { icon: '📌', label: 'Other' },
-};
+import { SiCategoryService } from '../../../core/services/si-category.service';
 
 @Component({
   selector: 'app-special-interest-detail',
@@ -207,6 +194,7 @@ const CATEGORY_META: Record<string, { icon: string; label: string }> = {
   `,
 })
 export class SpecialInterestDetailComponent implements OnInit {
+  private catSvc      = inject(SiCategoryService);
   private route       = inject(ActivatedRoute);
   private router      = inject(Router);
   private svc         = inject(SpecialInterestService);
@@ -233,8 +221,8 @@ export class SpecialInterestDetailComponent implements OnInit {
     return p.photos?.find((ph) => ph.is_primary)?.url ?? p.photos?.[0]?.url ?? p.image_url ?? null;
   }
   stars(n?: number): boolean[] { return Array.from({ length: 5 }, (_, i) => i < (n ?? 0)); }
-  categoryLabel(c?: SpecialInterestCategory): string { return c ? (CATEGORY_META[c]?.label ?? c) : 'Special Interest'; }
-  categoryIcon(c?: SpecialInterestCategory): string { return c ? (CATEGORY_META[c]?.icon ?? '📌') : '📌'; }
+  categoryLabel(c?: SpecialInterestCategory): string { return c ? this.catSvc.label(c) : 'Special Interest'; }
+  categoryIcon(c?: SpecialInterestCategory): string  { return this.catSvc.icon(c); }
   mapsUrl(p: SpecialInterestPlace): string {
     if (p.latitude && p.longitude) return `https://www.google.com/maps?q=${p.latitude},${p.longitude}`;
     return `https://www.google.com/maps?q=${encodeURIComponent(`${p.address ?? ''} ${p.city} ${p.state_province}`)}`;

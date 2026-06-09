@@ -281,10 +281,7 @@ export interface WeatherResponse {
 
 // ─── Special Interest Places ──────────────────────────────────────────────────
 
-export type SpecialInterestCategory =
-  | 'winery_brewery' | 'bourbon_distillery' | 'museum' | 'historic_site' | 'state_park'
-  | 'national_park' | 'live_music' | 'scenic' | 'roadside_attraction'
-  | 'shopping' | 'other';
+export type SpecialInterestCategory = string;
 
 export interface SpecialInterestPhoto {
   id: number;

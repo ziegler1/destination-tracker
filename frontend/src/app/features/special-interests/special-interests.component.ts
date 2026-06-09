@@ -8,34 +8,16 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatBottomSheet } from '@angular/material/bottom-sheet';
 import { SpecialInterestService } from '../../core/services/special-interest.service';
+import { SiCategoryService } from '../../core/services/si-category.service';
 import { QuickAddSpecialInterestComponent } from '../../shared/components/quick-add/quick-add-special-interest.component';
+import { SiManageCategoriesSheetComponent } from './si-manage-categories-sheet/si-manage-categories-sheet.component';
 import { SpecialInterestPlace, SpecialInterestCategory } from '../../types/schema.types';
 
-const CATEGORY_META: Record<string, { icon: string; label: string }> = {
-  winery_brewery:     { icon: '🍷', label: 'Winery / Brewery' },
-  bourbon_distillery: { icon: '🥃', label: 'Bourbon Distillery' },
-  museum:             { icon: '🏛️', label: 'Museum' },
-  historic_site:      { icon: '🏛️', label: 'Historic Site' },
-  state_park:         { icon: '🌲', label: 'State Park' },
-  national_park:      { icon: '⛰️', label: 'National Park' },
-  live_music:         { icon: '🎵', label: 'Live Music' },
-  scenic:             { icon: '🌅', label: 'Scenic' },
-  roadside_attraction:{ icon: '🗿', label: 'Roadside Attraction' },
-  shopping:           { icon: '🛍️', label: 'Shopping' },
-  other:              { icon: '📌', label: 'Other' },
-};
-
-const CATEGORIES: Array<{ value: SpecialInterestCategory | ''; label: string }> = [
-  { value: '', label: 'All categories' },
-  ...Object.entries(CATEGORY_META).map(([value, { label }]) => ({
-    value: value as SpecialInterestCategory,
-    label,
-  })),
-];
-
 type RatingFilter = 'all' | '4plus' | '5' | 'would_return';
+
 
 const RATING_CHIPS: Array<{ value: RatingFilter; label: string }> = [
   { value: 'all',          label: 'All' },
@@ -50,11 +32,18 @@ const RATING_CHIPS: Array<{ value: RatingFilter; label: string }> = [
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     RouterLink, FormsModule,
-    MatButtonModule, MatIconModule, MatFormFieldModule, MatInputModule, MatSelectModule,
+    MatButtonModule, MatIconModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatTooltipModule,
   ],
   styles: [`
     .page { max-width: 1100px; margin: 0 auto; padding: 24px; }
 
+    .fab {
+      position: fixed; bottom: 28px; right: 28px;
+      background: var(--wp-primary) !important;
+      color: #fff !important;
+      box-shadow: 0 4px 12px var(--wp-shadow) !important;
+      z-index: 100;
+    }
     @media (max-width: 768px) {
       .page { padding: 16px 16px 160px; }
       .page-title { font-size: 22px; }
@@ -64,6 +53,7 @@ const RATING_CHIPS: Array<{ value: RatingFilter; label: string }> = [
         font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
       }
       .card-loc { font-size: 12px; }
+      .fab { bottom: 88px; right: 20px; }
     }
     .page-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
     .page-title  { font-size: 26px; font-weight: 800; margin: 0; flex: 1; }
@@ -119,8 +109,8 @@ const RATING_CHIPS: Array<{ value: RatingFilter; label: string }> = [
     <div class="page">
       <div class="page-header">
         <p class="page-title">🌟 Special Interest Places</p>
-        <button mat-raised-button color="primary" (click)="openAdd()">
-          <mat-icon>add</mat-icon> Add Place
+        <button mat-icon-button (click)="openManageCategories()" matTooltip="Manage categories">
+          <mat-icon>tune</mat-icon>
         </button>
       </div>
 
@@ -133,8 +123,9 @@ const RATING_CHIPS: Array<{ value: RatingFilter; label: string }> = [
         <mat-form-field appearance="outline">
           <mat-label>Category</mat-label>
           <mat-select [(ngModel)]="filterCategory">
-            @for (c of categories; track c.value) {
-              <mat-option [value]="c.value">{{ c.label }}</mat-option>
+            <mat-option value="">All categories</mat-option>
+            @for (c of catSvc.all(); track c.value) {
+              <mat-option [value]="c.value">{{ c.icon }} {{ c.label }}</mat-option>
             }
           </mat-select>
         </mat-form-field>
@@ -188,18 +179,22 @@ const RATING_CHIPS: Array<{ value: RatingFilter; label: string }> = [
         }
       </div>
     </div>
+
+    <button mat-fab class="fab" (click)="openAdd()" matTooltip="Add place">
+      <mat-icon>add</mat-icon>
+    </button>
   `,
 })
 export class SpecialInterestsComponent implements OnInit {
   private svc         = inject(SpecialInterestService);
   private bottomSheet = inject(MatBottomSheet);
+  readonly catSvc     = inject(SiCategoryService);
 
   places        = signal<SpecialInterestPlace[]>([]);
   searchQuery   = '';
   filterCategory: SpecialInterestCategory | '' = '';
   ratingFilter  = signal<RatingFilter>('all');
 
-  readonly categories   = CATEGORIES;
   readonly ratingChips  = RATING_CHIPS;
 
   filtered = computed(() => {
@@ -229,12 +224,16 @@ export class SpecialInterestsComponent implements OnInit {
     ref.afterDismissed().subscribe(added => { if (added) this.load(); });
   }
 
+  openManageCategories() {
+    this.bottomSheet.open(SiManageCategoriesSheetComponent);
+  }
+
   primaryPhoto(p: SpecialInterestPlace) {
     return p.photos?.find(ph => ph.is_primary)?.url ?? p.photos?.[0]?.url ?? null;
   }
 
-  catIcon(cat?: string)  { return cat ? (CATEGORY_META[cat]?.icon ?? '📌') : '📌'; }
-  catLabel(cat?: string) { return cat ? (CATEGORY_META[cat]?.label ?? cat) : ''; }
+  catIcon(cat?: string)  { return this.catSvc.icon(cat); }
+  catLabel(cat?: string) { return this.catSvc.label(cat); }
 
   onImgErr(e: Event) { (e.target as HTMLImageElement).style.display = 'none'; }
 }

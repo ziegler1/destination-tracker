@@ -19,20 +19,7 @@ import { KeyboardAwareScrollDirective } from '../../../shared/directives/keyboar
 import { PlacesAutocompleteComponent, PlaceSelectedEvent } from '../../../shared/components/places-autocomplete/places-autocomplete.component';
 import { PhotoUploaderComponent } from '../../../shared/photo-uploader/photo-uploader.component';
 import { EntityPhoto } from '../../../core/services/photo.service';
-
-const CATEGORY_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: 'winery_brewery',      label: 'Winery / Brewery' },
-  { value: 'bourbon_distillery',  label: 'Bourbon Distillery' },
-  { value: 'museum',              label: 'Museum' },
-  { value: 'historic_site',       label: 'Historic Site' },
-  { value: 'state_park',          label: 'State Park' },
-  { value: 'national_park',       label: 'National Park' },
-  { value: 'live_music',          label: 'Live Music' },
-  { value: 'scenic',              label: 'Scenic' },
-  { value: 'roadside_attraction', label: 'Roadside Attraction' },
-  { value: 'shopping',            label: 'Shopping' },
-  { value: 'other',               label: 'Other' },
-];
+import { SiCategoryService } from '../../../core/services/si-category.service';
 
 @Component({
   selector: 'app-special-interest-form',
@@ -102,7 +89,7 @@ const CATEGORY_OPTIONS: Array<{ value: string; label: string }> = [
               <mat-form-field appearance="outline">
                 <mat-label>Category *</mat-label>
                 <mat-select formControlName="category">
-                  @for (c of categoryOptions; track c.value) {
+                  @for (c of catSvc.all(); track c.value) {
                     <mat-option [value]="c.value">{{ c.label }}</mat-option>
                   }
                 </mat-select>
@@ -270,6 +257,7 @@ const CATEGORY_OPTIONS: Array<{ value: string; label: string }> = [
   `,
 })
 export class SpecialInterestFormComponent implements OnInit {
+  readonly catSvc   = inject(SiCategoryService);
   private route     = inject(ActivatedRoute);
   private router    = inject(Router);
   private svc       = inject(SpecialInterestService);
@@ -286,7 +274,6 @@ export class SpecialInterestFormComponent implements OnInit {
   placeId    = signal<number | null>(null);
   photos     = signal<EntityPhoto[]>([]);
 
-  readonly categoryOptions = CATEGORY_OPTIONS;
 
   form = this.fb.group({
     name:           ['', Validators.required],
