@@ -86,11 +86,14 @@ body {
 .page-container { padding: 24px; max-width: 1200px; margin: 0 auto; }
 
 @media (max-width: 768px) {
-  // 16px horizontal padding; extra bottom breathing room keeps Save/Cancel
-  // reachable above the fixed mobile bottom-tab bar.
+  // Page container: 16px side padding + 120px bottom so Save/Cancel stays above the bottom tab bar
   .page-container { padding: 16px 16px 120px; }
 
-  // Fix 8 #4 — form inputs: ≥16px font prevents iOS auto-zoom; 52px min targets
+  // Typography scale
+  h1 { font-size: 22px; }
+  h2 { font-size: 18px; }
+
+  // Form inputs: ≥16px font prevents iOS auto-zoom; 52px min-height for tap targets
   form .mat-mdc-form-field { width: 100%; }
   form .mat-mdc-form-field input,
   form .mat-mdc-form-field textarea,
@@ -98,14 +101,26 @@ body {
   form .mat-mdc-text-field-wrapper,
   form .mat-mdc-select { min-height: 52px; }
 
-  // Fix 8 #5 — primary form buttons: full width, comfortable tap target
+  // Form action buttons: stacked, full width, 52px tap target
   form .actions { flex-direction: column; }
   form .actions .mat-mdc-raised-button,
   form .actions .mat-mdc-stroked-button,
   form .actions .mat-mdc-flat-button { width: 100%; min-height: 52px; font-size: 16px; }
 
-  // icon buttons (edit/delete): minimum 44×44 touch target
+  // All raised/stroked buttons outside forms: minimum 44px tap target
+  // (form .actions already gets 52px via the higher-specificity rule above)
+  .mat-mdc-raised-button,
+  .mat-mdc-stroked-button { min-height: 44px; }
+
+  // Icon buttons: minimum 44×44 touch target
   .mat-mdc-icon-button { width: 44px; height: 44px; padding: 10px; }
+
+  // Dialogs: constrain width so they don't bleed off small screens
+  .mat-mdc-dialog-container { max-width: calc(100vw - 32px) !important; }
+  .mdc-dialog__surface { border-radius: 12px !important; }
+
+  // Bottom sheets: hard cap so the sheet never covers the full screen
+  .mat-bottom-sheet-container { max-height: 90vh !important; }
 }
 .loading-wrap   { display:flex; justify-content:center; align-items:center; height:240px; }
 .status-badge {
