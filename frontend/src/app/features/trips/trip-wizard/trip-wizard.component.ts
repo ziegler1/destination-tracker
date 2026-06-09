@@ -73,12 +73,13 @@ const STOP_TIMINGS = [
     PlacesAutocompleteComponent,
   ],
   styles: [`
-    .wizard-wrap { max-width:900px; margin:0 auto; padding:24px; }
+    .wizard-wrap { max-width:900px; margin:0 auto; padding:24px; overflow-x:hidden; }
     .step-title  { font-size:22px; font-weight:700; margin:0 0 6px; }
     .step-sub    { color:var(--wp-text-secondary); margin:0 0 24px; }
 
     /* Step 1 */
     .basics-grid { display:grid; grid-template-columns:1fr 1fr; gap:0 16px; }
+    .basics-grid > * { min-width:0; }
     .full { grid-column:1/-1; }
     .chip-row { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; }
     .chip {
@@ -209,10 +210,11 @@ const STOP_TIMINGS = [
     .confirmed-icon { font-size:72px; display:block; margin-bottom:16px; }
 
     /* Origin/destination autocomplete display */
-    .place-field { margin-bottom:12px; }
+    .place-field { margin-bottom:12px; min-width:0; overflow:hidden; }
     .place-label { font-size:12px; font-weight:600; margin:0 0 4px; color:var(--wp-text-secondary); }
     .place-selected { font-size:12px; color:var(--wp-primary); margin:4px 0 0;
-                      display:flex; align-items:center; gap:4px; }
+                      display:flex; align-items:center; gap:4px;
+                      overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
     /* Mobile responsive */
     @media (max-width:768px) {

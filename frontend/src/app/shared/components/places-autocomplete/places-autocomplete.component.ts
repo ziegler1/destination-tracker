@@ -30,7 +30,7 @@ const PRICE_MAP: Record<string, number> = {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [`
-    :host { display: block; width: 100%; margin-bottom: 8px; }
+    :host { display: block; width: 100%; max-width: 100%; overflow: hidden; margin-bottom: 8px; }
     .hint { font-size: 12px; color: var(--wp-text-hint); margin-top: 2px; }
   `],
   template: `
@@ -72,6 +72,8 @@ export class PlacesAutocompleteComponent implements AfterViewInit, OnDestroy {
     const el = this.element as unknown as HTMLElement;
     el.setAttribute('placeholder', this.placeholder());
     el.style.width = '100%';
+    el.style.maxWidth = '100%';
+    el.style.boxSizing = 'border-box';
 
     this.containerRef.nativeElement.appendChild(el);
 
