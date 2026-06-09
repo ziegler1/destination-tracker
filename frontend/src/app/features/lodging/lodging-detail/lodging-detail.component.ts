@@ -36,7 +36,7 @@ const TYPE_LABELS: Record<LodgingType, string> = {
   styles: [`
     .hero { width:100%; max-height:320px; object-fit:cover; border-radius:12px; margin-bottom:20px; }
     .hero-placeholder {
-      width:100%; height:200px; border-radius:12px; margin-bottom:20px;
+      width:100%; height:220px; border-radius:12px; margin-bottom:20px;
       background:linear-gradient(135deg,#004d40,#00897b);
       display:flex; align-items:center; justify-content:center; font-size:64px;
     }
@@ -44,6 +44,12 @@ const TYPE_LABELS: Record<LodgingType, string> = {
     .title { font-size:26px; font-weight:700; margin:0; }
     .subtitle { font-size:14px; color:var(--wp-text-secondary); margin:4px 0 0; }
     .actions { display:flex; gap:8px; }
+    @media (max-width:768px) {
+      .hero { max-height:220px; }
+      .header-row { flex-direction:column; }
+      .actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; width:100%; }
+      .actions button { width:100%; }
+    }
     .info-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:12px; margin:16px 0; }
     .info-item label { font-size:11px; text-transform:uppercase; letter-spacing:.8px; color:var(--wp-text-hint); display:block; }
     .info-item span  { font-size:15px; font-weight:500; }
@@ -100,7 +106,7 @@ const TYPE_LABELS: Record<LodgingType, string> = {
               <mat-icon>edit</mat-icon> Edit
             </button>
             <button mat-stroked-button color="warn" (click)="confirmDelete(l.id)">
-              <mat-icon>delete</mat-icon>
+              <mat-icon>delete</mat-icon> Delete
             </button>
           </div>
         </div>

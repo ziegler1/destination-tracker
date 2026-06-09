@@ -49,6 +49,11 @@ interface WeatherDay {
     .hero { position:relative; width:100%; max-height:340px; overflow:hidden; border-radius:12px; margin-bottom:24px; }
     .hero img { width:100%; height:340px; object-fit:cover; }
     .hero-placeholder { width:100%; height:240px; border-radius:12px; margin-bottom:24px; overflow:hidden; }
+    @media (max-width:768px) {
+      .hero { max-height:220px; }
+      .hero img { height:220px; }
+      .hero-placeholder { height:220px; }
+    }
     .hero-overlay {
       position:absolute; bottom:0; left:0; right:0;
       background:linear-gradient(transparent,rgba(0,0,0,.7));
@@ -95,6 +100,13 @@ interface WeatherDay {
 
     .stars { color:#FFB300; }
     .notes { font-size:14px; color:var(--wp-text-secondary); line-height:1.6; white-space:pre-wrap; }
+
+    .status-rating { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+    .action-grid { display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; align-items:center; }
+    @media (max-width:768px) {
+      .action-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+      .action-grid button { width:100%; }
+    }
   `],
   template: `
     <app-page-header [title]="dest()?.name ?? 'Destination'" backRoute="/destinations" />
@@ -121,15 +133,18 @@ interface WeatherDay {
           </div>
         }
 
-        <!-- Action bar -->
-        <div style="display:flex;gap:10px;margin-bottom:20px;align-items:center">
+        <!-- Status + rating -->
+        <div class="status-rating">
           <span class="status-badge {{ dest()!.status }}">{{ statusLabel(dest()!.status) }}</span>
           <span class="stars">
             @for (i of stars(dest()!.rating); track $index) {
               <mat-icon style="font-size:18px">{{ i ? 'star' : 'star_border' }}</mat-icon>
             }
           </span>
-          <span class="spacer"></span>
+        </div>
+
+        <!-- Action buttons — 2×2 grid on mobile -->
+        <div class="action-grid">
           <button mat-raised-button color="primary" (click)="logVisit()" [disabled]="visitLogging()">
             <mat-icon>add_location_alt</mat-icon>
             {{ visitLogging() ? 'Logged!' : 'Log a Visit' }}
@@ -142,7 +157,7 @@ interface WeatherDay {
             <mat-icon>edit</mat-icon> Edit
           </button>
           <button mat-stroked-button color="warn" (click)="confirmDelete()">
-            <mat-icon>delete</mat-icon>
+            <mat-icon>delete</mat-icon> Delete
           </button>
         </div>
 
