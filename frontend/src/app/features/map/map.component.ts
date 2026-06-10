@@ -233,13 +233,13 @@ function primaryPhotoUrl(
       <map-info-window #infoWindow>
         @if (activeMarker(); as m) {
           <div style="min-width:180px;max-width:220px;font-family:Roboto,sans-serif;overflow:hidden">
-            <div style="padding:6px 8px;font-size:14px;font-weight:700;background:#fff;border-bottom:1px solid #eee">{{ m.name }}</div>
+            <div style="padding:6px 8px;font-size:14px;font-weight:700;background:#fff;color:#212121;border-bottom:1px solid #eee">{{ m.name }}</div>
             @if (m.photoUrl) {
               <img [src]="m.photoUrl" style="width:100%;height:110px;object-fit:cover;display:block"
                    (error)="$any($event.target).style.display='none'" />
             }
             <div style="padding:8px">
-              <strong style="font-size:14px;display:block;margin-bottom:2px">{{ m.name }}</strong>
+              <strong style="font-size:14px;display:block;margin-bottom:2px;color:#212121">{{ m.name }}</strong>
               <small style="color:#666">{{ m.city }}, {{ m.state }}</small><br/>
               <span style="font-size:12px;text-transform:capitalize;color:#888">{{ m.sub }}</span>
               @if (m.rating) {
