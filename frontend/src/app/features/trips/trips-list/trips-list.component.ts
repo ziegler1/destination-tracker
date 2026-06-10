@@ -111,9 +111,9 @@ const STATUS_META: Record<TripStatus, { label: string; icon: string; color: stri
                 <div class="card-content">
                   <p class="trip-name">{{ t.name }}</p>
                   <p class="trip-meta">
-                    @if (t.start_date) { {{ t.start_date | date:'MMM d, y' }} }
+                    @if (t.start_date) { {{ t.start_date | date:'MMM d, y':'UTC' }} }
                     @if (t.start_date && t.end_date) { → }
-                    @if (t.end_date) { {{ t.end_date | date:'MMM d, y' }} }
+                    @if (t.end_date) { {{ t.end_date | date:'MMM d, y':'UTC' }} }
                     @if (!t.start_date && !t.end_date) { No dates set }
                   </p>
                   <div class="trip-footer">

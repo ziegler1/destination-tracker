@@ -12,6 +12,7 @@ import { StatsService } from '../../core/services/stats.service';
 import { RestaurantService } from '../../core/services/restaurant.service';
 import { LodgingService } from '../../core/services/lodging.service';
 import { TripDraftService } from '../../core/services/trip-draft.service';
+import { parseApiDate } from '../../core/utils/date.utils';
 import {
   PlacesAutocompleteComponent, PlaceSelectedEvent,
 } from '../../shared/components/places-autocomplete/places-autocomplete.component';
@@ -178,7 +179,7 @@ const TRIP_COLORS = ['#00695C', '#1565C0', '#6A1B9A', '#B71C1C', '#E65100', '#2E
             <p class="active-meta">
               Day {{ dayInfo().dayNum }} of {{ dayInfo().totalDays }}
               @if (trip.start_date && trip.end_date) {
-                &nbsp;·&nbsp;{{ trip.start_date | date:'MMM d' }} – {{ trip.end_date | date:'MMM d, y' }}
+                &nbsp;·&nbsp;{{ trip.start_date | date:'MMM d':'UTC' }} – {{ trip.end_date | date:'MMM d, y':'UTC' }}
               }
             </p>
 
@@ -228,7 +229,7 @@ const TRIP_COLORS = ['#00695C', '#1565C0', '#6A1B9A', '#B71C1C', '#E65100', '#2E
                   <div class="trip-card-body">
                     <div class="trip-card-dates">
                       @if (trip.start_date) {
-                        {{ trip.start_date | date:'MMM d' }}@if (trip.end_date) { – {{ trip.end_date | date:'MMM d, y' }}}
+                        {{ trip.start_date | date:'MMM d':'UTC' }}@if (trip.end_date) { – {{ trip.end_date | date:'MMM d, y':'UTC' }}}
                       } @else {
                         Dates TBD
                       }
@@ -269,7 +270,7 @@ const TRIP_COLORS = ['#00695C', '#1565C0', '#6A1B9A', '#B71C1C', '#E65100', '#2E
                     </div>
                     <div class="trip-card-body">
                       <div class="trip-card-dates">
-                        {{ trip.start_date | date:'MMM d' }} – {{ trip.end_date | date:'MMM d, y' }}
+                        {{ trip.start_date | date:'MMM d':'UTC' }} – {{ trip.end_date | date:'MMM d, y':'UTC' }}
                       </div>
                       <div class="trip-card-meta">{{ trip.stop_count ?? 0 }} stops</div>
                     </div>
@@ -416,8 +417,8 @@ export class HomeComponent implements OnInit {
   dayInfo = computed(() => {
     const trip = this.activeTrip();
     if (!trip?.start_date || !trip?.end_date) return { dayNum: 1, totalDays: 1 };
-    const start = new Date(trip.start_date + 'T00:00:00');
-    const end   = new Date(trip.end_date   + 'T00:00:00');
+    const start = parseApiDate(trip.start_date);
+    const end   = parseApiDate(trip.end_date);
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const dayNum   = Math.max(1, Math.floor((today.getTime() - start.getTime()) / 86_400_000) + 1);
     const totalDays = Math.max(1, Math.floor((end.getTime() - start.getTime()) / 86_400_000) + 1);

@@ -172,7 +172,7 @@ import { SiCategoryService } from '../../../core/services/si-category.service';
           @if (p.visited_at) {
             <div class="info-item">
               <label>Visited</label>
-              <span>{{ p.visited_at | date:'mediumDate' }}</span>
+              <span>{{ p.visited_at | date:'mediumDate':'UTC' }}</span>
             </div>
           }
         </div>

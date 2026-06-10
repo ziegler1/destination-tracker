@@ -13,6 +13,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { ThemeService } from '../services/theme.service';
 import { TripService } from '../services/trip.service';
 import { Trip } from '../../types/schema.types';
+import { parseApiDate } from '../utils/date.utils';
 import { QuickAddRestaurantComponent } from '../../shared/components/quick-add/quick-add-restaurant.component';
 import { QuickAddLodgingComponent } from '../../shared/components/quick-add/quick-add-lodging.component';
 import { QuickAddDestinationComponent } from '../../shared/components/quick-add/quick-add-destination.component';
@@ -300,7 +301,7 @@ const QUICK_ADD_ITEMS: QuickAddItem[] = [
           <div class="atrip-badge">🔴 Active Trip</div>
           <p class="atrip-name">{{ activeTrip()!.name }}</p>
           <p class="atrip-meta">
-            {{ activeTrip()!.start_date | date:'MMM d' }} → {{ activeTrip()!.end_date | date:'MMM d' }}
+            {{ activeTrip()!.start_date | date:'MMM d':'UTC' }} → {{ activeTrip()!.end_date | date:'MMM d':'UTC' }}
             @if (daysRemaining() !== null) {
               · {{ daysRemaining() }} days left
             }
@@ -423,7 +424,9 @@ export class ShellComponent implements OnInit {
   daysRemaining = computed(() => {
     const t = this.activeTrip();
     if (!t?.end_date) return null;
-    const diff = Math.ceil((new Date(t.end_date).getTime() - Date.now()) / 86_400_000);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const end = parseApiDate(t.end_date);
+    const diff = Math.ceil((end.getTime() - today.getTime()) / 86_400_000);
     return diff > 0 ? diff : 0;
   });
 

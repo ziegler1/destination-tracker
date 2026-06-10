@@ -16,6 +16,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { BaseChartDirective } from 'ng2-charts';
 import { ChartData, ChartOptions } from 'chart.js';
 import { ExpenseService } from '../../../core/services/expense.service';
+import { parseApiDate } from '../../../core/utils/date.utils';
 import { TripExpense, ExpenseCategory } from '../../../types/schema.types';
 
 const CAT_COLOR: Record<ExpenseCategory, string> = {
@@ -211,7 +212,7 @@ const CATEGORIES: ExpenseCategory[] = ['lodging','food','fuel','activities','sho
                   <div style="display:flex;gap:8px">
                     <span class="exp-cat">{{ e.category | titlecase }}</span>
                     @if (e.expense_date) {
-                      <span class="exp-date">· {{ e.expense_date | date:'MMM d' }}</span>
+                      <span class="exp-date">· {{ e.expense_date | date:'MMM d':'UTC' }}</span>
                     }
                   </div>
                 </div>
@@ -325,7 +326,7 @@ export class TripExpensesTabComponent implements OnInit {
   startEdit(e: TripExpense) {
     this.editForm.patchValue({
       category: e.category, description: e.description,
-      amount: e.amount, expense_date: e.expense_date ? new Date(e.expense_date) : null,
+      amount: e.amount, expense_date: e.expense_date ? parseApiDate(e.expense_date) : null,
     });
     this.editingId.set(e.id);
   }

@@ -27,6 +27,7 @@ import { JournalService } from '../../../core/services/journal.service';
 import { ClaudeService } from '../../../core/services/claude.service';
 import { GeocodingService } from '../../../core/services/geocoding.service';
 import { MapsService } from '../../../core/services/maps.service';
+import { parseApiDate } from '../../../core/utils/date.utils';
 import {
   Trip, TripStatus, TripStop, TripExpense, TripJournalEntry, Lodging, Restaurant, SpecialInterestPlace,
 } from '../../../types/schema.types';
@@ -368,7 +369,7 @@ function restaurantMarkerEl(): HTMLElement {
                 <h1 class="scrap-title">{{ t.name }}</h1>
                 @if (t.start_date || t.end_date) {
                   <p class="scrap-dates">
-                    {{ t.start_date | date:'MMMM d' }} – {{ t.end_date | date:'MMMM d, y' }}
+                    {{ t.start_date | date:'MMMM d':'UTC' }} – {{ t.end_date | date:'MMMM d, y':'UTC' }}
                   </p>
                 }
                 <div class="scrap-hero-stats">
@@ -435,7 +436,7 @@ function restaurantMarkerEl(): HTMLElement {
                       </h3>
                       @if (stop.arrival_date || stop.departure_date) {
                         <span class="tl-dates">
-                          {{ stop.arrival_date | date:'MMM d' }}@if (stop.departure_date) { – {{ stop.departure_date | date:'MMM d' }}}
+                          {{ stop.arrival_date | date:'MMM d':'UTC' }}@if (stop.departure_date) { – {{ stop.departure_date | date:'MMM d':'UTC' }}}
                         </span>
                       }
                     </div>
@@ -558,9 +559,9 @@ function restaurantMarkerEl(): HTMLElement {
             <div class="trip-header">
               <p class="trip-name">{{ t.name }}</p>
               <p class="trip-dates">
-                @if (t.start_date) { {{ t.start_date | date:'MMM d' }} }
+                @if (t.start_date) { {{ t.start_date | date:'MMM d':'UTC' }} }
                 @if (t.start_date && t.end_date) { → }
-                @if (t.end_date) { {{ t.end_date | date:'MMM d, y' }} }
+                @if (t.end_date) { {{ t.end_date | date:'MMM d, y':'UTC' }} }
                 @if (!t.start_date && !t.end_date) { Dates not set }
               </p>
               <div class="header-meta">
@@ -637,9 +638,9 @@ function restaurantMarkerEl(): HTMLElement {
                   @if (stop.arrival_date || stop.departure_date) {
                     <p class="stop-row">
                       <mat-icon>calendar_today</mat-icon>
-                      @if (stop.arrival_date)   { Arrive {{ stop.arrival_date | date:'MMM d' }} }
+                      @if (stop.arrival_date)   { Arrive {{ stop.arrival_date | date:'MMM d':'UTC' }} }
                       @if (stop.arrival_date && stop.departure_date) { → }
-                      @if (stop.departure_date) { Depart {{ stop.departure_date | date:'MMM d' }} }
+                      @if (stop.departure_date) { Depart {{ stop.departure_date | date:'MMM d':'UTC' }} }
                     </p>
                   }
                   @if (stop.drive_minutes_from_prev && stop.drive_minutes_from_prev > 0) {
@@ -918,9 +919,9 @@ function restaurantMarkerEl(): HTMLElement {
                   </div>
                   @if (s.arrival_date || s.departure_date) {
                     <div class="strip-dates">
-                      {{ s.arrival_date ? (s.arrival_date | date:'MMM d') : '' }}
+                      {{ s.arrival_date ? (s.arrival_date | date:'MMM d':'UTC') : '' }}
                       {{ s.arrival_date && s.departure_date ? '→' : '' }}
-                      {{ s.departure_date ? (s.departure_date | date:'MMM d') : '' }}
+                      {{ s.departure_date ? (s.departure_date | date:'MMM d':'UTC') : '' }}
                     </div>
                   }
                 </div>
@@ -1001,8 +1002,8 @@ export class TripDetailComponent implements OnInit {
     let nights = 0;
     for (const s of stops) {
       if (s.arrival_date && s.departure_date) {
-        const a = new Date(s.arrival_date   + 'T00:00:00');
-        const d = new Date(s.departure_date + 'T00:00:00');
+        const a = parseApiDate(s.arrival_date);
+        const d = parseApiDate(s.departure_date);
         nights += Math.max(0, Math.round((d.getTime() - a.getTime()) / 86_400_000));
       }
     }
@@ -1208,8 +1209,8 @@ export class TripDetailComponent implements OnInit {
   startEditStop(stop: TripStop) {
     if (this.editingStopId() === stop.id) { this.editingStopId.set(null); return; }
     this.editStopForm.patchValue({
-      arrival_date:   stop.arrival_date   ? new Date(stop.arrival_date)   : null,
-      departure_date: stop.departure_date ? new Date(stop.departure_date) : null,
+      arrival_date:   stop.arrival_date   ? parseApiDate(stop.arrival_date)   : null,
+      departure_date: stop.departure_date ? parseApiDate(stop.departure_date) : null,
       notes: stop.notes ?? '',
     });
     this.editingStopId.set(stop.id);

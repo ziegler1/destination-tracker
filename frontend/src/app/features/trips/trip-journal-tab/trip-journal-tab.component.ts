@@ -13,6 +13,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { JournalService } from '../../../core/services/journal.service';
 import { TripJournalEntry } from '../../../types/schema.types';
+import { parseApiDate } from '../../../core/utils/date.utils';
 
 @Component({
   selector: 'app-trip-journal-tab',
@@ -112,7 +113,7 @@ import { TripJournalEntry } from '../../../types/schema.types';
             <mat-card class="entry-card" (click)="toggleExpand(entry.id)">
               <div class="entry-header">
                 <div style="flex:1">
-                  <div class="entry-date">{{ entry.entry_date | date:'EEEE, MMMM d, y' }}</div>
+                  <div class="entry-date">{{ entry.entry_date | date:'EEEE, MMMM d, y':'UTC' }}</div>
                   @if (entry.title) { <p class="entry-title">{{ entry.title }}</p> }
                 </div>
                 <div class="entry-actions" (click)="$event.stopPropagation()">
@@ -192,7 +193,7 @@ export class TripJournalTabComponent implements OnInit {
     this.editForm.patchValue({
       title: entry.title ?? '',
       body: entry.body,
-      entry_date: new Date(entry.entry_date),
+      entry_date: parseApiDate(entry.entry_date),
     });
     this.editingId.set(entry.id);
   }

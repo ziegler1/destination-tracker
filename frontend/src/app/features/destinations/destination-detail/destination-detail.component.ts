@@ -332,7 +332,7 @@ interface WeatherDay {
               @if (dest()!.visited_at) {
                 <div class="meta-row">
                   <mat-icon class="meta-icon">event</mat-icon>
-                  <span class="meta-val">Visited {{ dest()!.visited_at | date:'MMM d, y' }}</span>
+                  <span class="meta-val">Visited {{ dest()!.visited_at | date:'MMM d, y':'UTC' }}</span>
                 </div>
               }
               @if (dest()!.latitude) {

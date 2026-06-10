@@ -135,7 +135,7 @@ function numberedPinEl(order: number): HTMLElement {
               <div class="route-stop-body">
                 <p class="route-stop-city">{{ stop.destination?.city }}, {{ stop.destination?.state_province }}</p>
                 @if (stop.arrival_date || stop.departure_date) {
-                  <p class="route-stop-dates">{{ stop.arrival_date | date:'MMM d' }} → {{ stop.departure_date | date:'MMM d' }}</p>
+                  <p class="route-stop-dates">{{ stop.arrival_date | date:'MMM d':'UTC' }} → {{ stop.departure_date | date:'MMM d':'UTC' }}</p>
                 }
               </div>
               <button mat-icon-button color="warn" matTooltip="Remove this stop"

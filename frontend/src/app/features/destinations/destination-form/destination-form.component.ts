@@ -19,6 +19,7 @@ import { EntityPhoto } from '../../../core/services/photo.service';
 import { HttpErrorResponse } from '@angular/common/http';
 import { DestinationService } from '../../../core/services/destination.service';
 import { GeocodingService } from '../../../core/services/geocoding.service';
+import { parseApiDate } from '../../../core/utils/date.utils';
 import { PlacesAutocompleteComponent, PlaceSelectedEvent } from '../../../shared/components/places-autocomplete/places-autocomplete.component';
 import { DuplicateDestinationDialogComponent } from '../../../shared/components/duplicate-destination-dialog/duplicate-destination-dialog.component';
 import { HomeAddressDialogComponent } from '../../../shared/components/home-address-dialog/home-address-dialog.component';
@@ -264,7 +265,7 @@ export class DestinationFormComponent implements OnInit {
       this.svc.get(+id).subscribe((d) => {
         this.form.patchValue({
           ...d,
-          visited_at: d.visited_at ? new Date(d.visited_at) : null,
+          visited_at: d.visited_at ? parseApiDate(d.visited_at) : null,
         });
         this.selectedMonths.set(d.best_months ?? []);
         this.photos.set((d.photos ?? []) as EntityPhoto[]);

@@ -13,6 +13,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { TripService } from '../../../core/services/trip.service';
+import { parseApiDate } from '../../../core/utils/date.utils';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 import { KeyboardAwareScrollDirective } from '../../../shared/directives/keyboard-aware-scroll.directive';
 
@@ -142,8 +143,8 @@ export class TripFormComponent implements OnInit {
         next: (t) => {
           this.form.patchValue({
             ...t,
-            start_date: t.start_date ? new Date(t.start_date) : null,
-            end_date:   t.end_date   ? new Date(t.end_date)   : null,
+            start_date: t.start_date ? parseApiDate(t.start_date) : null,
+            end_date:   t.end_date   ? parseApiDate(t.end_date)   : null,
           });
           this.loading.set(false);
         },

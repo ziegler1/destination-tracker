@@ -16,6 +16,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { StopService } from '../../../core/services/stop.service';
 import { DestinationService } from '../../../core/services/destination.service';
 import { LodgingService } from '../../../core/services/lodging.service';
+import { parseApiDate } from '../../../core/utils/date.utils';
 import { TripStop, TripStopStatus, Destination, Lodging } from '../../../types/schema.types';
 
 const STATUS_COLOR: Record<TripStopStatus, string> = {
@@ -161,9 +162,9 @@ const STATUS_COLOR: Record<TripStopStatus, string> = {
                     }
                     @if (stop.arrival_date || stop.departure_date) {
                       <p class="stop-dates">
-                        @if (stop.arrival_date) { Arrive {{ stop.arrival_date | date:'MMM d' }} }
+                        @if (stop.arrival_date) { Arrive {{ stop.arrival_date | date:'MMM d':'UTC' }} }
                         @if (stop.arrival_date && stop.departure_date) { → }
-                        @if (stop.departure_date) { Depart {{ stop.departure_date | date:'MMM d' }} }
+                        @if (stop.departure_date) { Depart {{ stop.departure_date | date:'MMM d':'UTC' }} }
                       </p>
                     }
                     <div class="stop-meta">
@@ -336,8 +337,8 @@ export class TripStopsTabComponent implements OnInit {
     this.editForm.patchValue({
       destination_id: stop.destination_id ?? null,
       lodging_id: stop.lodging_id ?? null,
-      arrival_date: stop.arrival_date ? new Date(stop.arrival_date) : null,
-      departure_date: stop.departure_date ? new Date(stop.departure_date) : null,
+      arrival_date: stop.arrival_date ? parseApiDate(stop.arrival_date) : null,
+      departure_date: stop.departure_date ? parseApiDate(stop.departure_date) : null,
       notes: stop.notes ?? '',
     });
     this.editingId.set(stop.id);
