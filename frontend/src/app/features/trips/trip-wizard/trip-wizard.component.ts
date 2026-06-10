@@ -514,6 +514,32 @@ function numberedPinEl(order: number): HTMLElement {
           }
         }
 
+        <!-- Add a stop before the first stop -->
+        <div class="add-stop-row">
+          @if (insertingAfter() === 0) {
+            <div class="insert-stop-form">
+              <p class="insert-stop-label">
+                Add a city between {{ shortPlace(form.value.origin || '') }} and {{ nextStopCity(0) }}
+              </p>
+              @if (insertLoading()) {
+                <div style="display:flex;align-items:center;gap:8px;padding:8px 0">
+                  <mat-spinner diameter="20" />
+                  <span style="font-size:13px;color:var(--wp-text-secondary)">Finding lodging & dining…</span>
+                </div>
+              } @else {
+                <app-places-autocomplete placeholder="Search city or address…"
+                  (placeSelected)="onInsertPlaceSelected($event, 0)" />
+                <button type="button" mat-stroked-button style="font-size:12px" (click)="insertingAfter.set(null)">Cancel</button>
+              }
+            </div>
+          } @else {
+            <button class="add-stop-btn" (click)="insertingAfter.set(0)">
+              <mat-icon style="font-size:16px;width:16px;height:16px">add</mat-icon>
+              Add a stop here
+            </button>
+          }
+        </div>
+
         <!-- Stop list -->
         @for (stop of plan()!.stops; track stop.stop_order) {
           <div class="route-stop-card" [id]="'route-stop-' + stop.stop_order">
