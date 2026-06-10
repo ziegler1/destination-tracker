@@ -21,14 +21,17 @@ import { MatDatepickerModule } from '@angular/material/datepicker';
 import { TripService } from '../../../core/services/trip.service';
 import { StopService } from '../../../core/services/stop.service';
 import { LodgingService } from '../../../core/services/lodging.service';
+import { RestaurantService } from '../../../core/services/restaurant.service';
+import { SpecialInterestService } from '../../../core/services/special-interest.service';
 import { JournalService } from '../../../core/services/journal.service';
 import { ClaudeService } from '../../../core/services/claude.service';
 import { GeocodingService } from '../../../core/services/geocoding.service';
 import { MapsService } from '../../../core/services/maps.service';
 import {
-  Trip, TripStatus, TripStop, TripExpense, TripJournalEntry, Lodging,
+  Trip, TripStatus, TripStop, TripExpense, TripJournalEntry, Lodging, Restaurant, SpecialInterestPlace,
 } from '../../../types/schema.types';
 import { AddStopSheetComponent } from '../../../shared/components/add-stop-sheet/add-stop-sheet.component';
+import { PlacesAutocompleteComponent, PlaceSelectedEvent } from '../../../shared/components/places-autocomplete/places-autocomplete.component';
 import { MatBottomSheet } from '@angular/material/bottom-sheet';
 import { TripStopsTabComponent }   from '../trip-stops-tab/trip-stops-tab.component';
 import { TripExpensesTabComponent } from '../trip-expenses-tab/trip-expenses-tab.component';
@@ -87,7 +90,7 @@ function restaurantMarkerEl(): HTMLElement {
     MatFormFieldModule, MatInputModule, MatSelectModule, MatDatepickerModule,
     TripStopsTabComponent, TripExpensesTabComponent,
     TripPackingTabComponent, TripJournalTabComponent, TripFuelTabComponent,
-    PageHeaderComponent,
+    PageHeaderComponent, PlacesAutocompleteComponent,
   ],
   styles: [`
     :host { display:block; }
@@ -251,12 +254,21 @@ function restaurantMarkerEl(): HTMLElement {
     .edit-form { padding:12px 14px; background:var(--wp-surface-variant); }
     .edit-grid { display:grid; grid-template-columns:1fr 1fr; gap:0 10px; }
     .edit-full { grid-column:1/-1; }
-    .hotel-panel { margin:8px 14px; padding:12px; border-radius:8px; background:var(--wp-surface-variant); }
-    .hotel-option { display:flex; align-items:center; gap:10px; padding:8px; border-radius:6px; cursor:pointer; margin-bottom:4px; }
-    .hotel-option:hover { background:var(--wp-surface); }
-    .hotel-option.selected { background:var(--wp-primary); color:#fff; }
-    .hotel-option.selected .hotel-sub { color:rgba(255,255,255,.7); }
-    .hotel-sub { font-size:12px; color:var(--wp-text-hint); }
+    .places-panel { margin:8px 14px; padding:12px; border-radius:8px; background:var(--wp-surface-variant); }
+    .places-section { margin-bottom:16px; }
+    .places-section:last-child { margin-bottom:0; }
+    .places-section-title { font-size:13px; font-weight:600; margin:0 0 8px; }
+    .place-option { display:flex; align-items:center; gap:10px; padding:8px; border-radius:6px; cursor:pointer; margin-bottom:4px; }
+    .place-option:hover { background:var(--wp-surface); }
+    .place-option.selected { background:var(--wp-primary); color:#fff; }
+    .place-option.selected .place-sub { color:rgba(255,255,255,.7); }
+    .place-sub { font-size:12px; color:var(--wp-text-hint); }
+    .place-search-label { font-size:12px; color:var(--wp-text-hint); margin:8px 0 4px; }
+    .place-chip { font-size:12px; background:var(--wp-surface-variant); padding:2px 6px 2px 8px;
+                  border-radius:8px; white-space:nowrap; display:inline-flex; align-items:center; gap:4px; }
+    .chip-remove { border:none; background:none; cursor:pointer; padding:0 2px; font-size:12px;
+                   line-height:1; color:var(--wp-text-hint); }
+    .chip-remove:hover { color:#b71c1c; }
     .right-panel { position:relative; overflow:hidden; }
     .map-recenter { position:absolute; bottom:20px; right:16px; z-index:1000;
                     background:var(--wp-surface) !important; box-shadow:0 2px 8px var(--wp-shadow) !important; }
@@ -663,8 +675,27 @@ function restaurantMarkerEl(): HTMLElement {
                       <mat-icon style="margin-top:2px">restaurant</mat-icon>
                       @for (tr of stop.restaurants!; track tr.id) {
                         @if (tr.restaurant; as r) {
-                          <span style="font-size:12px;background:var(--wp-surface-variant);padding:2px 8px;border-radius:8px;white-space:nowrap">
+                          <span class="place-chip">
                             {{ r.name }}@if (r.cuisine_type) { · {{ r.cuisine_type }}}
+                            @if (editingStopId() === stop.id) {
+                              <button type="button" class="chip-remove" (click)="removeRestaurant(stop, tr.id)" title="Remove">✕</button>
+                            }
+                          </span>
+                        }
+                      }
+                    </div>
+                  }
+
+                  @if (stop.special_interests?.length) {
+                    <div class="stop-row" style="align-items:flex-start;flex-wrap:wrap;gap:4px;padding:4px 14px 6px">
+                      <mat-icon style="margin-top:2px">attractions</mat-icon>
+                      @for (tsi of stop.special_interests!; track tsi.id) {
+                        @if (tsi.special_interest; as si) {
+                          <span class="place-chip">
+                            {{ si.name }}@if (si.category) { · {{ si.category }}}
+                            @if (editingStopId() === stop.id) {
+                              <button type="button" class="chip-remove" (click)="removeSpecialInterest(stop, tsi.id)" title="Remove">✕</button>
+                            }
                           </span>
                         }
                       }
@@ -700,28 +731,62 @@ function restaurantMarkerEl(): HTMLElement {
                         </div>
                       </form>
                     </div>
-                    <div class="hotel-panel">
-                      <p style="font-size:13px;font-weight:600;margin:0 0 8px">Change Hotel</p>
-                      @if (cityLodgings().length === 0) {
-                        <p style="font-size:12px;color:var(--wp-text-hint)">No lodging in this city yet.
-                          <a [routerLink]="['/lodging/new']" style="color:var(--wp-primary)">Add one →</a>
-                        </p>
-                      } @else {
-                        <div class="hotel-option" [class.selected]="!stop.lodging_id" (click)="changeLodging(stop, null)">
+                    <div class="places-panel">
+                      <!-- Lodging -->
+                      <div class="places-section">
+                        <p class="places-section-title">Lodging</p>
+                        <div class="place-option" [class.selected]="!stop.lodging_id" (click)="changeLodging(stop, null)">
                           <mat-icon>hotel_outlined</mat-icon><span>None — I'll decide later</span>
                         </div>
                         @for (l of cityLodgings(); track l.id) {
-                          <div class="hotel-option" [class.selected]="stop.lodging_id === l.id" (click)="changeLodging(stop, l.id)">
+                          <div class="place-option" [class.selected]="stop.lodging_id === l.id" (click)="changeLodging(stop, l.id)">
                             <mat-icon>hotel</mat-icon>
                             <div>
                               <div>{{ l.name }}</div>
-                              <div class="hotel-sub">{{ l.lodging_type | titlecase }}
+                              <div class="place-sub">{{ l.lodging_type | titlecase }}
                                 @if (l.price_per_night) { · {{ l.price_per_night | currency:'USD':'symbol':'1.0-0' }}/night }
                               </div>
                             </div>
                           </div>
                         }
-                      }
+                        <p class="place-search-label">Search for a new place</p>
+                        <app-places-autocomplete [types]="[]" placeholder="Search a hotel, motel, campground…"
+                          (placeSelected)="onNewLodgingSelected(stop, $event)" />
+                      </div>
+
+                      <!-- Restaurants -->
+                      <div class="places-section">
+                        <p class="places-section-title">Restaurants</p>
+                        @for (r of availableRestaurants(stop); track r.id) {
+                          <div class="place-option" (click)="addExistingRestaurant(stop, r.id)">
+                            <mat-icon>restaurant</mat-icon>
+                            <div>
+                              <div>{{ r.name }}</div>
+                              @if (r.cuisine_type) { <div class="place-sub">{{ r.cuisine_type }}</div> }
+                            </div>
+                          </div>
+                        }
+                        <p class="place-search-label">Search for a new place</p>
+                        <app-places-autocomplete [types]="[]" placeholder="Search a restaurant…"
+                          (placeSelected)="onNewRestaurantSelected(stop, $event)" />
+                      </div>
+
+                      <!-- Special Interests -->
+                      <div class="places-section">
+                        <p class="places-section-title">Special Interests</p>
+                        @for (s of availableSpecialInterests(stop); track s.id) {
+                          <div class="place-option" (click)="addExistingSpecialInterest(stop, s.id)">
+                            <mat-icon>attractions</mat-icon>
+                            <div>
+                              <div>{{ s.name }}</div>
+                              @if (s.category) { <div class="place-sub">{{ s.category }}</div> }
+                            </div>
+                          </div>
+                        }
+                        <p class="place-search-label">Search for a new place</p>
+                        <app-places-autocomplete [types]="[]" placeholder="Search an attraction, landmark…"
+                          (placeSelected)="onNewSpecialInterestSelected(stop, $event)" />
+                      </div>
                     </div>
                   }
 
@@ -877,6 +942,8 @@ export class TripDetailComponent implements OnInit {
   private svc        = inject(TripService);
   private stopSvc    = inject(StopService);
   private lodgingSvc = inject(LodgingService);
+  private restaurantSvc = inject(RestaurantService);
+  private specialInterestSvc = inject(SpecialInterestService);
   private journalSvc = inject(JournalService);
   private claudeSvc  = inject(ClaudeService);
   private geoSvc     = inject(GeocodingService);
@@ -898,6 +965,8 @@ export class TripDetailComponent implements OnInit {
   editingStopId       = signal<number | null>(null);
   savingStop          = signal(false);
   cityLodgings        = signal<Lodging[]>([]);
+  cityRestaurants     = signal<Restaurant[]>([]);
+  citySpecialInterests = signal<SpecialInterestPlace[]>([]);
   routeStats          = signal<{ distanceMi: number; durationMin: number } | null>(null);
   directionsResult    = signal<google.maps.DirectionsResult | null>(null);
 
@@ -1149,6 +1218,16 @@ export class TripDetailComponent implements OnInit {
       this.lodgingSvc.list().subscribe(all =>
         this.cityLodgings.set(all.filter(l => l.city.toLowerCase() === city.toLowerCase())),
       );
+      this.restaurantSvc.list().subscribe(all =>
+        this.cityRestaurants.set(all.filter(r => r.city.toLowerCase() === city.toLowerCase())),
+      );
+      this.specialInterestSvc.list().subscribe(all =>
+        this.citySpecialInterests.set(all.filter(s => s.city.toLowerCase() === city.toLowerCase())),
+      );
+    } else {
+      this.cityLodgings.set([]);
+      this.cityRestaurants.set([]);
+      this.citySpecialInterests.set([]);
     }
   }
 
@@ -1178,6 +1257,62 @@ export class TripDetailComponent implements OnInit {
       departure_date: fmt(v.departure_date as Date | null) ?? stop.departure_date ?? null,
       notes: v.notes ?? stop.notes ?? null,
     }).subscribe(() => this.reload());
+  }
+
+  isLinkedRestaurant(stop: TripStop, restaurantId: number): boolean {
+    return (stop.restaurants ?? []).some(tr => tr.restaurant_id === restaurantId);
+  }
+
+  isLinkedSpecialInterest(stop: TripStop, specialInterestId: number): boolean {
+    return (stop.special_interests ?? []).some(tsi => tsi.special_interest_id === specialInterestId);
+  }
+
+  availableRestaurants(stop: TripStop): Restaurant[] {
+    return this.cityRestaurants().filter(r => !this.isLinkedRestaurant(stop, r.id));
+  }
+
+  availableSpecialInterests(stop: TripStop): SpecialInterestPlace[] {
+    return this.citySpecialInterests().filter(s => !this.isLinkedSpecialInterest(stop, s.id));
+  }
+
+  addExistingRestaurant(stop: TripStop, restaurantId: number) {
+    this.stopSvc.addRestaurant(this.tripSig()!.id, stop.id, restaurantId).subscribe(() => this.reload());
+  }
+
+  addExistingSpecialInterest(stop: TripStop, specialInterestId: number) {
+    this.stopSvc.addSpecialInterest(this.tripSig()!.id, stop.id, specialInterestId).subscribe(() => this.reload());
+  }
+
+  removeRestaurant(stop: TripStop, linkId: number) {
+    this.stopSvc.removeRestaurant(this.tripSig()!.id, stop.id, linkId).subscribe(() => this.reload());
+  }
+
+  removeSpecialInterest(stop: TripStop, linkId: number) {
+    this.stopSvc.removeSpecialInterest(this.tripSig()!.id, stop.id, linkId).subscribe(() => this.reload());
+  }
+
+  onNewLodgingSelected(stop: TripStop, e: PlaceSelectedEvent) {
+    this.lodgingSvc.create({
+      name: e.name, city: e.city, state_province: e.state_province, country: e.country,
+      address: e.formatted_address, latitude: e.lat, longitude: e.lng,
+      lodging_type: 'hotel', website: e.website, phone: e.phone, pet_friendly: false,
+    }).subscribe(newLodging => this.changeLodging(stop, newLodging.id));
+  }
+
+  onNewRestaurantSelected(stop: TripStop, e: PlaceSelectedEvent) {
+    this.restaurantSvc.create({
+      name: e.name, city: e.city, state_province: e.state_province, country: e.country,
+      address: e.formatted_address, latitude: e.lat, longitude: e.lng,
+      website: e.website, phone: e.phone, pet_friendly: false,
+    }).subscribe(newRestaurant => this.addExistingRestaurant(stop, newRestaurant.id));
+  }
+
+  onNewSpecialInterestSelected(stop: TripStop, e: PlaceSelectedEvent) {
+    this.specialInterestSvc.create({
+      name: e.name, city: e.city, state_province: e.state_province, country: e.country,
+      address: e.formatted_address, latitude: e.lat, longitude: e.lng,
+      website: e.website, phone: e.phone,
+    }).subscribe(newSI => this.addExistingSpecialInterest(stop, newSI.id));
   }
 
   private reload() {

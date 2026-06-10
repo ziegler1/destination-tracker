@@ -43,4 +43,12 @@ export class StopService {
   addSpecialInterest(tripId: number, stopId: number, specialInterestId: number) {
     return this.http.post<unknown>(`${this.base(tripId)}/${stopId}/special-interests`, { special_interest_id: specialInterestId });
   }
+
+  removeRestaurant(tripId: number, stopId: number, linkId: number) {
+    return this.http.delete<void>(`${this.base(tripId)}/${stopId}/restaurants/${linkId}`);
+  }
+
+  removeSpecialInterest(tripId: number, stopId: number, linkId: number) {
+    return this.http.delete<void>(`${this.base(tripId)}/${stopId}/special-interests/${linkId}`);
+  }
 }

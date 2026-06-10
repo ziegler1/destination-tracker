@@ -233,6 +233,7 @@ function primaryPhotoUrl(
       <map-info-window #infoWindow>
         @if (activeMarker(); as m) {
           <div style="min-width:180px;max-width:220px;font-family:Roboto,sans-serif;overflow:hidden">
+            <div style="padding:6px 8px;font-size:14px;font-weight:700;background:#fff;border-bottom:1px solid #eee">{{ m.name }}</div>
             @if (m.photoUrl) {
               <img [src]="m.photoUrl" style="width:100%;height:110px;object-fit:cover;display:block"
                    (error)="$any($event.target).style.display='none'" />

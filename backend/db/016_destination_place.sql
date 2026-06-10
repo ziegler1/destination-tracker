@@ -1,0 +1,3 @@
+ALTER TABLE destinations
+  ADD COLUMN IF NOT EXISTS address TEXT,
+  ADD COLUMN IF NOT EXISTS google_place_id TEXT;

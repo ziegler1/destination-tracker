@@ -159,6 +159,11 @@ interface WizardStop {
   poi_suggestions:        PoiSuggestion[];
   special_interest_matches?: SpecialInterestMatch[];
   city_photo_url?: string | null;
+  place_name?:    string | null;
+  place_address?: string | null;
+  place_lat?:     number | null;
+  place_lng?:     number | null;
+  place_id?:      string | null;
 }
 
 interface WizardTrip {
@@ -184,7 +189,7 @@ interface WizardPlan {
 
 router.post('/generate', asyncHandler(async (req, res) => {
   const {
-    origin, destination, start_date, end_date, budget,
+    origin, destination, destination_place, start_date, end_date, budget,
     trip_type = 'one_way',
     drive_hours_per_day = 6,
     stop_timing = 'flexible',
@@ -194,6 +199,9 @@ router.post('/generate', asyncHandler(async (req, res) => {
   } = req.body as {
     origin: string;
     destination: string;
+    destination_place?: {
+      name: string; formatted_address: string; lat: number; lng: number; place_id: string;
+    } | null;
     start_date: string;
     end_date: string;
     budget: number;
@@ -347,6 +355,29 @@ Return JSON:
     console.error('Claude JSON parse failed. Raw (first 800 chars):', rawText.slice(0, 800));
     res.status(502).json({ error: 'Claude returned invalid JSON', raw: rawText.slice(0, 800) });
     return;
+  }
+
+  // If the user picked a specific place (restaurant/lodging/special interest/etc.) as their
+  // destination, attach its precise name/address/coordinates to the stop that represents it,
+  // so /confirm can preserve the exact location instead of falling back to city-center.
+  if (destination_place) {
+    const sorted = [...plan.stops].sort((a, b) => a.stop_order - b.stop_order);
+    let destStop: WizardStop | undefined;
+    if (trip_type === 'based_at_destination') {
+      destStop = sorted.find((s) => s.stop_type === 'base');
+    } else if (trip_type === 'round_trip') {
+      const outbound = sorted.filter((s) => s.stop_type !== 'return_transit');
+      destStop = outbound[outbound.length - 1];
+    } else {
+      destStop = sorted[sorted.length - 1];
+    }
+    if (destStop) {
+      destStop.place_name    = destination_place.name;
+      destStop.place_address = destination_place.formatted_address;
+      destStop.place_lat     = destination_place.lat;
+      destStop.place_lng     = destination_place.lng;
+      destStop.place_id      = destination_place.place_id;
+    }
   }
 
   // ── STEP 2: Google Places enrichment ─────────────────────────────────────
@@ -569,38 +600,66 @@ router.post('/confirm', asyncHandler(async (req, res) => {
 
     for (const stop of stops.sort((a, b) => a.stop_order - b.stop_order)) {
 
-      // 2a. Ensure a destination record exists for this city
-      // Geocode the stop city so map pins work
-      const coords = await geocodeCity(stop.city, stop.state_province);
-
-      const { rows: existingDest } = await client.query<{ id: number; latitude: number | null }>(
-        `SELECT id, latitude FROM destinations
-         WHERE city = $1 AND state_province = $2
-         LIMIT 1`,
-        [stop.city, stop.state_province],
-      );
+      // 2a. Ensure a destination record exists for this stop
       let destinationId: number;
-      if (existingDest.length > 0) {
-        destinationId = existingDest[0].id;
-        // Backfill coordinates if missing
-        if (!existingDest[0].latitude && coords) {
-          await client.query(
-            'UPDATE destinations SET latitude=$1, longitude=$2 WHERE id=$3',
-            [coords.lat, coords.lon, destinationId],
+      if (stop.place_id) {
+        // The user picked a specific place (restaurant/lodging/special interest/landmark) as
+        // their destination — preserve its precise name/address/coordinates rather than
+        // collapsing to the city center.
+        const { rows: existingByPlace } = await client.query<{ id: number }>(
+          `SELECT id FROM destinations WHERE google_place_id = $1 LIMIT 1`,
+          [stop.place_id],
+        );
+        if (existingByPlace.length > 0) {
+          destinationId = existingByPlace[0].id;
+        } else {
+          const { rows: [newDest] } = await client.query<{ id: number }>(
+            `INSERT INTO destinations
+               (name, city, state_province, country, status, latitude, longitude, image_url, address, google_place_id)
+             VALUES ($1, $2, $3, $4, 'want_to_visit', $5, $6, $7, $8, $9)
+             RETURNING id`,
+            [
+              stop.place_name || stop.city, stop.city, stop.state_province, normalizeCountry(stop.country),
+              stop.place_lat ?? null, stop.place_lng ?? null,
+              stop.city_photo_url ?? null,
+              stop.place_address ?? null,
+              stop.place_id,
+            ],
           );
+          destinationId = newDest.id;
         }
       } else {
-        const { rows: [newDest] } = await client.query<{ id: number }>(
-          `INSERT INTO destinations (name, city, state_province, country, status, latitude, longitude, image_url)
-           VALUES ($1, $2, $3, $4, 'want_to_visit', $5, $6, $7)
-           RETURNING id`,
-          [
-            stop.city, stop.city, stop.state_province, normalizeCountry(stop.country),
-            coords?.lat ?? null, coords?.lon ?? null,
-            stop.city_photo_url ?? null,
-          ],
+        // Geocode the stop city so map pins work
+        const coords = await geocodeCity(stop.city, stop.state_province);
+
+        const { rows: existingDest } = await client.query<{ id: number; latitude: number | null }>(
+          `SELECT id, latitude FROM destinations
+           WHERE city = $1 AND state_province = $2
+           LIMIT 1`,
+          [stop.city, stop.state_province],
         );
-        destinationId = newDest.id;
+        if (existingDest.length > 0) {
+          destinationId = existingDest[0].id;
+          // Backfill coordinates if missing
+          if (!existingDest[0].latitude && coords) {
+            await client.query(
+              'UPDATE destinations SET latitude=$1, longitude=$2 WHERE id=$3',
+              [coords.lat, coords.lon, destinationId],
+            );
+          }
+        } else {
+          const { rows: [newDest] } = await client.query<{ id: number }>(
+            `INSERT INTO destinations (name, city, state_province, country, status, latitude, longitude, image_url)
+             VALUES ($1, $2, $3, $4, 'want_to_visit', $5, $6, $7)
+             RETURNING id`,
+            [
+              stop.city, stop.city, stop.state_province, normalizeCountry(stop.country),
+              coords?.lat ?? null, coords?.lon ?? null,
+              stop.city_photo_url ?? null,
+            ],
+          );
+          destinationId = newDest.id;
+        }
       }
 
       // 2b. Resolve lodging — pick the approved suggestion (first approved wins)

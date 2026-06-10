@@ -26,12 +26,21 @@ router.get('/', asyncHandler(async (req, res) => {
           'id', r.id, 'name', r.name, 'city', r.city,
           'cuisine_type', r.cuisine_type, 'price_range', r.price_range, 'rating', r.rating
         ) ELSE NULL END
-      )) FILTER (WHERE tr.id IS NOT NULL), '[]') AS restaurants
+      )) FILTER (WHERE tr.id IS NOT NULL), '[]') AS restaurants,
+      COALESCE(jsonb_agg(DISTINCT jsonb_build_object(
+        'id', tsi.id, 'special_interest_id', tsi.special_interest_id,
+        'special_interest', CASE WHEN sip.id IS NOT NULL THEN jsonb_build_object(
+          'id', sip.id, 'name', sip.name, 'city', sip.city,
+          'category', sip.category, 'rating', sip.rating
+        ) ELSE NULL END
+      )) FILTER (WHERE tsi.id IS NOT NULL), '[]') AS special_interests
     FROM trip_stops ts
     LEFT JOIN destinations  d  ON d.id  = ts.destination_id
     LEFT JOIN lodging        l  ON l.id  = ts.lodging_id
     LEFT JOIN trip_restaurants tr ON tr.trip_stop_id = ts.id
     LEFT JOIN restaurants    r  ON r.id  = tr.restaurant_id
+    LEFT JOIN trip_special_interests tsi ON tsi.trip_stop_id = ts.id
+    LEFT JOIN special_interest_places sip ON sip.id = tsi.special_interest_id
     WHERE ts.trip_id = $1
     GROUP BY ts.id, d.id, l.id
     ORDER BY ts.stop_order
@@ -52,7 +61,32 @@ router.get('/:id', asyncHandler(async (req, res) => {
       CASE WHEN ts.lodging_id IS NOT NULL THEN jsonb_build_object(
         'id', l.id, 'name', l.name, 'city', l.city,
         'lodging_type', l.lodging_type, 'price_per_night', l.price_per_night
-      ) ELSE NULL END AS lodging
+      ) ELSE NULL END AS lodging,
+      COALESCE((
+        SELECT jsonb_agg(jsonb_build_object(
+          'id', tr.id, 'restaurant_id', tr.restaurant_id,
+          'visited_at', tr.visited_at, 'notes', tr.notes,
+          'restaurant', jsonb_build_object(
+            'id', r.id, 'name', r.name, 'city', r.city,
+            'cuisine_type', r.cuisine_type, 'price_range', r.price_range, 'rating', r.rating
+          )
+        ))
+        FROM trip_restaurants tr
+        JOIN restaurants r ON r.id = tr.restaurant_id
+        WHERE tr.trip_stop_id = ts.id
+      ), '[]') AS restaurants,
+      COALESCE((
+        SELECT jsonb_agg(jsonb_build_object(
+          'id', tsi.id, 'special_interest_id', tsi.special_interest_id,
+          'special_interest', jsonb_build_object(
+            'id', sip.id, 'name', sip.name, 'city', sip.city,
+            'category', sip.category, 'rating', sip.rating
+          )
+        ))
+        FROM trip_special_interests tsi
+        JOIN special_interest_places sip ON sip.id = tsi.special_interest_id
+        WHERE tsi.trip_stop_id = ts.id
+      ), '[]') AS special_interests
     FROM trip_stops ts
     LEFT JOIN destinations d ON d.id = ts.destination_id
     LEFT JOIN lodging      l ON l.id = ts.lodging_id
@@ -194,6 +228,28 @@ router.post('/:id/special-interests', asyncHandler(async (req, res) => {
     [tripId, stopId, special_interest_id],
   );
   res.status(201).json(rows[0] ?? { trip_id: tripId, trip_stop_id: stopId, special_interest_id });
+}));
+
+// DELETE /api/trips/:tripId/stops/:id/restaurants/:linkId — unlink a restaurant from a stop
+router.delete('/:id/restaurants/:linkId', asyncHandler(async (req, res) => {
+  const { tripId, id: stopId, linkId } = req.params;
+  const { rowCount } = await pool.query(
+    'DELETE FROM trip_restaurants WHERE id=$1 AND trip_stop_id=$2 AND trip_id=$3',
+    [linkId, stopId, tripId],
+  );
+  if (!rowCount) return void res.status(404).json({ error: 'Link not found' });
+  res.json({ deleted: true, id: +linkId });
+}));
+
+// DELETE /api/trips/:tripId/stops/:id/special-interests/:linkId — unlink a special interest from a stop
+router.delete('/:id/special-interests/:linkId', asyncHandler(async (req, res) => {
+  const { tripId, id: stopId, linkId } = req.params;
+  const { rowCount } = await pool.query(
+    'DELETE FROM trip_special_interests WHERE id=$1 AND trip_stop_id=$2 AND trip_id=$3',
+    [linkId, stopId, tripId],
+  );
+  if (!rowCount) return void res.status(404).json({ error: 'Link not found' });
+  res.json({ deleted: true, id: +linkId });
 }));
 
 export default router;

@@ -22,6 +22,8 @@ export interface Destination {
   travel_tips?: string;
   highlights?: string;
   visit_count?: number;
+  address?: string | null;
+  google_place_id?: string | null;
   created_at: string;
   updated_at: string;
   photos?: DestinationPhoto[];
@@ -173,6 +175,7 @@ export interface TripStop {
   destination?: Destination;
   lodging?: Lodging;
   restaurants?: TripRestaurant[];
+  special_interests?: TripSpecialInterest[];
 }
 
 export interface TripRestaurant {
@@ -183,6 +186,14 @@ export interface TripRestaurant {
   visited_at?: string;
   notes?: string;
   restaurant?: Restaurant;
+}
+
+export interface TripSpecialInterest {
+  id: number;
+  trip_id: number;
+  trip_stop_id?: number;
+  special_interest_id?: number;
+  special_interest?: SpecialInterestPlace;
 }
 
 export type ExpenseCategory = 'lodging' | 'food' | 'fuel' | 'activities' | 'shopping' | 'other';
@@ -396,6 +407,11 @@ export interface WizardStop {
   restaurant_suggestions:  WizardRestaurantSuggestion[];
   poi_suggestions:         WizardPoiSuggestion[];
   special_interest_matches?: WizardSpecialInterestMatch[];
+  place_name?:             string | null;
+  place_address?:          string | null;
+  place_lat?:              number | null;
+  place_lng?:              number | null;
+  place_id?:               string | null;
 }
 
 export interface WizardTripMeta {
@@ -426,6 +442,13 @@ export type TripType = 'round_trip' | 'one_way' | 'based_at_destination';
 export interface WizardGenerateRequest {
   origin:             string;
   destination:        string;
+  destination_place?: {
+    name:              string;
+    formatted_address: string;
+    lat:               number;
+    lng:               number;
+    place_id:          string;
+  } | null;
   start_date:         string;
   end_date:           string;
   budget:             number;

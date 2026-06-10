@@ -78,6 +78,24 @@ router.get('/:id', asyncHandler(async (req, res) => {
               FROM trip_restaurants tr
               JOIN restaurants r ON r.id = tr.restaurant_id
               WHERE tr.trip_stop_id = ts.id
+            ),
+            'special_interests', (
+              SELECT COALESCE(jsonb_agg(
+                jsonb_build_object(
+                  'id', tsi.id, 'trip_id', tsi.trip_id, 'trip_stop_id', tsi.trip_stop_id,
+                  'special_interest_id', tsi.special_interest_id,
+                  'special_interest', jsonb_build_object(
+                    'id', sip.id, 'name', sip.name, 'city', sip.city,
+                    'category', sip.category, 'rating', sip.rating,
+                    'address', sip.address, 'latitude', sip.latitude, 'longitude', sip.longitude,
+                    'website', sip.website
+                  )
+                )
+                ORDER BY sip.name
+              ), '[]')
+              FROM trip_special_interests tsi
+              JOIN special_interest_places sip ON sip.id = tsi.special_interest_id
+              WHERE tsi.trip_stop_id = ts.id
             )
           )
           ORDER BY ts.stop_order

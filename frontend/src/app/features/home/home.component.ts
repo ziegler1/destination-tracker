@@ -91,14 +91,15 @@ const TRIP_COLORS = ['#00695C', '#1565C0', '#6A1B9A', '#B71C1C', '#E65100', '#2E
     }
     .trips-row::-webkit-scrollbar { display:none; }
     .trip-card {
-      flex:0 0 200px; border-radius:12px; overflow:hidden;
+      flex:0 0 auto; width:max-content; min-width:140px; max-width:240px;
+      border-radius:12px; overflow:hidden;
       box-shadow:0 2px 8px rgba(0,0,0,.12); cursor:pointer;
       text-decoration:none; color:inherit;
       transition:transform .15s, box-shadow .15s;
     }
     .trip-card:hover { transform:translateY(-2px); box-shadow:0 6px 18px rgba(0,0,0,.16); }
     .trip-card-top {
-      height:110px; display:flex; align-items:flex-end; padding:12px;
+      min-height:55px; display:flex; align-items:flex-end; padding:12px;
     }
     .trip-card-name { font-size:14px; font-weight:700; color:#fff; line-height:1.3; text-shadow:0 1px 4px rgba(0,0,0,.4); }
     .trip-card-body { padding:10px 12px 12px; background:var(--wp-surface); }

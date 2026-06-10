@@ -348,7 +348,8 @@ function numberedPinEl(order: number): HTMLElement {
                 <p class="place-label">Destination *</p>
                 <app-places-autocomplete
                   #destAC
-                  placeholder="Search destination city or address…"
+                  placeholder="Search a city, address, hotel, restaurant, or attraction…"
+                  [types]="[]"
                   (placeSelected)="onDestSelected($event)" />
                 @if (destDisplay()) {
                   <p class="place-selected"><mat-icon style="font-size:14px;width:14px;height:14px">place</mat-icon> {{ destDisplay() }}</p>
@@ -867,6 +868,7 @@ export class TripWizardComponent implements OnInit, OnDestroy {
 
   originDisplay = signal('');
   destDisplay   = signal('');
+  destPlace     = signal<{ name: string; formatted_address: string; lat: number; lng: number; place_id: string } | null>(null);
 
   // ── Step state ──────────────────────────────────────────────────────
   step        = signal(1);
@@ -981,7 +983,13 @@ export class TripWizardComponent implements OnInit, OnDestroy {
 
   onDestSelected(e: PlaceSelectedEvent) {
     this.form.patchValue({ destination: e.formatted_address });
-    this.destDisplay.set(e.formatted_address);
+    this.destDisplay.set(
+      e.name && e.name !== e.formatted_address ? `${e.name} — ${e.formatted_address}` : e.formatted_address,
+    );
+    this.destPlace.set({
+      name: e.name, formatted_address: e.formatted_address,
+      lat: e.lat, lng: e.lng, place_id: e.place_id,
+    });
   }
 
   useHome() {
@@ -1033,6 +1041,7 @@ export class TripWizardComponent implements OnInit, OnDestroy {
     const payload: WizardGenerateRequest = {
       origin:              v.origin!,
       destination:         v.destination!,
+      destination_place:   this.destPlace(),
       start_date:          (v.start_date as Date).toISOString().split('T')[0],
       end_date:            (v.end_date   as Date).toISOString().split('T')[0],
       budget:              v.budget ?? 0,
