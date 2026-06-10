@@ -98,6 +98,12 @@ function restaurantMarkerEl(): HTMLElement {
                     background:var(--wp-surface-variant); text-transform:capitalize; }
     .return-yes-sm { font-size:11px; font-weight:700; color:#2E7D32;
                      background:#E8F5E9; padding:1px 6px; border-radius:8px; }
+    .planning-banner {
+      display:flex; align-items:center; gap:8px; margin-top:12px;
+      padding:8px 12px; border-radius:8px; background:var(--wp-surface-variant);
+      font-size:12px; color:var(--wp-text-secondary); line-height:1.4;
+    }
+    .planning-banner mat-icon { flex-shrink:0; font-size:18px; width:18px; height:18px; color:var(--wp-primary); }
 
     // SCRAPBOOK LAYOUT (completed trips)
     .scrapbook { max-width:960px; margin:0 auto; padding:0 0 48px; }
@@ -572,6 +578,13 @@ function restaurantMarkerEl(): HTMLElement {
                 </span>
               </div>
               @if (t.status === 'planning') {
+                <div class="planning-banner">
+                  <mat-icon>edit_road</mat-icon>
+                  <span>Still planning? You can adjust your route, stops, and order anytime.</span>
+                </div>
+                <button mat-stroked-button style="margin-top:8px;width:100%" [routerLink]="['/trips', t.id, 'edit-wizard']">
+                  <mat-icon>edit_road</mat-icon> Edit Route & Stops
+                </button>
                 <button mat-raised-button color="primary" style="margin-top:10px;width:100%" (click)="setStatus('active')">
                   <mat-icon>flight_takeoff</mat-icon> Start Trip
                 </button>

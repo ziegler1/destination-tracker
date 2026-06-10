@@ -28,6 +28,10 @@ export class StopService {
     return this.http.delete<void>(`${this.base(tripId)}/${stopId}`);
   }
 
+  reorder(tripId: number, order: number[]) {
+    return this.http.put<TripStop[]>(`${this.base(tripId)}/reorder`, { order });
+  }
+
   addRestaurant(tripId: number, stopId: number, restaurantId: number) {
     return this.http.post<unknown>(`${this.base(tripId)}/${stopId}/restaurants`, { restaurant_id: restaurantId });
   }

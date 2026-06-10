@@ -77,6 +77,35 @@ router.post('/', asyncHandler(async (req, res) => {
   res.status(201).json(rows[0]);
 }));
 
+// PUT /api/trips/:tripId/stops/reorder — bulk-persist a new stop_order sequence
+router.put('/reorder', asyncHandler(async (req, res) => {
+  const { tripId } = req.params;
+  const { order } = req.body as { order: number[] };
+  if (!Array.isArray(order) || order.length === 0) {
+    return void res.status(400).json({ error: 'order must be a non-empty array of stop IDs' });
+  }
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    for (let i = 0; i < order.length; i++) {
+      await client.query(
+        'UPDATE trip_stops SET stop_order=$1 WHERE id=$2 AND trip_id=$3',
+        [i + 1, order[i], tripId],
+      );
+    }
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+  const { rows } = await pool.query(
+    'SELECT * FROM trip_stops WHERE trip_id=$1 ORDER BY stop_order', [tripId],
+  );
+  res.json(rows);
+}));
+
 // PUT /api/trips/:tripId/stops/:id
 router.put('/:id', asyncHandler(async (req, res) => {
   const { tripId, id } = req.params;

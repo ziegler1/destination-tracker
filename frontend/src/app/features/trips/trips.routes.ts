@@ -22,6 +22,11 @@ export const TRIP_ROUTES: Routes = [
       import('./trip-form/trip-form.component').then((m) => m.TripFormComponent),
   },
   {
+    path: ':id/edit-wizard',
+    loadComponent: () =>
+      import('./trip-edit-wizard/trip-edit-wizard.component').then((m) => m.TripEditWizardComponent),
+  },
+  {
     path: ':id/journal',
     loadComponent: () =>
       import('./trip-detail/trip-detail.component').then((m) => m.TripDetailComponent),
