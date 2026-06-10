@@ -956,11 +956,26 @@ export class TripWizardComponent implements OnInit, OnDestroy {
   ngOnInit() {
     const draft = this.draftSvc.consume();
     if (draft) {
-      const label = [draft.city || draft.destination, draft.state_province].filter(Boolean).join(', ');
-      if (label) {
-        this.form.patchValue({ destination: label });
-        this.destDisplay.set(label);
-        setTimeout(() => this.destAC?.setValue(label));
+      if (draft.place_id && draft.formatted_address && draft.lat != null && draft.lng != null) {
+        // Carry the precise place picked on the home page through to the wizard,
+        // matching onDestSelected() so /generate preserves its exact location.
+        const display = draft.destination && draft.destination !== draft.formatted_address
+          ? `${draft.destination} — ${draft.formatted_address}`
+          : draft.formatted_address;
+        this.form.patchValue({ destination: draft.formatted_address });
+        this.destDisplay.set(display);
+        this.destPlace.set({
+          name: draft.destination ?? '', formatted_address: draft.formatted_address,
+          lat: draft.lat, lng: draft.lng, place_id: draft.place_id,
+        });
+        setTimeout(() => this.destAC?.setValue(display));
+      } else {
+        const label = [draft.city || draft.destination, draft.state_province].filter(Boolean).join(', ');
+        if (label) {
+          this.form.patchValue({ destination: label });
+          this.destDisplay.set(label);
+          setTimeout(() => this.destAC?.setValue(label));
+        }
       }
     }
 

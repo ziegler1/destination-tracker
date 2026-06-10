@@ -248,8 +248,8 @@ const TRIP_COLORS = ['#00695C', '#1565C0', '#6A1B9A', '#B71C1C', '#E65100', '#2E
             <p class="search-sub">Search a destination to start planning your next adventure</p>
             <div class="search-wrap">
               <app-places-autocomplete
-                placeholder="Enter a city or destination…"
-                [types]="['(cities)']"
+                placeholder="Enter a city, hotel, restaurant, or attraction…"
+                [types]="[]"
                 (placeSelected)="onDestinationSearch($event)" />
             </div>
           </div>
@@ -495,6 +495,10 @@ export class HomeComponent implements OnInit {
       destination: e.name,
       city: e.city,
       state_province: e.state_province,
+      formatted_address: e.formatted_address,
+      lat: e.lat,
+      lng: e.lng,
+      place_id: e.place_id,
     });
     this.router.navigate(['/trips/new']);
   }

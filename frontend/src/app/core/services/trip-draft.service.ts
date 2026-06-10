@@ -5,6 +5,10 @@ export interface TripDraft {
   destination?: string;
   city?: string;
   state_province?: string;
+  formatted_address?: string;
+  lat?: number;
+  lng?: number;
+  place_id?: string;
 }
 
 /**
