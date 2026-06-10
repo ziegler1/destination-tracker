@@ -546,7 +546,7 @@ function numberedPinEl(order: number): HTMLElement {
           <div class="route-stop-card" [id]="'route-stop-' + stop.stop_order">
             <div class="route-stop-num">{{ stop.stop_order }}</div>
             <div class="route-stop-body">
-              <p class="route-stop-city">{{ stop.city }}, {{ stop.state_province }}</p>
+              <p class="route-stop-city">{{ stopLabel(stop) }}</p>
               @if (stop.arrive_date) {
                 <p class="route-stop-dates">{{ stop.arrive_date | date:'MMM d' }} → {{ stop.depart_date | date:'MMM d' }}</p>
               }
@@ -619,7 +619,7 @@ function numberedPinEl(order: number): HTMLElement {
           <div class="stop-b-header">
             <div class="route-stop-num">{{ stop.stop_order }}</div>
             <div>
-              <p class="route-stop-city">{{ stop.city }}, {{ stop.state_province }}</p>
+              <p class="route-stop-city">{{ stopLabel(stop) }}</p>
               @if (stop.arrive_date) {
                 <p class="route-stop-dates">
                   {{ stop.arrive_date | date:'MMM d' }} → {{ stop.depart_date | date:'MMM d' }}
@@ -777,7 +777,7 @@ function numberedPinEl(order: number): HTMLElement {
         @for (stop of plan()!.stops; track stop.stop_order) {
           @if (stop.stop_type !== 'base') {
             <div class="lodging-summary-row">
-              <span class="lodging-summary-city">{{ stop.city }}, {{ stop.state_province }}</span>
+              <span class="lodging-summary-city">{{ stopLabel(stop) }}</span>
               @if (selectedLodgingFor(stop); as lodging) {
                 <span class="lodging-summary-name">{{ lodging.name }}</span>
                 <span class="lodging-summary-price">{{ lodging.estimated_price_per_night | currency:'USD':'symbol':'1.0-0' }}/night</span>
@@ -910,7 +910,7 @@ export class TripWizardComponent implements OnInit, OnDestroy {
   routeRecap = computed(() => {
     const p = this.plan();
     if (!p) return [];
-    return [this.shortPlace(p.trip.origin), ...p.stops.map(s => s.city)];
+    return [this.shortPlace(p.trip.origin), ...p.stops.map(s => s.place_name || s.city)];
   });
 
   totalPackItems = computed(() =>
@@ -1087,8 +1087,8 @@ export class TripWizardComponent implements OnInit, OnDestroy {
     const origin     = this.form.value.origin || '';
     const tripType   = this.form.value.trip_type;
 
-    // Build address list: origin → each stop city → (origin if round trip)
-    const stopAddresses = sorted.map(s => `${s.city}, ${s.state_province}`);
+    // Build address list: origin → each stop city (or precise place) → (origin if round trip)
+    const stopAddresses = sorted.map(s => s.place_address || `${s.city}, ${s.state_province}`);
     const addresses: string[] = [origin, ...stopAddresses];
     if (tripType === 'round_trip' || (tripType === 'based_at_destination' && this.form.value.include_return)) {
       addresses.push(origin);
@@ -1208,6 +1208,12 @@ export class TripWizardComponent implements OnInit, OnDestroy {
     const next = (this.plan()?.stops ?? []).find(s => s.stop_order === afterOrder + 1);
     if (next) return `${next.city}, ${next.state_province}`;
     return this.form.value.destination || 'your destination';
+  }
+
+  stopLabel(stop: WizardStop): string {
+    return stop.place_name
+      ? `${stop.place_name} — ${stop.city}, ${stop.state_province}`
+      : `${stop.city}, ${stop.state_province}`;
   }
 
   // ── Phase B/C navigation ──────────────────────────────────────────────

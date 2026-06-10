@@ -232,23 +232,22 @@ function primaryPhotoUrl(
 
       <map-info-window #infoWindow>
         @if (activeMarker(); as m) {
-          <div style="min-width:180px;max-width:220px;font-family:Roboto,sans-serif;overflow:hidden">
-            <div style="padding:6px 8px;font-size:14px;font-weight:700;background:#fff;color:#212121;border-bottom:1px solid #eee">{{ m.name }}</div>
+          <div style="min-width:140px;max-width:170px;font-family:Roboto,sans-serif;overflow:hidden">
             @if (m.photoUrl) {
-              <img [src]="m.photoUrl" style="width:100%;height:110px;object-fit:cover;display:block"
+              <img [src]="m.photoUrl" style="width:100%;height:80px;object-fit:cover;display:block"
                    (error)="$any($event.target).style.display='none'" />
             }
-            <div style="padding:8px">
-              <strong style="font-size:14px;display:block;margin-bottom:2px;color:#212121">{{ m.name }}</strong>
+            <div style="padding:6px">
+              <strong style="font-size:13px;display:block;margin-bottom:2px;color:#212121">{{ m.name }}</strong>
               <small style="color:#666">{{ m.city }}, {{ m.state }}</small><br/>
-              <span style="font-size:12px;text-transform:capitalize;color:#888">{{ m.sub }}</span>
+              <span style="font-size:11px;text-transform:capitalize;color:#888">{{ m.sub }}</span>
               @if (m.rating) {
-                <span style="font-size:12px;color:#f57f17;margin-left:6px">★ {{ m.rating }}</span>
+                <span style="font-size:11px;color:#f57f17;margin-left:6px">★ {{ m.rating }}</span>
               }
               <br/>
               <button (click)="router.navigate(m.route)"
-                style="margin-top:8px;padding:4px 12px;background:#00695C;color:white;border:none;
-                       border-radius:4px;cursor:pointer;font-size:12px">
+                style="margin-top:6px;padding:3px 10px;background:#00695C;color:white;border:none;
+                       border-radius:4px;cursor:pointer;font-size:11px">
                 View →
               </button>
             </div>
