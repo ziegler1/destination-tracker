@@ -313,9 +313,18 @@ function restaurantMarkerEl(): HTMLElement {
       background:var(--wp-surface); border:2px solid var(--wp-border); cursor:pointer;
       transition:border-color .2s;
     }
-    .strip-card.active { border-color:#1565c0; }
+    .strip-card.active { border-color:#1565c0; box-shadow:0 0 0 1px #1565c0; }
+    .strip-card.status-current {
+      background:#00695C; border-color:#00695C;
+    }
+    .strip-card.status-current .strip-num,
+    .strip-card.status-current .strip-city,
+    .strip-card.status-current .strip-dates { color:#fff; }
+    .strip-card.status-completed { border-color:#2e7d32; }
     .strip-num   { font-size:11px; font-weight:700; color:var(--wp-text-hint); text-transform:uppercase; letter-spacing:.04em; }
     .strip-city  { font-size:14px; font-weight:600; margin:2px 0; }
+    .strip-check { color:#2e7d32; font-weight:700; }
+    .status-current .strip-check { color:#fff; }
     .strip-dates { font-size:12px; color:var(--wp-text-secondary); margin-bottom:4px; }
     .add-stop-btn { margin:0 12px 12px; background:#00695C !important; color:#fff !important; }
   `],
@@ -738,7 +747,7 @@ function restaurantMarkerEl(): HTMLElement {
             <mat-divider style="margin-top:16px" />
             <div class="tab-scroll-wrap">
             <mat-tab-group animationDuration="150ms" class="bottom-tabs" mat-stretch-tabs="false">
-              <mat-tab label="Stops"><app-trip-stops-tab [tripId]="t.id" /></mat-tab>
+              <mat-tab label="Stops"><app-trip-stops-tab [tripId]="t.id" (stopFocused)="onStopFocused($event)" /></mat-tab>
               <mat-tab label="Map">
                 <div class="map-tab-prompt">
                   <mat-icon class="map-tab-icon">map</mat-icon>
@@ -790,7 +799,8 @@ function restaurantMarkerEl(): HTMLElement {
             </div>
             <div class="map-overlay-body">
               <google-map #mapTabGmap height="100%" width="100%"
-                          [center]="mapCenter()" [zoom]="mapZoom()" [options]="mapOptions">
+                          [center]="mapCenter()" [zoom]="mapZoom()" [options]="mapOptions"
+                          (mapInitialized)="onMapInitialized()">
                 @if (directionsResult()) {
                   <map-directions-renderer
                     [directions]="directionsResult()!"
@@ -818,9 +828,16 @@ function restaurantMarkerEl(): HTMLElement {
 
             <div class="stop-strip">
               @for (s of sortedStops(); track s.id) {
-                <div class="strip-card" [class.active]="selectedMapStop()?.id === s.id" (click)="flyToStop(s)">
+                <div class="strip-card"
+                     [class.active]="selectedMapStop()?.id === s.id"
+                     [class.status-current]="s.status === 'current'"
+                     [class.status-completed]="s.status === 'completed'"
+                     (click)="flyToStop(s)">
                   <div class="strip-num">Stop {{ s.stop_order }}</div>
-                  <div class="strip-city">{{ s.destination?.city || s.destination?.name || ('Stop ' + s.stop_order) }}</div>
+                  <div class="strip-city">
+                    {{ s.destination?.city || s.destination?.name || ('Stop ' + s.stop_order) }}
+                    @if (s.status === 'completed') { <span class="strip-check">✓</span> }
+                  </div>
                   @if (s.arrival_date || s.departure_date) {
                     <div class="strip-dates">
                       {{ s.arrival_date ? (s.arrival_date | date:'MMM d') : '' }}
@@ -828,7 +845,6 @@ function restaurantMarkerEl(): HTMLElement {
                       {{ s.departure_date ? (s.departure_date | date:'MMM d') : '' }}
                     </div>
                   }
-                  <span class="status-pill" [style.color]="STOP_STATUS_COLOR[s.status]">{{ s.status }}</span>
                 </div>
               }
             </div>
@@ -860,6 +876,7 @@ export class TripDetailComponent implements OnInit {
   mapTabGmap = viewChild<GoogleMap>('mapTabGmap');
   mapTabInfo = viewChild<MapInfoWindow>('mapTabInfo');
   selectedMapStop = signal<TripStop | null>(null);
+  private pendingFocusStop = signal<TripStop | null>(null);
 
   loading             = signal(true);
   summaryLoading      = signal(false);
@@ -1070,6 +1087,34 @@ export class TripDetailComponent implements OnInit {
     map.setZoom(Math.max(map.getZoom() ?? 9, 10));
     info.setPosition(coords);
     info.open(map);
+  }
+
+  /** Opens the map overlay (if needed) and flies to the given stop, e.g. from the Stops tab. */
+  onStopFocused(stop: TripStop) {
+    this.mapOverlayOpen.set(true);
+    if (this.mapTabGmap()?.googleMap) {
+      this.flyToStop(stop);
+    } else {
+      this.pendingFocusStop.set(stop);
+    }
+  }
+
+  /** Fired once the overlay's google-map finishes initializing — flies to any pending focus request. */
+  onMapInitialized() {
+    this.tryFlyToPendingFocus();
+  }
+
+  private tryFlyToPendingFocus(attemptsLeft = 20) {
+    const pending = this.pendingFocusStop();
+    if (!pending) return;
+    if (this.mapTabGmap()?.googleMap && this.mapTabInfo()?.infoWindow) {
+      this.pendingFocusStop.set(null);
+      this.flyToStop(pending);
+    } else if (attemptsLeft > 0) {
+      setTimeout(() => this.tryFlyToPendingFocus(attemptsLeft - 1), 100);
+    } else {
+      this.pendingFocusStop.set(null);
+    }
   }
 
   openAddStop() {

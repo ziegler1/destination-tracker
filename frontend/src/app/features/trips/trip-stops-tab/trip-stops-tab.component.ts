@@ -1,5 +1,5 @@
 import {
-  Component, OnInit, ChangeDetectionStrategy, inject, signal, computed, input,
+  Component, OnInit, ChangeDetectionStrategy, inject, signal, computed, input, output,
 } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { forkJoin } from 'rxjs';
@@ -58,6 +58,7 @@ const STATUS_COLOR: Record<TripStopStatus, string> = {
     }
     .stop-actions { display:flex; gap:4px; margin-left:auto; }
     .stop-lodging { font-size:13px; color:var(--wp-text-secondary); display:flex; align-items:center; gap:4px; }
+    .directions-btn { margin-top:10px; width:100%; }
 
     .add-btn { margin-top:12px; }
     .add-form { margin-top:16px; padding:16px; border-radius:12px; background:var(--wp-surface-variant); }
@@ -135,6 +136,9 @@ const STATUS_COLOR: Record<TripStopStatus, string> = {
                     <div class="stop-header">
                       <span class="stop-num">Stop {{ stop.stop_order }}</span>
                       <div class="stop-actions">
+                        <button mat-icon-button (click)="stopFocused.emit(stop)" title="View on map">
+                          <mat-icon>map</mat-icon>
+                        </button>
                         <button mat-icon-button (click)="move(stop, 'up')" [disabled]="stop.stop_order === 1" title="Move up">
                           <mat-icon>arrow_upward</mat-icon>
                         </button>
@@ -176,6 +180,11 @@ const STATUS_COLOR: Record<TripStopStatus, string> = {
                     </div>
                     @if (stop.notes) {
                       <p style="font-size:13px;color:var(--wp-text-secondary);margin:6px 0 0">{{ stop.notes }}</p>
+                    }
+                    @if (stop.status === 'current' && nextStopDirectionsUrl(stop); as dirUrl) {
+                      <a mat-stroked-button color="primary" class="directions-btn" [href]="dirUrl" target="_blank" rel="noopener">
+                        <mat-icon>directions</mat-icon> Get Directions to Next Stop
+                      </a>
                     }
                   </mat-card>
                 }
@@ -245,6 +254,7 @@ const STATUS_COLOR: Record<TripStopStatus, string> = {
 })
 export class TripStopsTabComponent implements OnInit {
   tripId = input.required<number>();
+  stopFocused = output<TripStop>();
 
   private stopSvc = inject(StopService);
   private destSvc = inject(DestinationService);
@@ -373,6 +383,16 @@ export class TripStopsTabComponent implements OnInit {
   }
 
   statusColor(s: TripStopStatus): string { return STATUS_COLOR[s] ?? '#666'; }
+
+  nextStopDirectionsUrl(stop: TripStop): string | null {
+    const cur = stop.destination;
+    if (!cur?.latitude || !cur?.longitude) return null;
+    const list = this.sorted();
+    const idx = list.findIndex((s) => s.id === stop.id);
+    const next = list[idx + 1]?.destination;
+    if (!next?.latitude || !next?.longitude) return null;
+    return `https://www.google.com/maps/dir/?api=1&origin=${cur.latitude},${cur.longitude}&destination=${next.latitude},${next.longitude}&travelmode=driving`;
+  }
 
   protected get Validators() { return Validators; }
 }
