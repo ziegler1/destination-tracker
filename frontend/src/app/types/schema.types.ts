@@ -335,6 +335,8 @@ export interface WizardPlaceSuggestion {
   photo_url:          string | null;
   website:            string | null;
   approved?:          boolean;
+  lat?:               number | null;
+  lng?:               number | null;
 }
 
 export interface WizardLodgingSuggestion extends WizardPlaceSuggestion {
@@ -361,6 +363,8 @@ export interface WizardPoiSuggestion {
   formatted_address:string | null;
   photo_url:        string | null;
   approved?:        boolean;
+  lat?:             number | null;
+  lng?:             number | null;
 }
 
 export interface WizardSpecialInterestMatch {
@@ -437,4 +441,21 @@ export interface WizardGenerateRequest {
     interests?:           string[];
     min_rating?:          number;
   };
+}
+
+export interface WizardEnrichStopRequest {
+  city:  string;
+  state: string;
+  preferences?: {
+    cuisine?:      string[];
+    interests?:    string[];
+    lodging_type?: string;
+    min_rating?:   number;
+  };
+}
+
+export interface WizardEnrichStopResponse {
+  lodging_suggestions:    WizardLodgingSuggestion[];
+  restaurant_suggestions: WizardRestaurantSuggestion[];
+  poi_suggestions:        WizardPoiSuggestion[];
 }

@@ -26,10 +26,12 @@ export interface PlaceEnrichment {
 
 interface TextSearchResult {
   place_id:           string;
+  name?:              string;
   formatted_address:  string;
   rating?:            number;
   user_ratings_total?: number;
   price_level?:       number;
+  types?:             string[];
   geometry?:          { location: { lat: number; lng: number } };
   photos?:            Array<{ photo_reference: string }>;
 }
@@ -107,6 +109,53 @@ async function placeDetails(placeId: string): Promise<PlaceDetailsResponse['resu
 
   if (data.status !== 'OK') return null;
   return data.result;
+}
+
+// ── Generic category search (e.g. "hotels in Charleston, WV") ─────────────────
+
+export interface PlaceSearchResult {
+  place_id:           string;
+  name:               string;
+  formatted_address:  string;
+  rating:             number | null;
+  user_ratings_total: number | null;
+  price_level:        number | null;
+  photo_url:          string | null;
+  types:              string[];
+  lat:                number | null;
+  lng:                number | null;
+}
+
+/**
+ * Text Search for a free-form query (e.g. "BBQ restaurants in Charleston, WV").
+ * Returns up to `limit` results, each enriched with a resolved photo URL.
+ */
+export async function searchPlaces(query: string, limit = 5): Promise<PlaceSearchResult[]> {
+  if (!API_KEY) return [];
+
+  try {
+    const url = `${BASE_URL}/textsearch/json?query=${encodeURIComponent(query)}&key=${API_KEY}`;
+    const res  = await fetch(url, { headers: { Accept: 'application/json' } });
+    const data = await res.json() as TextSearchResponse;
+
+    if (data.status !== 'OK' || !data.results.length) return [];
+
+    const top = data.results.slice(0, limit);
+    return await Promise.all(top.map(async (r) => ({
+      place_id:           r.place_id,
+      name:               r.name ?? '',
+      formatted_address:  r.formatted_address,
+      rating:             r.rating             ?? null,
+      user_ratings_total: r.user_ratings_total ?? null,
+      price_level:        r.price_level        ?? null,
+      photo_url:          r.photos?.[0]?.photo_reference ? await resolvePhotoUrl(r.photos[0].photo_reference) : null,
+      types:              r.types ?? [],
+      lat:  r.geometry?.location.lat ?? null,
+      lng:  r.geometry?.location.lng ?? null,
+    })));
+  } catch {
+    return [];
+  }
 }
 
 /**

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import Anthropic from '@anthropic-ai/sdk';
 import pool from '../db';
 import { asyncHandler } from '../lib/asyncHandler';
-import { enrichBatch } from '../lib/googlePlaces';
+import { enrichBatch, searchPlaces, PlaceSearchResult } from '../lib/googlePlaces';
 
 const router = Router();
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -409,6 +409,132 @@ Return JSON:
     }
   }
   res.json(plan);
+}));
+
+// ── POST /api/trips/wizard/enrich-stop ───────────────────────────────────────
+// Returns lodging/restaurant/POI suggestions for a single city, sourced
+// directly from Google Places (no Claude call) — used when the user adds a
+// new stop during route review.
+
+function priceLevelToEstimate(level: number | null): number {
+  switch (level) {
+    case 0: return 60;
+    case 1: return 90;
+    case 2: return 140;
+    case 3: return 220;
+    case 4: return 320;
+    default: return 130;
+  }
+}
+
+function priceLevelToRange(level: number | null): string {
+  switch (level) {
+    case 0:
+    case 1: return '$';
+    case 2: return '$$';
+    case 3: return '$$$';
+    case 4: return '$$$$';
+    default: return '$$';
+  }
+}
+
+function describeWhy(r: PlaceSearchResult, fallback: string): string {
+  if (r.rating) {
+    const reviews = r.user_ratings_total ? ` (${r.user_ratings_total.toLocaleString()} reviews)` : '';
+    return `Rated ${r.rating}★ on Google${reviews}`;
+  }
+  return fallback;
+}
+
+router.post('/enrich-stop', asyncHandler(async (req, res) => {
+  const { city, state, preferences = {} } = req.body as {
+    city?: string;
+    state?: string;
+    preferences?: {
+      cuisine?:      string[];
+      interests?:    string[];
+      lodging_type?: string;
+      min_rating?:   number;
+    };
+  };
+
+  if (!city || !state) {
+    res.status(400).json({ error: 'city and state are required' });
+    return;
+  }
+
+  const minRating = preferences.min_rating ?? 0;
+
+  const lodgingQueryTerm = preferences.lodging_type
+    ? `${preferences.lodging_type}s`
+    : 'hotels';
+  const cuisineQueryTerm = preferences.cuisine?.length
+    ? `${preferences.cuisine[0]} restaurants`
+    : 'restaurants';
+  const interestQueryTerm = preferences.interests?.length
+    ? preferences.interests[0]
+    : 'tourist attractions';
+
+  const [lodgingResults, restResults, poiResults] = await Promise.all([
+    searchPlaces(`${lodgingQueryTerm} in ${city}, ${state}`, 5),
+    searchPlaces(`${cuisineQueryTerm} in ${city}, ${state}`, 6),
+    searchPlaces(`${interestQueryTerm} in ${city}, ${state}`, 5),
+  ]);
+
+  const filterByRating = (r: PlaceSearchResult) => !minRating || (r.rating ?? 0) >= minRating;
+
+  const lodging_suggestions: LodgingSuggestion[] = lodgingResults
+    .filter(filterByRating)
+    .slice(0, 2)
+    .map((r) => ({
+      name:                      r.name,
+      area:                      city,
+      lodging_type:              normalizeLodgingType(preferences.lodging_type),
+      estimated_price_per_night: priceLevelToEstimate(r.price_level),
+      why_recommended:           describeWhy(r, 'Convenient option in the area'),
+      google_verified:           true,
+      place_id:                  r.place_id,
+      formatted_address:         r.formatted_address,
+      google_rating:             r.rating,
+      photo_url:                 r.photo_url,
+      website:                   null,
+      lat:                       r.lat,
+      lng:                       r.lng,
+    } as LodgingSuggestion));
+
+  const restaurant_suggestions: RestaurantSuggestion[] = restResults
+    .filter(filterByRating)
+    .slice(0, 3)
+    .map((r) => ({
+      name:              r.name,
+      cuisine_type:      preferences.cuisine?.[0] ?? 'American',
+      price_range:       priceLevelToRange(r.price_level),
+      why_recommended:   describeWhy(r, 'Popular nearby spot'),
+      google_verified:   true,
+      place_id:          r.place_id,
+      formatted_address: r.formatted_address,
+      google_rating:     r.rating,
+      photo_url:         r.photo_url,
+      website:           null,
+      lat:               r.lat,
+      lng:               r.lng,
+    } as RestaurantSuggestion));
+
+  const poi_suggestions: PoiSuggestion[] = poiResults
+    .slice(0, 3)
+    .map((r) => ({
+      name:              r.name,
+      poi_type:          normalizePoiType(r.types?.join(' ')),
+      why_recommended:   describeWhy(r, 'Worth a look while you\'re in town'),
+      google_verified:   true,
+      place_id:          r.place_id,
+      formatted_address: r.formatted_address,
+      photo_url:         r.photo_url,
+      lat:               r.lat,
+      lng:               r.lng,
+    } as PoiSuggestion));
+
+  res.json({ lodging_suggestions, restaurant_suggestions, poi_suggestions });
 }));
 
 // ── POST /api/trips/wizard/confirm ───────────────────────────────────────────

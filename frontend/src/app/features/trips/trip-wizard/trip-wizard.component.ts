@@ -5,7 +5,7 @@ import {
 import { FormBuilder, ReactiveFormsModule, FormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { DatePipe, CurrencyPipe, TitleCasePipe } from '@angular/common';
-import { GoogleMap, MapDirectionsRenderer } from '@angular/google-maps';
+import { GoogleMap, MapDirectionsRenderer, MapAdvancedMarker } from '@angular/google-maps';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -58,6 +58,15 @@ const STOP_TIMINGS = [
   { value: 'evening_arrival', label: 'Depart mid-morning, arrive evening' },
 ];
 
+function numberedPinEl(order: number): HTMLElement {
+  const el = document.createElement('div');
+  el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" style="cursor:pointer">
+    <circle cx="14" cy="14" r="12" fill="#00695C" stroke="white" stroke-width="2"/>
+    <text x="14" y="19" font-family="Arial" font-size="11" font-weight="bold"
+          fill="white" text-anchor="middle">${order}</text></svg>`;
+  return el.firstElementChild as HTMLElement;
+}
+
 @Component({
   selector: 'app-trip-wizard',
   standalone: true,
@@ -65,7 +74,7 @@ const STOP_TIMINGS = [
   imports: [
     RouterLink, ReactiveFormsModule, FormsModule,
     DatePipe, CurrencyPipe, TitleCasePipe,
-    GoogleMap, MapDirectionsRenderer,
+    GoogleMap, MapDirectionsRenderer, MapAdvancedMarker,
     MatCardModule, MatFormFieldModule, MatInputModule, MatSelectModule,
     MatDatepickerModule, MatButtonModule, MatIconModule, MatSlideToggleModule,
     MatSliderModule, MatProgressSpinnerModule, MatDividerModule, MatCheckboxModule,
@@ -115,11 +124,6 @@ const STOP_TIMINGS = [
     .gen-msg  { font-size:18px; color:var(--wp-text-secondary); min-height:28px; }
 
     /* Step 3 */
-    .route-map {
-      height:340px; border-radius:12px; overflow:hidden;
-      border:1px solid var(--wp-border); margin-bottom:20px;
-      background:var(--wp-surface-variant); position:relative;
-    }
     .map-loading {
       position:absolute; inset:0; display:flex; flex-direction:column;
       align-items:center; justify-content:center; gap:12px;
@@ -136,6 +140,36 @@ const STOP_TIMINGS = [
     .budget-indicator { font-size:12px; font-weight:600; margin-left:4px; }
     .budget-indicator.under { color:#2e7d32; }
     .budget-indicator.over  { color:#FFB300; }
+
+    /* Phase A — Route Review */
+    .route-map-compact {
+      height:220px; border-radius:12px; overflow:hidden;
+      border:1px solid var(--wp-border); margin-bottom:16px;
+      background:var(--wp-surface-variant); position:relative;
+    }
+    .narrative-toggle {
+      display:block; width:100%; text-align:left; background:none; border:none;
+      padding:8px 0; font-size:13px; font-weight:600; color:var(--wp-primary); cursor:pointer;
+    }
+    .narrative-text {
+      font-size:13px; color:var(--wp-text-secondary); line-height:1.6; margin:0 0 12px;
+      padding:12px 16px; border-radius:8px; background:var(--wp-surface); border-left:3px solid var(--wp-accent);
+    }
+    .route-stop-card {
+      display:flex; align-items:flex-start; gap:12px; padding:14px 16px;
+      border-radius:10px; background:var(--wp-surface); box-shadow:0 1px 4px var(--wp-shadow);
+      margin-bottom:10px; scroll-margin-top:80px;
+    }
+    .route-stop-num {
+      flex-shrink:0; width:28px; height:28px; border-radius:50%; background:#00695C; color:#fff;
+      display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700;
+    }
+    .route-stop-body  { flex:1; min-width:0; }
+    .route-stop-city  { font-size:15px; font-weight:700; margin:0 0 2px; }
+    .route-stop-dates { font-size:12px; color:var(--wp-text-secondary); margin:0 0 2px; }
+    .route-stop-drive { font-size:12px; color:var(--wp-text-hint); margin:0; }
+    .insert-stop-form { width:100%; padding:10px 0; }
+    .insert-stop-label { font-size:12px; color:var(--wp-text-secondary); margin:0 0 6px; }
 
     .stop-panel-header { display:flex; align-items:center; width:100%; gap:8px; }
     .stop-header-info  { display:flex; align-items:center; gap:10px; flex-wrap:wrap; flex:1; min-width:0; }
@@ -222,7 +256,6 @@ const STOP_TIMINGS = [
       .basics-grid { grid-template-columns:1fr; }
       .trip-type-grid { grid-template-columns:1fr; }
       .suggestion-grid { grid-template-columns:1fr; }
-      .route-map { height:220px; }
     }
   `],
   template: `
@@ -399,53 +432,113 @@ const STOP_TIMINGS = [
         </div>
       }
 
-      <!-- ── Step 3: Review ─────────────────────────────────────────── -->
+      <!-- ── Step 3: Phase A — Review Your Route ───────────────────── -->
       @if (step() === 3 && plan()) {
-        <p class="step-title">Review Your Trip</p>
-        <p class="step-sub">Delete unwanted stops, add new cities, then pick lodging and restaurants to save.</p>
+        <p class="step-title">Review Your Route</p>
+        <p class="step-sub">Does this route look right? Add or remove stops, then continue.</p>
 
         <!-- Route map -->
-        <div class="route-map">
+        <div class="route-map-compact">
           @if (!directionsResult()) {
             <div class="map-loading">
               <mat-spinner diameter="36" />
               <span>Loading route map…</span>
             </div>
           }
-          <google-map width="100%" height="340px" [options]="mapOpts">
+          <google-map width="100%" height="220px" [options]="mapOpts">
             @if (directionsResult()) {
               <map-directions-renderer [directions]="directionsResult()!" [options]="rendererOpts" />
+            }
+            @for (m of routeMarkers(); track m.stopOrder) {
+              <map-advanced-marker [position]="m.position" [content]="m.content" (mapClick)="scrollToStop(m.stopOrder)" />
             }
           </google-map>
         </div>
 
-        <!-- Summary bar -->
+        <!-- Trip summary bar -->
         <div class="summary-bar">
           <div class="sum-item"><label>Origin</label><span style="font-size:13px;font-weight:600">{{ form.value.origin }}</span></div>
           <div class="sum-item"><label>Stops</label><span>{{ plan()!.stops.length }}</span></div>
-          <div class="sum-item"><label>Drive time</label><span>{{ totalDriveHours() }}h</span></div>
-          <div class="sum-item"><label>Est. cost</label><span>{{ plan()!.trip.estimated_costs.total | currency:'USD':'symbol':'1.0-0' }}</span></div>
-          @if (plan()!.trip.budget > 0) {
-            <div class="sum-item">
-              <label>Budget</label>
-              <span>
-                {{ plan()!.trip.budget | currency:'USD':'symbol':'1.0-0' }}
-                @if (plan()!.trip.estimated_costs.total < plan()!.trip.budget) {
-                  <span class="budget-indicator under">(under budget)</span>
-                } @else if (plan()!.trip.estimated_costs.total > plan()!.trip.budget) {
-                  <span class="budget-indicator over">(over budget)</span>
-                }
-              </span>
-            </div>
+          <div class="sum-item"><label>Drive Time</label><span>{{ totalDriveHours() }}h</span></div>
+          @if (plan()!.trip.estimated_costs.total > 0) {
+            <div class="sum-item"><label>Est. Cost</label><span>{{ plan()!.trip.estimated_costs.total | currency:'USD':'symbol':'1.0-0' }}</span></div>
           }
         </div>
 
+        <!-- Collapsible narrative -->
         @if (plan()!.trip.travel_notes) {
-          <p style="color:var(--wp-text-secondary);font-size:14px;line-height:1.6;margin-bottom:20px;
-                    padding:12px 16px;border-radius:8px;background:var(--wp-surface);border-left:3px solid var(--wp-accent)">
-            {{ plan()!.trip.travel_notes }}
-          </p>
+          <button type="button" class="narrative-toggle" (click)="narrativeExpanded.set(!narrativeExpanded())">
+            {{ narrativeExpanded() ? '▼' : '▶' }} See trip overview
+          </button>
+          @if (narrativeExpanded()) {
+            <p class="narrative-text">{{ plan()!.trip.travel_notes }}</p>
+          }
         }
+
+        <!-- Stop list -->
+        @for (stop of plan()!.stops; track stop.stop_order) {
+          <div class="route-stop-card" [id]="'route-stop-' + stop.stop_order">
+            <div class="route-stop-num">{{ stop.stop_order }}</div>
+            <div class="route-stop-body">
+              <p class="route-stop-city">{{ stop.city }}, {{ stop.state_province }}</p>
+              @if (stop.arrive_date) {
+                <p class="route-stop-dates">{{ stop.arrive_date | date:'MMM d' }} → {{ stop.depart_date | date:'MMM d' }}</p>
+              }
+              @if (stop.drive_minutes_from_prev > 0) {
+                <p class="route-stop-drive">
+                  {{ driveLbl(stop.drive_minutes_from_prev) }} drive
+                  @if (stop.estimated_fuel_cost) { · ~{{ stop.estimated_fuel_cost | currency:'USD':'symbol':'1.0-0' }} fuel }
+                </p>
+              }
+              @if (stop.gas_stop_before) {
+                <p class="gas-flag" style="margin:2px 0 0">
+                  <mat-icon style="font-size:14px;width:14px;height:14px">local_gas_station</mat-icon> Fuel up
+                </p>
+              }
+            </div>
+            <button mat-icon-button color="warn" style="flex-shrink:0" matTooltip="Remove this stop"
+                    (click)="removeStop(stop.stop_order, $event)">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+
+          <!-- Add a stop between this stop and the next -->
+          <div class="add-stop-row">
+            @if (insertingAfter() === stop.stop_order) {
+              <div class="insert-stop-form">
+                <p class="insert-stop-label">
+                  Add a city between {{ stop.city }}, {{ stop.state_province }} and {{ nextStopCity(stop.stop_order) }}
+                </p>
+                @if (insertLoading()) {
+                  <div style="display:flex;align-items:center;gap:8px;padding:8px 0">
+                    <mat-spinner diameter="20" />
+                    <span style="font-size:13px;color:var(--wp-text-secondary)">Finding lodging & dining…</span>
+                  </div>
+                } @else {
+                  <app-places-autocomplete placeholder="Search city or address…"
+                    (placeSelected)="onInsertPlaceSelected($event, stop.stop_order)" />
+                  <button type="button" mat-stroked-button style="font-size:12px" (click)="insertingAfter.set(null)">Cancel</button>
+                }
+              </div>
+            } @else {
+              <button class="add-stop-btn" (click)="insertingAfter.set(stop.stop_order)">
+                <mat-icon style="font-size:16px;width:16px;height:16px">add</mat-icon>
+                Add a stop here
+              </button>
+            }
+          </div>
+        }
+
+        <div class="wizard-actions">
+          <button mat-stroked-button (click)="step.set(1)">← Back to Edit</button>
+          <button mat-raised-button color="primary" (click)="step.set(4)">Continue to Lodging & Dining →</button>
+        </div>
+      }
+
+      <!-- ── Step 4: Lodging, Dining, Packing & Budget ──────────────── -->
+      @if (step() === 4 && plan()) {
+        <p class="step-title">Pick Your Stops</p>
+        <p class="step-sub">Choose where to stay and eat at each stop, then review your packing list and budget.</p>
 
         <!-- Stops -->
         <mat-accordion multi>
@@ -470,11 +563,6 @@ const STOP_TIMINGS = [
                       <span class="gas-flag"><mat-icon style="font-size:14px;width:14px;height:14px">local_gas_station</mat-icon> Fuel up</span>
                     }
                   </div>
-                  <button mat-icon-button color="warn" style="flex-shrink:0"
-                          matTooltip="Remove this stop"
-                          (click)="removeStop(stop.stop_order, $event)">
-                    <mat-icon>delete_outline</mat-icon>
-                  </button>
                 </div>
               </mat-expansion-panel-header>
 
@@ -575,32 +663,6 @@ const STOP_TIMINGS = [
               }
 
             </mat-expansion-panel>
-
-            <!-- Add stop between panels -->
-            <div class="add-stop-row">
-              @if (insertingAfter() === stop.stop_order) {
-                <div class="add-stop-form">
-                  <mat-form-field appearance="outline" style="width:180px">
-                    <mat-label>City</mat-label>
-                    <input matInput [(ngModel)]="insertCity" [ngModelOptions]="{standalone:true}"
-                           placeholder="Louisville" (keydown.enter)="confirmInsert(stop.stop_order)" />
-                  </mat-form-field>
-                  <mat-form-field appearance="outline" style="width:80px">
-                    <mat-label>State</mat-label>
-                    <input matInput [(ngModel)]="insertState" [ngModelOptions]="{standalone:true}"
-                           placeholder="KY" maxlength="2" (keydown.enter)="confirmInsert(stop.stop_order)" />
-                  </mat-form-field>
-                  <button mat-raised-button color="primary" (click)="confirmInsert(stop.stop_order)"
-                          [disabled]="!insertCity || !insertState">Insert</button>
-                  <button mat-stroked-button (click)="insertingAfter.set(null)">Cancel</button>
-                </div>
-              } @else {
-                <button class="add-stop-btn" (click)="insertingAfter.set(stop.stop_order)">
-                  <mat-icon style="font-size:16px;width:16px;height:16px">add</mat-icon>
-                  add stop here
-                </button>
-              }
-            </div>
           }
         </mat-accordion>
 
@@ -641,7 +703,7 @@ const STOP_TIMINGS = [
         }
 
         <div class="wizard-actions">
-          <button mat-stroked-button (click)="step.set(1)">← Back</button>
+          <button mat-stroked-button (click)="step.set(3)">← Back</button>
           <button mat-raised-button color="primary" [disabled]="confirming()" (click)="confirm()">
             @if (confirming()) { <mat-spinner diameter="20" style="display:inline-block;margin-right:6px" /> Saving… }
             @else { Looks Good — Save My Trip → }
@@ -649,8 +711,8 @@ const STOP_TIMINGS = [
         </div>
       }
 
-      <!-- ── Step 4: Confirmed ──────────────────────────────────────── -->
-      @if (step() === 4) {
+      <!-- ── Step 5: Confirmed ──────────────────────────────────────── -->
+      @if (step() === 5) {
         <div class="confirmed">
           <span class="confirmed-icon">🎉</span>
           <h2 style="font-size:28px;font-weight:700;margin-bottom:8px">Trip Created!</h2>
@@ -703,8 +765,10 @@ export class TripWizardComponent implements OnInit, OnDestroy {
 
   // ── Stop editing ─────────────────────────────────────────────────────
   insertingAfter = signal<number | null>(null);
-  insertCity  = '';
-  insertState = '';
+  insertLoading  = signal(false);
+
+  // ── Phase A — Route Review ───────────────────────────────────────────
+  narrativeExpanded = signal(false);
 
   // ── Review selection state ──────────────────────────────────────────
   selectedLodging   = signal(new Map<number, number>());
@@ -884,6 +948,7 @@ export class TripWizardComponent implements OnInit, OnDestroy {
     event.stopPropagation();
     const current = this.plan();
     if (!current || current.stops.length <= 1) return;
+    if (!confirm('Remove this stop from your route?')) return;
 
     const filtered = current.stops
       .filter(s => s.stop_order !== stopOrder)
@@ -896,23 +961,27 @@ export class TripWizardComponent implements OnInit, OnDestroy {
     this.insertingAfter.set(null);
   }
 
-  // ── Insert a stub stop ───────────────────────────────────────────────
-  confirmInsert(afterOrder: number) {
-    const city  = this.insertCity.trim();
-    const state = this.insertState.trim().toUpperCase();
-    if (!city || !state) return;
-
+  // ── Insert a stop via Places Autocomplete ─────────────────────────────
+  onInsertPlaceSelected(e: PlaceSelectedEvent, afterOrder: number) {
     const current = this.plan();
     if (!current) return;
+
+    const before = current.stops.filter(s => s.stop_order <= afterOrder);
+
+    // Dates are required by the backend (DATE columns) — fall back to the
+    // previous stop's departure date (or the trip start date) so a freshly
+    // inserted stop never carries an empty-string date into /confirm.
+    const prevStop = before[before.length - 1];
+    const fallbackDate = prevStop?.depart_date || prevStop?.arrive_date || current.trip.start_date;
 
     const stub: WizardStop = {
       stop_order:              afterOrder + 1,
       stop_type:               'transit',
-      city,
-      state_province:          state,
-      country:                 'USA',
-      arrive_date:             '',
-      depart_date:             '',
+      city:                    e.city || e.name,
+      state_province:          e.state_province,
+      country:                 e.country,
+      arrive_date:             fallbackDate,
+      depart_date:             fallbackDate,
       drive_minutes_from_prev: 0,
       gas_stop_before:         false,
       estimated_fuel_cost:     0,
@@ -921,17 +990,34 @@ export class TripWizardComponent implements OnInit, OnDestroy {
       poi_suggestions:         [],
     };
 
+    this.insertLoading.set(true);
+
+    this.wizardSvc.enrichStop({
+      city:  stub.city,
+      state: stub.state_province,
+      preferences: {
+        cuisine:      this.selectedCuisines(),
+        interests:    this.selectedInterests(),
+        lodging_type: this.form.value.lodging_type || undefined,
+        min_rating:   this.form.value.min_rating ?? 0,
+      },
+    }).subscribe({
+      next: (enrichment) => {
+        stub.lodging_suggestions    = enrichment.lodging_suggestions;
+        stub.restaurant_suggestions = enrichment.restaurant_suggestions;
+        stub.poi_suggestions        = enrichment.poi_suggestions;
+        this.finalizeInsert(stub, afterOrder);
+      },
+      error: () => this.finalizeInsert(stub, afterOrder),
+    });
+  }
+
+  private finalizeInsert(stub: WizardStop, afterOrder: number) {
+    const current = this.plan();
+    if (!current) return;
+
     const before = current.stops.filter(s => s.stop_order <= afterOrder);
     const after  = current.stops.filter(s => s.stop_order  > afterOrder);
-
-    // Dates are required by the backend (DATE columns) — fall back to the
-    // previous stop's departure date (or the trip start date) so a freshly
-    // inserted stop never carries an empty-string date into /confirm.
-    const prevStop = before[before.length - 1];
-    const fallbackDate = prevStop?.depart_date || prevStop?.arrive_date || current.trip.start_date;
-    stub.arrive_date = fallbackDate;
-    stub.depart_date = fallbackDate;
-
     const merged = [...before, stub, ...after].map((s, i) => ({ ...s, stop_order: i + 1 }));
 
     const updated = { ...current, stops: merged };
@@ -939,9 +1025,33 @@ export class TripWizardComponent implements OnInit, OnDestroy {
     this.resetReviewState(merged);
     this.computeRoute(updated);
 
-    this.insertCity  = '';
-    this.insertState = '';
+    this.insertLoading.set(false);
     this.insertingAfter.set(null);
+  }
+
+  // ── Phase A helpers ───────────────────────────────────────────────────
+  routeMarkers = computed(() => {
+    const dr    = this.directionsResult();
+    const stops = this.plan()?.stops ?? [];
+    const legs  = dr?.routes?.[0]?.legs;
+    if (!legs) return [];
+
+    return stops
+      .map((s, i) => {
+        const position = legs[i]?.end_location;
+        return position ? { stopOrder: s.stop_order, position, content: numberedPinEl(s.stop_order) } : null;
+      })
+      .filter((m): m is { stopOrder: number; position: google.maps.LatLng; content: HTMLElement } => m !== null);
+  });
+
+  scrollToStop(stopOrder: number) {
+    document.getElementById('route-stop-' + stopOrder)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  nextStopCity(afterOrder: number): string {
+    const next = (this.plan()?.stops ?? []).find(s => s.stop_order === afterOrder + 1);
+    if (next) return `${next.city}, ${next.state_province}`;
+    return this.form.value.destination || 'your destination';
   }
 
   // ── Review state ─────────────────────────────────────────────────────
@@ -1047,7 +1157,7 @@ export class TripWizardComponent implements OnInit, OnDestroy {
     };
 
     this.wizardSvc.confirm(payload).subscribe({
-      next: (saved) => { this.savedTripId.set(saved.id); this.confirming.set(false); this.step.set(4); },
+      next: (saved) => { this.savedTripId.set(saved.id); this.confirming.set(false); this.step.set(5); },
       error: () => { this.snack.open('Save failed — please try again', 'Dismiss', { duration: 4000 }); this.confirming.set(false); },
     });
   }
