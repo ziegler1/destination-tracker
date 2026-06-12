@@ -19,7 +19,8 @@ import { PageHeaderComponent } from '../../../shared/components/page-header/page
 import {
   PlacesAutocompleteComponent, PlaceSelectedEvent,
 } from '../../../shared/components/places-autocomplete/places-autocomplete.component';
-import { Trip, TripStop, Destination } from '../../../types/schema.types';
+import { Trip, TripStop } from '../../../types/schema.types';
+import { stopCoords } from '../../../core/utils/stop-location.util';
 
 function numberedPinEl(order: number): HTMLElement {
   const el = document.createElement('div');
@@ -111,7 +112,7 @@ function numberedPinEl(order: number): HTMLElement {
           <div class="add-stop-row">
             @if (insertingAfter() === 0) {
               <div class="insert-stop-form">
-                <p class="insert-stop-label">Add a stop before {{ stops()[0].destination?.city || 'your first stop' }}</p>
+                <p class="insert-stop-label">Add a stop before {{ stops()[0] ? stopLabel(stops()[0]) : 'your first stop' }}</p>
                 @if (insertLoading()) {
                   <div class="insert-spinner"><mat-spinner diameter="20" /><span>Adding stop…</span></div>
                 } @else {
@@ -133,7 +134,7 @@ function numberedPinEl(order: number): HTMLElement {
               <div class="drag-handle" cdkDragHandle><mat-icon>drag_indicator</mat-icon></div>
               <div class="route-stop-num">{{ i + 1 }}</div>
               <div class="route-stop-body">
-                <p class="route-stop-city">{{ stop.destination?.city }}, {{ stop.destination?.state_province }}</p>
+                <p class="route-stop-city">{{ stopLabel(stop) }}</p>
                 @if (stop.arrival_date || stop.departure_date) {
                   <p class="route-stop-dates">{{ stop.arrival_date | date:'MMM d':'UTC' }} → {{ stop.departure_date | date:'MMM d':'UTC' }}</p>
                 }
@@ -147,7 +148,7 @@ function numberedPinEl(order: number): HTMLElement {
             <div class="add-stop-row">
               @if (insertingAfter() === i + 1) {
                 <div class="insert-stop-form">
-                  <p class="insert-stop-label">Add a stop after {{ stop.destination?.city }}, {{ stop.destination?.state_province }}</p>
+                  <p class="insert-stop-label">Add a stop after {{ stopLabel(stop) }}</p>
                   @if (insertLoading()) {
                     <div class="insert-spinner"><mat-spinner diameter="20" /><span>Adding stop…</span></div>
                   } @else {
@@ -209,26 +210,26 @@ export class TripEditWizardComponent implements OnInit {
     });
   }
 
-  private destinationsWithCoords(): Destination[] {
+  private stopPoints(): google.maps.LatLngLiteral[] {
     return this.stops()
-      .map(s => s.destination)
-      .filter((d): d is Destination => !!d?.latitude && !!d?.longitude);
+      .map(s => stopCoords(s))
+      .filter((p): p is google.maps.LatLngLiteral => !!p);
   }
 
   mapCenter = computed<google.maps.LatLngLiteral>(() => {
-    const pts = this.destinationsWithCoords();
+    const pts = this.stopPoints();
     if (!pts.length) return { lat: 39.5, lng: -98.35 };
     return {
-      lat: pts.reduce((sum, d) => sum + d.latitude!, 0) / pts.length,
-      lng: pts.reduce((sum, d) => sum + d.longitude!, 0) / pts.length,
+      lat: pts.reduce((sum, p) => sum + p.lat, 0) / pts.length,
+      lng: pts.reduce((sum, p) => sum + p.lng, 0) / pts.length,
     };
   });
 
   mapZoom = computed(() => {
-    const pts = this.destinationsWithCoords();
+    const pts = this.stopPoints();
     if (pts.length <= 1) return 6;
-    const lats = pts.map(d => d.latitude!);
-    const lngs = pts.map(d => d.longitude!);
+    const lats = pts.map(p => p.lat);
+    const lngs = pts.map(p => p.lng);
     const spread = Math.max(Math.max(...lats) - Math.min(...lats), Math.max(...lngs) - Math.min(...lngs));
     if (spread > 15) return 4;
     if (spread > 8)  return 5;
@@ -240,12 +241,18 @@ export class TripEditWizardComponent implements OnInit {
   stopMarkers = computed(() =>
     this.stops()
       .map((s, i) => {
-        const d = s.destination;
-        if (!d?.latitude || !d?.longitude) return null;
-        return { stopId: s.id, position: { lat: d.latitude, lng: d.longitude }, content: numberedPinEl(i + 1) };
+        const pos = stopCoords(s);
+        if (!pos) return null;
+        return { stopId: s.id, position: pos, content: numberedPinEl(i + 1) };
       })
       .filter((m): m is { stopId: number; position: google.maps.LatLngLiteral; content: HTMLElement } => !!m),
   );
+
+  /** Best display label for a route card: destination city/state, falling back to the stop's place display_name. */
+  stopLabel(stop: TripStop): string {
+    if (stop.destination) return `${stop.destination.city}, ${stop.destination.state_province}`;
+    return stop.display_name ?? `Stop ${stop.stop_order}`;
+  }
 
   onDrop(event: CdkDragDrop<TripStop[]>) {
     if (event.previousIndex === event.currentIndex) return;
@@ -257,7 +264,7 @@ export class TripEditWizardComponent implements OnInit {
 
   removeStop(stop: TripStop) {
     if (this.stops().length <= 1) return;
-    if (!confirm(`Remove ${stop.destination?.city ?? 'this stop'} from your route?`)) return;
+    if (!confirm(`Remove ${this.stopLabel(stop)} from your route?`)) return;
     this.stopSvc.delete(this.tripId, stop.id).subscribe({
       next: () => {
         this.stops.update(list => list.filter(s => s.id !== stop.id));

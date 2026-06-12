@@ -28,6 +28,7 @@ import { ClaudeService } from '../../../core/services/claude.service';
 import { GeocodingService } from '../../../core/services/geocoding.service';
 import { MapsService } from '../../../core/services/maps.service';
 import { parseApiDate } from '../../../core/utils/date.utils';
+import { stopAddress, stopCoords as resolveStopCoords, redactStreetNumber } from '../../../core/utils/stop-location.util';
 import {
   Trip, TripStatus, TripStop, TripExpense, TripJournalEntry, Lodging, Restaurant, SpecialInterestPlace,
 } from '../../../types/schema.types';
@@ -52,13 +53,33 @@ const EXP_COLORS: Record<string, string> = {
   activities: '#2E7D32', shopping: '#AD1457', other: '#546E7A',
 };
 
-function stopMarkerEl(order: number, status: string): HTMLElement {
-  const color = STOP_STATUS_COLOR[status] ?? '#9e9e9e';
+function stopMarkerEl(stop: TripStop): HTMLElement {
+  const color = STOP_STATUS_COLOR[stop.status] ?? '#9e9e9e';
+  const type  = stop.place_type ?? 'city';
   const el = document.createElement('div');
-  el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28">
-    <circle cx="14" cy="14" r="12" fill="${color}" stroke="white" stroke-width="2"/>
-    <text x="14" y="19" font-family="Arial" font-size="11" font-weight="bold"
-          fill="white" text-anchor="middle">${order}</text></svg>`;
+  const badge = (emoji: string) => `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26">
+    <rect x="2" y="2" width="22" height="22" rx="5" fill="${color}" stroke="white" stroke-width="2"/>
+    <text x="13" y="18" font-size="13" text-anchor="middle" fill="white">${emoji}</text></svg>`;
+  if (type === 'hotel') {
+    el.innerHTML = badge('🏨');
+  } else if (type === 'rental' || type === 'residence') {
+    el.innerHTML = badge('🏠');
+  } else if (type === 'campsite') {
+    el.innerHTML = badge('⛺');
+  } else {
+    el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28">
+      <circle cx="14" cy="14" r="12" fill="${color}" stroke="white" stroke-width="2"/>
+      <text x="14" y="19" font-family="Arial" font-size="11" font-weight="bold"
+            fill="white" text-anchor="middle">${stop.stop_order}</text></svg>`;
+  }
+  return el.firstElementChild as HTMLElement;
+}
+
+function homeMarkerEl(): HTMLElement {
+  const el = document.createElement('div');
+  el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26">
+    <circle cx="13" cy="13" r="12" fill="#37474F" stroke="white" stroke-width="2"/>
+    <text x="13" y="18" font-size="13" text-anchor="middle" fill="white">🏠</text></svg>`;
   return el.firstElementChild as HTMLElement;
 }
 
@@ -412,6 +433,9 @@ function restaurantMarkerEl(): HTMLElement {
                 @for (m of stopMarkers(); track m.stopId) {
                   <map-advanced-marker [position]="m.position" [content]="m.content" [title]="m.title" />
                 }
+                @if (originMarker(); as m) {
+                  <map-advanced-marker [position]="m.position" [content]="m.content" [title]="m.title" />
+                }
               </google-map>
             </div>
           }
@@ -432,7 +456,7 @@ function restaurantMarkerEl(): HTMLElement {
                   <div class="tl-card" style="margin-bottom: 0">
                     <div class="tl-card-header">
                       <h3 class="tl-city">
-                        {{ stop.destination?.city ?? ('Stop ' + stop.stop_order) }}@if (stop.destination?.state_province) {, {{ stop.destination!.state_province }}}
+                        {{ stopDisplayName(stop) }}
                       </h3>
                       @if (stop.arrival_date || stop.departure_date) {
                         <span class="tl-dates">
@@ -627,12 +651,12 @@ function restaurantMarkerEl(): HTMLElement {
                      [class.editing]="editingStopId()===stop.id">
                   <div class="stop-header">
                     <div class="stop-num">{{ stop.stop_order }}</div>
-                    <span class="stop-city">{{ stop.destination?.name ?? ('Stop ' + stop.stop_order) }}</span>
+                    <span class="stop-city">{{ stopDisplayName(stop) }}</span>
                     <span class="status-pill" [style.color]="STOP_STATUS_COLOR[stop.status]">{{ stop.status }}</span>
                   </div>
-                  @if (stop.destination) {
+                  @if (stopLocationText(stop); as loc) {
                     <p class="stop-row" style="color:var(--wp-text-hint)">
-                      <mat-icon>place</mat-icon>{{ stop.destination.city }}, {{ stop.destination.state_province }}
+                      <mat-icon>place</mat-icon>{{ loc }}
                     </p>
                   }
                   @if (stop.arrival_date || stop.departure_date) {
@@ -655,20 +679,49 @@ function restaurantMarkerEl(): HTMLElement {
                   @if (stop.gas_stop_before) {
                     <p class="stop-row gas-flag"><mat-icon>local_gas_station</mat-icon> Fill up before leaving</p>
                   }
-                  @if (stop.lodging) {
-                    <p class="stop-row"><mat-icon>hotel</mat-icon>
-                      <span>
-                        <strong>{{ stop.lodging.name }}</strong>
-                        @if (lodgingAddress(stop)) {
-                          <br/><span style="font-size:12px;color:var(--wp-text-hint)">{{ lodgingAddress(stop) }}</span>
-                        }
-                        @if (stop.lodging.price_per_night) {
-                          <span style="font-size:12px;color:var(--wp-primary);margin-left:6px">{{ stop.lodging.price_per_night | currency:'USD':'symbol':'1.0-0' }}/night</span>
-                        }
-                      </span>
-                    </p>
-                  } @else {
-                    <p class="stop-row" style="color:var(--wp-text-hint)"><mat-icon>hotel</mat-icon> No lodging set</p>
+                  @switch (stop.place_type ?? 'city') {
+                    @case ('hotel') {
+                      <p class="stop-row"><mat-icon>hotel</mat-icon>
+                        <span>
+                          <strong>{{ stopDisplayName(stop) }}</strong>
+                          @if (stop.lodging?.phone) {
+                            <br/><span style="font-size:12px;color:var(--wp-text-hint)">{{ stop.lodging!.phone }}</span>
+                          }
+                          @if (stop.lodging?.website) {
+                            <br/><a [href]="stop.lodging!.website" target="_blank" style="font-size:12px">Website</a>
+                          }
+                          @if (stop.lodging?.price_per_night) {
+                            <span style="font-size:12px;color:var(--wp-primary);margin-left:6px">{{ stop.lodging!.price_per_night | currency:'USD':'symbol':'1.0-0' }}/night</span>
+                          }
+                        </span>
+                      </p>
+                    }
+                    @case ('rental') {
+                      <p class="stop-row" style="color:var(--wp-text-hint)"><mat-icon>cottage</mat-icon> Vacation rental — this is your lodging</p>
+                    }
+                    @case ('residence') {
+                      <p class="stop-row" style="color:var(--wp-text-hint)"><mat-icon>home</mat-icon> Staying at a residence — this is your lodging</p>
+                    }
+                    @case ('campsite') {
+                      <p class="stop-row" style="color:var(--wp-text-hint)"><mat-icon>cabin</mat-icon> Campsite — this is your lodging</p>
+                    }
+                    @case ('city') {
+                      @if (stop.lodging) {
+                        <p class="stop-row"><mat-icon>hotel</mat-icon>
+                          <span>
+                            <strong>{{ stop.lodging.name }}</strong>
+                            @if (lodgingAddress(stop)) {
+                              <br/><span style="font-size:12px;color:var(--wp-text-hint)">{{ lodgingAddress(stop) }}</span>
+                            }
+                            @if (stop.lodging.price_per_night) {
+                              <span style="font-size:12px;color:var(--wp-primary);margin-left:6px">{{ stop.lodging.price_per_night | currency:'USD':'symbol':'1.0-0' }}/night</span>
+                            }
+                          </span>
+                        </p>
+                      } @else {
+                        <p class="stop-row" style="color:var(--wp-text-hint)"><mat-icon>hotel</mat-icon> No lodging set</p>
+                      }
+                    }
                   }
 
                   @if (stop.restaurants?.length) {
@@ -859,6 +912,9 @@ function restaurantMarkerEl(): HTMLElement {
               @for (m of lodgingMarkers(); track m.title) {
                 <map-advanced-marker [position]="m.position" [content]="m.content" [title]="m.title" [zIndex]="m.zIndex" />
               }
+              @if (originMarker(); as m) {
+                <map-advanced-marker [position]="m.position" [content]="m.content" [title]="m.title" [zIndex]="m.zIndex" />
+              }
             </google-map>
             <button mat-mini-fab class="map-recenter" (click)="recenterMap()" title="Recenter">
               <mat-icon>my_location</mat-icon>
@@ -892,6 +948,9 @@ function restaurantMarkerEl(): HTMLElement {
                   <map-advanced-marker [position]="m.position" [content]="m.content" [title]="m.title" [zIndex]="m.zIndex" />
                 }
                 @for (m of restaurantMarkers(); track m.title) {
+                  <map-advanced-marker [position]="m.position" [content]="m.content" [title]="m.title" [zIndex]="m.zIndex" />
+                }
+                @if (originMarker(); as m) {
                   <map-advanced-marker [position]="m.position" [content]="m.content" [title]="m.title" [zIndex]="m.zIndex" />
                 }
                 <map-info-window #mapTabInfo>
@@ -972,6 +1031,7 @@ export class TripDetailComponent implements OnInit {
   directionsResult    = signal<google.maps.DirectionsResult | null>(null);
 
   private coordCache = new Map<number, { lat: number; lng: number }>();
+  originCoords = signal<google.maps.LatLngLiteral | null>(null);
   private tripSig    = signal<Trip | null>(null);
   protected get t(): Trip | null { return this.tripSig(); }
 
@@ -1049,15 +1109,21 @@ export class TripDetailComponent implements OnInit {
       .map(x => ({
         stopId:   x.stop.id,
         position: x.pos!,
-        title:    x.stop.destination?.name ?? `Stop ${x.stop.stop_order}`,
-        content:  stopMarkerEl(x.stop.stop_order, x.stop.status),
+        title:    x.stop.display_name ?? x.stop.destination?.name ?? `Stop ${x.stop.stop_order}`,
+        content:  stopMarkerEl(x.stop),
         zIndex:   10,
       })),
   );
 
+  originMarker = computed(() => {
+    const pos = this.originCoords();
+    return pos ? { position: pos, content: homeMarkerEl(), title: 'Home', zIndex: 8 } : null;
+  });
+
   lodgingMarkers = computed(() =>
     this.sortedStops()
-      .filter(s => s.lodging?.latitude && s.lodging?.longitude)
+      // Hotel-type stops already render a 🏨 marker at their own location via stopMarkers
+      .filter(s => (s.place_type ?? 'city') === 'city' && s.lodging?.latitude && s.lodging?.longitude)
       .map(s => ({
         title:    s.lodging!.name,
         position: { lat: Number(s.lodging!.latitude), lng: Number(s.lodging!.longitude) },
@@ -1108,8 +1174,8 @@ export class TripDetailComponent implements OnInit {
   }
 
   private async geocodeAndRoute(t: Trip) {
-    // Geocode any stops whose destination lacks coordinates (needed for map markers)
-    const missing = (t.stops ?? []).filter(s => s.destination && s.destination.latitude == null);
+    // Geocode any stops that have neither a specific place location nor destination coordinates
+    const missing = (t.stops ?? []).filter(s => resolveStopCoords(s) === null && s.destination);
     if (missing.length) {
       this.geocodingInProgress.set(true);
       for (const stop of missing) {
@@ -1123,12 +1189,16 @@ export class TripDetailComponent implements OnInit {
       this.geocodingInProgress.set(false);
     }
 
+    if (t.origin_address) {
+      this.mapsSvc.geocode(t.origin_address).subscribe(r => this.originCoords.set(r));
+    }
+
     const sorted = this.sortedStops();
     if (!sorted.length) return;
 
-    // Build direction addresses: origin (home) → each stop city → (end at origin if no addresses exist)
+    // Build direction addresses: origin (home) → each stop's specific place/city → (end at origin if round trip)
     const stopAddresses = sorted
-      .map(s => s.destination ? `${s.destination.city}, ${s.destination.state_province}` : null)
+      .map(s => stopAddress(s))
       .filter(Boolean) as string[];
 
     if (stopAddresses.length === 0) return;
@@ -1153,9 +1223,7 @@ export class TripDetailComponent implements OnInit {
   }
 
   private stopCoords(stop: TripStop): google.maps.LatLngLiteral | null {
-    const d = stop.destination;
-    if (d?.latitude && d?.longitude) return { lat: Number(d.latitude), lng: Number(d.longitude) };
-    return this.coordCache.get(stop.id) ?? null;
+    return resolveStopCoords(stop) ?? this.coordCache.get(stop.id) ?? null;
   }
 
   recenterMap() { /* mapCenter computed is reactive — bound to map center input */ }
@@ -1376,4 +1444,16 @@ export class TripDetailComponent implements OnInit {
 
   statusColor(s: TripStatus): string { return STATUS_COLOR[s] ?? '#666'; }
   lodgingAddress(stop: TripStop): string | null { return stop.lodging?.address ?? null; }
+
+  stopDisplayName(stop: TripStop): string {
+    if (stop.display_name) return stop.display_name;
+    if (stop.place_type === 'rental') return 'Beach House';
+    return `Stop ${stop.stop_order}`;
+  }
+
+  stopLocationText(stop: TripStop): string | null {
+    const addr = stopAddress(stop);
+    if (!addr) return null;
+    return (stop.place_type === 'rental' || stop.place_type === 'residence') ? redactStreetNumber(addr) : addr;
+  }
 }

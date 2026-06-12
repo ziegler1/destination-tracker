@@ -15,6 +15,7 @@ export interface PlaceSelectedEvent {
   phone?:            string;
   website?:          string;
   price_level?:      number;
+  types:             string[];
 }
 
 const PRICE_MAP: Record<string, number> = {
@@ -91,7 +92,7 @@ export class PlacesAutocompleteComponent implements AfterViewInit, OnDestroy {
         const place = prediction.toPlace();
         await place.fetchFields({
           fields: ['id', 'displayName', 'formattedAddress', 'location',
-                   'addressComponents', 'nationalPhoneNumber', 'websiteURI', 'priceLevel'],
+                   'addressComponents', 'nationalPhoneNumber', 'websiteURI', 'priceLevel', 'types'],
         });
 
         if (!place.location) return;
@@ -121,6 +122,7 @@ export class PlacesAutocompleteComponent implements AfterViewInit, OnDestroy {
           phone:             place.nationalPhoneNumber  ?? undefined,
           website:           place.websiteURI           ?? undefined,
           price_level:       priceLevelKey !== undefined ? PRICE_MAP[priceLevelKey] : undefined,
+          types:             place.types ?? [],
         });
       },
       { signal: this.abortCtrl.signal },

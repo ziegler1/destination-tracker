@@ -18,6 +18,7 @@ import { DestinationService } from '../../../core/services/destination.service';
 import { LodgingService } from '../../../core/services/lodging.service';
 import { parseApiDate } from '../../../core/utils/date.utils';
 import { TripStop, TripStopStatus, Destination, Lodging } from '../../../types/schema.types';
+import { stopAddress, stopCoords, redactStreetNumber } from '../../../core/utils/stop-location.util';
 
 const STATUS_COLOR: Record<TripStopStatus, string> = {
   upcoming: '#1565c0', current: '#2e7d32', completed: '#6a1b9a',
@@ -155,10 +156,10 @@ const STATUS_COLOR: Record<TripStopStatus, string> = {
                       </div>
                     </div>
                     <p class="stop-name">
-                      {{ stop.destination?.name ?? 'Unassigned stop' }}
+                      {{ stop.display_name ?? 'Unassigned stop' }}
                     </p>
-                    @if (stop.destination) {
-                      <p class="stop-loc">{{ stop.destination.city }}, {{ stop.destination.state_province }}</p>
+                    @if (stopLocationText(stop); as loc) {
+                      <p class="stop-loc">{{ loc }}</p>
                     }
                     @if (stop.arrival_date || stop.departure_date) {
                       <p class="stop-dates">
@@ -348,6 +349,7 @@ export class TripStopsTabComponent implements OnInit {
     this.saving.set(true);
     const raw = this.editForm.getRawValue();
     this.stopSvc.update(this.tripId(), stop.id, {
+      ...stop,
       ...raw,
       arrival_date: this.fmtDate(raw.arrival_date as Date | null),
       departure_date: this.fmtDate(raw.departure_date as Date | null),
@@ -360,7 +362,7 @@ export class TripStopsTabComponent implements OnInit {
   }
 
   deleteStop(stop: TripStop) {
-    if (!confirm(`Delete stop "${stop.destination?.name ?? 'this stop'}"?`)) return;
+    if (!confirm(`Delete stop "${stop.display_name ?? 'this stop'}"?`)) return;
     this.stopSvc.delete(this.tripId(), stop.id).subscribe(() => this.reload());
   }
 
@@ -386,13 +388,20 @@ export class TripStopsTabComponent implements OnInit {
   statusColor(s: TripStopStatus): string { return STATUS_COLOR[s] ?? '#666'; }
 
   nextStopDirectionsUrl(stop: TripStop): string | null {
-    const cur = stop.destination;
-    if (!cur?.latitude || !cur?.longitude) return null;
+    const cur = stopCoords(stop);
+    if (!cur) return null;
     const list = this.sorted();
     const idx = list.findIndex((s) => s.id === stop.id);
-    const next = list[idx + 1]?.destination;
-    if (!next?.latitude || !next?.longitude) return null;
-    return `https://www.google.com/maps/dir/?api=1&origin=${cur.latitude},${cur.longitude}&destination=${next.latitude},${next.longitude}&travelmode=driving`;
+    const next = list[idx + 1] ? stopCoords(list[idx + 1]) : null;
+    if (!next) return null;
+    return `https://www.google.com/maps/dir/?api=1&origin=${cur.lat},${cur.lng}&destination=${next.lat},${next.lng}&travelmode=driving`;
+  }
+
+  /** Best address string for a stop, redacted for rental/residence place types. */
+  stopLocationText(stop: TripStop): string | null {
+    const addr = stopAddress(stop);
+    if (!addr) return null;
+    return (stop.place_type === 'rental' || stop.place_type === 'residence') ? redactStreetNumber(addr) : addr;
   }
 
   protected get Validators() { return Validators; }

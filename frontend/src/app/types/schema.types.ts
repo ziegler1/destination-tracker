@@ -158,6 +158,8 @@ export interface Trip {
 
 export type TripStopStatus = 'upcoming' | 'current' | 'completed';
 
+export type TripStopPlaceType = 'city' | 'hotel' | 'rental' | 'campsite' | 'residence' | 'other';
+
 export interface TripStop {
   id: number;
   trip_id: number;
@@ -172,6 +174,14 @@ export interface TripStop {
   gas_stop_before?: boolean;
   estimated_fuel_cost?: number;
   created_at: string;
+  display_name?:    string;
+  place_name?:      string | null;
+  place_address?:   string | null;
+  place_type?:      TripStopPlaceType;
+  place_lat?:       number | null;
+  place_lng?:       number | null;
+  place_google_id?: string | null;
+  is_home_base?:    boolean;
   destination?: Destination;
   lodging?: Lodging;
   restaurants?: TripRestaurant[];
