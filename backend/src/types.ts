@@ -138,6 +138,8 @@ export interface Trip {
 
 export type TripStopStatus = 'upcoming' | 'current' | 'completed';
 
+export type TripStopPlaceType = 'city' | 'hotel' | 'rental' | 'campsite' | 'residence' | 'other';
+
 export interface TripStop {
   id: number;
   trip_id: number;
@@ -148,10 +150,22 @@ export interface TripStop {
   status: TripStopStatus;
   lodging_id?: number;
   notes?: string;
+  drive_minutes_from_prev?: number;
+  gas_stop_before?: boolean;
+  estimated_fuel_cost?: number;
   created_at: string;
+  display_name?:    string;
+  place_name?:      string | null;
+  place_address?:   string | null;
+  place_type?:      TripStopPlaceType;
+  place_lat?:       number | null;
+  place_lng?:       number | null;
+  place_google_id?: string | null;
+  is_home_base?:    boolean;
   destination?: Destination;
   lodging?: Lodging;
   restaurants?: TripRestaurant[];
+  special_interests?: TripSpecialInterest[];
 }
 
 export interface TripRestaurant {
@@ -162,6 +176,29 @@ export interface TripRestaurant {
   visited_at?: string;
   notes?: string;
   restaurant?: Restaurant;
+}
+
+export interface SpecialInterestPlace {
+  id: number;
+  name: string;
+  city: string;
+  state_province: string;
+  category?: string;
+  address?: string;
+  latitude?: number;
+  longitude?: number;
+  website?: string;
+  rating?: number;
+  image_url?: string;
+  highlights?: string;
+}
+
+export interface TripSpecialInterest {
+  id: number;
+  trip_id: number;
+  trip_stop_id?: number;
+  special_interest_id?: number;
+  special_interest?: SpecialInterestPlace;
 }
 
 // ─── Expenses ────────────────────────────────────────────────────────────────
