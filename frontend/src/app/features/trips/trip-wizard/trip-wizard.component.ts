@@ -358,8 +358,8 @@ function numberedPinEl(order: number): HTMLElement {
       /* Trip stop builder — location on its own row, dates + remove below */
       .stop-row { flex-wrap:wrap; }
       .stop-row-main { flex:1 1 100%; }
-      .stop-row-dates { flex:1 1 auto; }
-      .stop-row-dates mat-form-field { flex:1; width:auto; }
+      .stop-row-dates { flex:1 1 auto; min-width:0; }
+      .stop-row-dates mat-form-field { flex:1; width:auto; min-width:0; }
     }
   `],
   template: `
