@@ -1102,7 +1102,7 @@ export class TripWizardComponent implements OnInit, OnDestroy {
   stopInputs = signal<WizardStopInput[]>([this.emptyStopInput()]);
 
   canGenerate = computed(() =>
-    !this.form.invalid &&
+    this.originDisplay().trim().length > 0 &&
     this.stopInputs().every(s => s.display.trim().length > 0 && s.arrival_date && s.departure_date),
   );
 
