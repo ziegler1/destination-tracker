@@ -33,6 +33,7 @@ import {
   TripStopPlaceType,
 } from '../../../types/schema.types';
 import { detectPlaceType } from '../../../core/utils/stop-location.util';
+import { parseApiDate } from '../../../core/utils/date.utils';
 
 const CUISINES   = ['BBQ', 'Italian', 'Seafood', 'American', 'Mexican', 'Asian', 'Southern', 'Steakhouse', 'Other'];
 const INTERESTS  = ['Historic Sites', 'State Parks', 'National Parks', 'Live Music', 'Scenic Drives', 'Museums', 'Roadside Attractions', 'Wineries/Breweries'];
@@ -176,9 +177,14 @@ function numberedPinEl(order: number): HTMLElement {
       display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700;
     }
     .route-stop-body  { flex:1; min-width:0; }
-    .route-stop-city  { font-size:15px; font-weight:700; margin:0 0 2px; }
+    .route-stop-city  { font-size:15px; font-weight:700; margin:0 0 2px; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
     .route-stop-dates { font-size:12px; color:var(--wp-text-secondary); margin:0 0 2px; }
     .route-stop-drive { font-size:12px; color:var(--wp-text-hint); margin:0; }
+    .confirmed-badge {
+      font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.5px;
+      padding:2px 8px; border-radius:10px; background:#00695C; color:#fff;
+    }
+    .confirmed-caption { font-size:12px; color:var(--wp-text-hint); font-style:italic; margin:2px 0 0; }
     .insert-stop-form { width:100%; padding:10px 0; }
     .insert-stop-label { font-size:12px; color:var(--wp-text-secondary); margin:0 0 6px; }
 
@@ -525,7 +531,7 @@ function numberedPinEl(order: number): HTMLElement {
       <!-- ── Step 3: Phase A — Review Your Route ───────────────────── -->
       @if (step() === 3 && plan()) {
         <p class="step-title">Review Your Route</p>
-        <p class="step-sub">Does this route look right? Add or remove stops, then continue.</p>
+        <p class="step-sub">Does this route look right? Add or remove stops, then continue to pick lodging and dining.</p>
 
         <!-- Route map -->
         <div class="route-map-compact">
@@ -570,7 +576,7 @@ function numberedPinEl(order: number): HTMLElement {
           @if (insertingAfter() === 0) {
             <div class="insert-stop-form">
               <p class="insert-stop-label">
-                Add a city between {{ shortPlace(form.value.origin || '') }} and {{ nextStopCity(0) }}
+                Add a stop between {{ shortPlace(form.value.origin || '') }} and {{ nextStopCity(0) }}
               </p>
               @if (insertLoading()) {
                 <div style="display:flex;align-items:center;gap:8px;padding:8px 0">
@@ -578,13 +584,29 @@ function numberedPinEl(order: number): HTMLElement {
                   <span style="font-size:13px;color:var(--wp-text-secondary)">Finding lodging & dining…</span>
                 </div>
               } @else {
+                <div class="add-stop-form">
+                  <mat-form-field appearance="outline">
+                    <mat-label>Arrive</mat-label>
+                    <input matInput [matDatepicker]="insArrDp0" [value]="insertArriveDate()"
+                           (dateChange)="insertArriveDate.set($event.value)" />
+                    <mat-datepicker-toggle matSuffix [for]="insArrDp0" />
+                    <mat-datepicker #insArrDp0 />
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>Depart</mat-label>
+                    <input matInput [matDatepicker]="insDepDp0" [value]="insertDepartDate()"
+                           (dateChange)="insertDepartDate.set($event.value)" />
+                    <mat-datepicker-toggle matSuffix [for]="insDepDp0" />
+                    <mat-datepicker #insDepDp0 />
+                  </mat-form-field>
+                </div>
                 <app-places-autocomplete placeholder="Search city or address…"
                   (placeSelected)="onInsertPlaceSelected($event, 0)" />
                 <button type="button" mat-stroked-button style="font-size:12px" (click)="insertingAfter.set(null)">Cancel</button>
               }
             </div>
           } @else {
-            <button class="add-stop-btn" (click)="insertingAfter.set(0)">
+            <button class="add-stop-btn" (click)="startInsert(0)">
               <mat-icon style="font-size:16px;width:16px;height:16px">add</mat-icon>
               Add a stop here
             </button>
@@ -592,38 +614,72 @@ function numberedPinEl(order: number): HTMLElement {
         </div>
 
         <!-- Stop list -->
-        @for (stop of plan()!.stops; track stop.stop_order) {
-          <div class="route-stop-card" [id]="'route-stop-' + stop.stop_order">
-            <div class="route-stop-num">{{ stop.stop_order }}</div>
+        @for (item of phaseAStops(); track item.stop.stop_order) {
+          <div class="route-stop-card" [id]="'route-stop-' + item.stop.stop_order">
+            <div class="route-stop-num">{{ item.stop.stop_order }}</div>
             <div class="route-stop-body">
-              <p class="route-stop-city">{{ stopLabel(stop) }}</p>
-              @if (stop.arrive_date) {
-                <p class="route-stop-dates">{{ stop.arrive_date | date:'MMM d' }} → {{ stop.depart_date | date:'MMM d' }}</p>
+              <p class="route-stop-city">
+                @if (item.placeType === 'hotel') { 🏨 }
+                @if (item.placeType === 'rental') { 🏖️ }
+                @if (item.placeType === 'city') { 📍 }
+                {{ phaseAStopName(item) }}
+                @if (item.placeType === 'hotel' || item.placeType === 'rental') {
+                  <span class="confirmed-badge">✓ Confirmed</span>
+                }
+              </p>
+              @if (item.stop.arrive_date) {
+                <p class="route-stop-dates">{{ item.stop.arrive_date | date:'MMM d' }} → {{ item.stop.depart_date | date:'MMM d' }}</p>
               }
-              @if (stop.drive_minutes_from_prev > 0) {
+              @if (item.stop.drive_minutes_from_prev > 0) {
                 <p class="route-stop-drive">
-                  {{ driveLbl(stop.drive_minutes_from_prev) }} drive
-                  @if (stop.estimated_fuel_cost) { · ~{{ stop.estimated_fuel_cost | currency:'USD':'symbol':'1.0-0' }} fuel }
+                  {{ driveLbl(item.stop.drive_minutes_from_prev) }} drive
+                  @if (item.stop.estimated_fuel_cost) { · ~{{ item.stop.estimated_fuel_cost | currency:'USD':'symbol':'1.0-0' }} fuel }
                 </p>
               }
-              @if (stop.gas_stop_before) {
+              @if (item.placeType === 'hotel') {
+                <p class="confirmed-caption">You've already chosen this hotel</p>
+              } @else if (item.placeType === 'rental') {
+                <p class="confirmed-caption">Rental property — we'll find restaurants nearby</p>
+              }
+              @if (item.stop.gas_stop_before) {
                 <p class="gas-flag" style="margin:2px 0 0">
                   <mat-icon style="font-size:14px;width:14px;height:14px">local_gas_station</mat-icon> Fuel up
                 </p>
               }
             </div>
-            <button mat-icon-button color="warn" style="flex-shrink:0" matTooltip="Remove this stop"
-                    (click)="removeStop(stop.stop_order, $event)">
-              <mat-icon>close</mat-icon>
-            </button>
+            @if (item.placeType === 'hotel' || item.placeType === 'rental') {
+              <button mat-stroked-button style="flex-shrink:0;font-size:12px"
+                      (click)="changingStop.set(changingStop() === item.stop.stop_order ? null : item.stop.stop_order)">
+                Change
+              </button>
+            } @else {
+              <button mat-icon-button color="warn" style="flex-shrink:0" matTooltip="Remove this stop"
+                      (click)="removeStop(item.stop.stop_order, $event)">
+                <mat-icon>close</mat-icon>
+              </button>
+            }
           </div>
+
+          <!-- Change hotel / rental for this stop -->
+          @if (changingStop() === item.stop.stop_order) {
+            <div class="insert-stop-form">
+              <p class="insert-stop-label">
+                Change the {{ item.placeType === 'hotel' ? 'hotel' : 'rental property' }} for {{ item.stop.city }}, {{ item.stop.state_province }}
+              </p>
+              <app-places-autocomplete
+                [placeholder]="item.placeType === 'hotel' ? 'Search hotels…' : 'Search address…'"
+                [types]="item.placeType === 'hotel' ? ['lodging'] : []"
+                (placeSelected)="onChangePlace($event, item.stop)" />
+              <button type="button" mat-stroked-button style="font-size:12px" (click)="changingStop.set(null)">Cancel</button>
+            </div>
+          }
 
           <!-- Add a stop between this stop and the next -->
           <div class="add-stop-row">
-            @if (insertingAfter() === stop.stop_order) {
+            @if (insertingAfter() === item.stop.stop_order) {
               <div class="insert-stop-form">
                 <p class="insert-stop-label">
-                  Add a city between {{ stop.city }}, {{ stop.state_province }} and {{ nextStopCity(stop.stop_order) }}
+                  Add a stop between {{ item.stop.city }}, {{ item.stop.state_province }} and {{ nextStopCity(item.stop.stop_order) }}
                 </p>
                 @if (insertLoading()) {
                   <div style="display:flex;align-items:center;gap:8px;padding:8px 0">
@@ -631,13 +687,29 @@ function numberedPinEl(order: number): HTMLElement {
                     <span style="font-size:13px;color:var(--wp-text-secondary)">Finding lodging & dining…</span>
                   </div>
                 } @else {
+                  <div class="add-stop-form">
+                    <mat-form-field appearance="outline">
+                      <mat-label>Arrive</mat-label>
+                      <input matInput [matDatepicker]="insArrDp" [value]="insertArriveDate()"
+                             (dateChange)="insertArriveDate.set($event.value)" />
+                      <mat-datepicker-toggle matSuffix [for]="insArrDp" />
+                      <mat-datepicker #insArrDp />
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Depart</mat-label>
+                      <input matInput [matDatepicker]="insDepDp" [value]="insertDepartDate()"
+                             (dateChange)="insertDepartDate.set($event.value)" />
+                      <mat-datepicker-toggle matSuffix [for]="insDepDp" />
+                      <mat-datepicker #insDepDp />
+                    </mat-form-field>
+                  </div>
                   <app-places-autocomplete placeholder="Search city or address…"
-                    (placeSelected)="onInsertPlaceSelected($event, stop.stop_order)" />
+                    (placeSelected)="onInsertPlaceSelected($event, item.stop.stop_order)" />
                   <button type="button" mat-stroked-button style="font-size:12px" (click)="insertingAfter.set(null)">Cancel</button>
                 }
               </div>
             } @else {
-              <button class="add-stop-btn" (click)="insertingAfter.set(stop.stop_order)">
+              <button class="add-stop-btn" (click)="startInsert(item.stop.stop_order)">
                 <mat-icon style="font-size:16px;width:16px;height:16px">add</mat-icon>
                 Add a stop here
               </button>
@@ -647,7 +719,7 @@ function numberedPinEl(order: number): HTMLElement {
 
         <div class="wizard-actions">
           <button mat-stroked-button (click)="step.set(1)">← Back to Edit</button>
-          <button mat-raised-button color="primary" (click)="goToPhaseB()">Continue to Lodging & Dining →</button>
+          <button mat-raised-button color="primary" (click)="goToPhaseB()">Continue →</button>
         </div>
       }
 
@@ -948,8 +1020,10 @@ export class TripWizardComponent implements OnInit, OnDestroy {
   };
 
   // ── Stop editing ─────────────────────────────────────────────────────
-  insertingAfter = signal<number | null>(null);
-  insertLoading  = signal(false);
+  insertingAfter   = signal<number | null>(null);
+  insertLoading    = signal(false);
+  insertArriveDate = signal<Date | null>(null);
+  insertDepartDate = signal<Date | null>(null);
 
   // ── Phase A — Route Review ───────────────────────────────────────────
   narrativeExpanded = signal(false);
@@ -1215,7 +1289,10 @@ export class TripWizardComponent implements OnInit, OnDestroy {
     event.stopPropagation();
     const current = this.plan();
     if (!current || current.stops.length <= 1) return;
-    if (!confirm('Remove this stop from your route?')) return;
+
+    const target = current.stops.find(s => s.stop_order === stopOrder);
+    const label  = target ? `${target.city}, ${target.state_province}` : 'this stop';
+    if (!confirm(`Remove ${label} from your trip?`)) return;
 
     const filtered = current.stops
       .filter(s => s.stop_order !== stopOrder)
@@ -1224,22 +1301,51 @@ export class TripWizardComponent implements OnInit, OnDestroy {
     const updated = { ...current, stops: filtered };
     this.plan.set(updated);
     this.resetReviewState(filtered);
+    this.remapPlaceOverrides(old => old === stopOrder ? null : (old > stopOrder ? old - 1 : old));
     this.computeRoute(updated);
     this.insertingAfter.set(null);
   }
 
+  // ── Remap placeOverrides keys when stops are removed/inserted ─────────
+  private remapPlaceOverrides(remap: (oldOrder: number) => number | null) {
+    this.placeOverrides.update(m => {
+      const n = new Map<number, { place: PlaceSelectedEvent; place_type: TripStopPlaceType }>();
+      for (const [oldOrder, val] of m) {
+        const newOrder = remap(oldOrder);
+        if (newOrder !== null) n.set(newOrder, val);
+      }
+      return n;
+    });
+  }
+
   // ── Insert a stop via Places Autocomplete ─────────────────────────────
+  /** Default arrive/depart date for a new stop inserted after `afterOrder`. */
+  private insertFallbackDate(afterOrder: number): string {
+    const current = this.plan();
+    if (!current) return '';
+    const before = current.stops.filter(s => s.stop_order <= afterOrder);
+    const prevStop = before[before.length - 1];
+    return prevStop?.depart_date || prevStop?.arrive_date || current.trip.start_date;
+  }
+
+  /** Opens the insert-stop form after `afterOrder`, pre-filling its date pickers. */
+  startInsert(afterOrder: number) {
+    const fallback = parseApiDate(this.insertFallbackDate(afterOrder));
+    this.insertArriveDate.set(fallback);
+    this.insertDepartDate.set(fallback);
+    this.insertingAfter.set(afterOrder);
+  }
+
   onInsertPlaceSelected(e: PlaceSelectedEvent, afterOrder: number) {
     const current = this.plan();
     if (!current) return;
 
-    const before = current.stops.filter(s => s.stop_order <= afterOrder);
-
-    // Dates are required by the backend (DATE columns) — fall back to the
-    // previous stop's departure date (or the trip start date) so a freshly
-    // inserted stop never carries an empty-string date into /confirm.
-    const prevStop = before[before.length - 1];
-    const fallbackDate = prevStop?.depart_date || prevStop?.arrive_date || current.trip.start_date;
+    // Dates are required by the backend (DATE columns) — use the date pickers if the
+    // user set them, falling back to the previous stop's departure date (or the trip
+    // start date) so a freshly inserted stop never carries an empty-string date into /confirm.
+    const fallbackDate = this.insertFallbackDate(afterOrder);
+    const arriveDate   = this.insertArriveDate()?.toISOString().split('T')[0]   || fallbackDate;
+    const departDate   = this.insertDepartDate()?.toISOString().split('T')[0]   || arriveDate;
 
     const stub: WizardStop = {
       stop_order:              afterOrder + 1,
@@ -1247,8 +1353,8 @@ export class TripWizardComponent implements OnInit, OnDestroy {
       city:                    e.city || e.name,
       state_province:          e.state_province,
       country:                 e.country,
-      arrive_date:             fallbackDate,
-      depart_date:             fallbackDate,
+      arrive_date:             arriveDate,
+      depart_date:             departDate,
       drive_minutes_from_prev: 0,
       gas_stop_before:         false,
       estimated_fuel_cost:     0,
@@ -1290,6 +1396,7 @@ export class TripWizardComponent implements OnInit, OnDestroy {
     const updated = { ...current, stops: merged };
     this.plan.set(updated);
     this.resetReviewState(merged);
+    this.remapPlaceOverrides(old => old > afterOrder ? old + 1 : old);
     this.computeRoute(updated);
 
     this.insertLoading.set(false);
@@ -1326,6 +1433,73 @@ export class TripWizardComponent implements OnInit, OnDestroy {
     return stop.place_name
       ? `${stop.place_name} — ${stop.city}, ${stop.state_province}`
       : `${stop.city}, ${stop.state_province}`;
+  }
+
+  // ── Stop place-type info (correlates plan.stops with Step 1 stopInputs) ─
+  /** stop_order → user-driven place override applied via "Change" in Phase A/B. */
+  private placeOverrides = signal<Map<number, { place: PlaceSelectedEvent; place_type: TripStopPlaceType }>>(new Map());
+
+  /**
+   * Best-known place type + place details for a generated stop. An explicit "Change"
+   * override takes priority; otherwise correlate back to the Step 1 stop the user entered
+   * (by place_id, falling back to city/state) so hotel/rental stops the user already chose
+   * show as confirmed instead of as lodging-TBD city stops.
+   */
+  placeInfoFor(stop: WizardStop): { placeType: TripStopPlaceType; place: PlaceSelectedEvent | null } {
+    const override = this.placeOverrides().get(stop.stop_order);
+    if (override) return { placeType: override.place_type, place: override.place };
+
+    const inputs = this.stopInputs();
+    const matched = (stop.place_id && inputs.find(i => i.place?.place_id === stop.place_id))
+      || inputs.find(i => i.place
+        && i.place.city.toLowerCase() === stop.city.toLowerCase()
+        && i.place.state_province.toLowerCase() === stop.state_province.toLowerCase());
+
+    return { placeType: matched?.place_type ?? 'city', place: matched?.place ?? null };
+  }
+
+  phaseAStops = computed(() => (this.plan()?.stops ?? []).map(stop => {
+    const { placeType, place } = this.placeInfoFor(stop);
+    return { stop, placeType, place };
+  }));
+
+  phaseAStopName(item: { stop: WizardStop; placeType: TripStopPlaceType; place: PlaceSelectedEvent | null }): string {
+    const cityState = `${item.stop.city}, ${item.stop.state_province}`;
+    if (item.placeType === 'hotel')  return `${item.place?.name ?? item.stop.place_name ?? 'Hotel'} — ${cityState}`;
+    if (item.placeType === 'rental') return `${item.place?.name ?? item.stop.place_name ?? 'Rental Property'} — ${cityState}`;
+    return cityState;
+  }
+
+  // ── Change a stop's place (Phase A "Change" / Phase B "Change Hotel") ───
+  changingStop = signal<number | null>(null);
+
+  onChangePlace(e: PlaceSelectedEvent, stop: WizardStop) {
+    const current = this.plan();
+    if (!current) return;
+
+    const updatedStops = current.stops.map(s => s.stop_order === stop.stop_order
+      ? {
+          ...s,
+          city:           e.city || e.name,
+          state_province: e.state_province,
+          place_name:     e.name,
+          place_address:  e.formatted_address,
+          place_lat:      e.lat,
+          place_lng:      e.lng,
+          place_id:       e.place_id,
+        }
+      : s);
+
+    const updated = { ...current, stops: updatedStops };
+    this.plan.set(updated);
+    this.computeRoute(updated);
+
+    this.placeOverrides.update(m => {
+      const n = new Map(m);
+      n.set(stop.stop_order, { place: e, place_type: detectPlaceType(e.types) });
+      return n;
+    });
+    this.changingStop.set(null);
   }
 
   // ── Phase B/C navigation ──────────────────────────────────────────────
@@ -1392,6 +1566,7 @@ export class TripWizardComponent implements OnInit, OnDestroy {
   private initReviewState(p: WizardPlan) {
     this.resetReviewState(p.stops);
     this.excludedPackItems.set(new Map());
+    this.placeOverrides.set(new Map());
   }
 
   private resetReviewState(stops: WizardStop[]) {
@@ -1409,6 +1584,7 @@ export class TripWizardComponent implements OnInit, OnDestroy {
     this.approvedRests.set(restMap);
     this.approvedPois.set(poiMap);
     this.approvedSpecialInterests.set(siMap);
+    this.changingStop.set(null);
   }
 
   selectLodging(stopOrder: number, idx: number) {
