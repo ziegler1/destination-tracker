@@ -30,7 +30,9 @@ import {
 } from '../../../shared/components/places-autocomplete/places-autocomplete.component';
 import {
   WizardPlan, WizardStop, WizardGenerateRequest, TripType, WizardLodgingSuggestion,
+  TripStopPlaceType,
 } from '../../../types/schema.types';
+import { detectPlaceType } from '../../../core/utils/stop-location.util';
 
 const CUISINES   = ['BBQ', 'Italian', 'Seafood', 'American', 'Mexican', 'Asian', 'Southern', 'Steakhouse', 'Other'];
 const INTERESTS  = ['Historic Sites', 'State Parks', 'National Parks', 'Live Music', 'Scenic Drives', 'Museums', 'Roadside Attractions', 'Wineries/Breweries'];
@@ -56,6 +58,16 @@ const STOP_TIMINGS = [
   { value: 'drive_through',   label: 'Drive most of the day, brief stops' },
   { value: 'evening_arrival', label: 'Depart mid-morning, arrive evening' },
 ];
+
+/** A single row in the Step 1 trip-stop builder, before any plan has been generated. */
+interface WizardStopInput {
+  id: number;
+  place: PlaceSelectedEvent | null;
+  display: string;
+  place_type: TripStopPlaceType;
+  arrival_date: Date | null;
+  departure_date: Date | null;
+}
 
 function numberedPinEl(order: number): HTMLElement {
   const el = document.createElement('div');
@@ -289,6 +301,21 @@ function numberedPinEl(order: number): HTMLElement {
                       display:flex; align-items:center; gap:4px;
                       overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
+    /* Step 1 — Trip stop builder */
+    .stop-row {
+      display:flex; align-items:flex-start; gap:8px; padding:10px 0;
+      border-bottom:1px solid var(--wp-border);
+    }
+    .stop-row:first-of-type { border-top:1px solid var(--wp-border); }
+    .stop-row-main { flex:1 1 240px; min-width:0; }
+    .stop-row-dates { display:flex; gap:8px; flex-shrink:0; }
+    .stop-row-dates mat-form-field { width:124px; }
+    .place-type-chip {
+      display:inline-block; margin-left:6px; padding:1px 8px; border-radius:10px;
+      font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.5px;
+      background:var(--wp-surface-variant); color:var(--wp-text-secondary); white-space:nowrap;
+    }
+
     /* Mobile responsive */
     @media (max-width:768px) {
       .wizard-wrap { padding:16px 16px 100px; }
@@ -344,31 +371,54 @@ function numberedPinEl(order: number): HTMLElement {
                 </button>
               </div>
 
-              <div class="place-field">
-                <p class="place-label">Destination *</p>
-                <app-places-autocomplete
-                  #destAC
-                  placeholder="Search a city, address, hotel, restaurant, or attraction…"
-                  [types]="[]"
-                  (placeSelected)="onDestSelected($event)" />
-                @if (destDisplay()) {
-                  <p class="place-selected"><mat-icon style="font-size:14px;width:14px;height:14px">place</mat-icon> {{ destDisplay() }}</p>
+              <div class="full" style="margin-bottom:8px">
+                <p class="place-label">Trip Stops *</p>
+                @for (stop of stopInputs(); track stop.id; let i = $index) {
+                  <div class="stop-row">
+                    <div class="stop-row-main">
+                      <app-places-autocomplete
+                        placeholder="Search hotel, city, or address…"
+                        [types]="[]"
+                        [initialValue]="stop.display"
+                        (placeSelected)="onStopPlaceSelected($event, i)" />
+                      @if (stop.display) {
+                        <p class="place-selected">
+                          <mat-icon style="font-size:14px;width:14px;height:14px">place</mat-icon>
+                          {{ stop.display }}
+                          <span class="place-type-chip">{{ stop.place_type }}</span>
+                        </p>
+                      }
+                    </div>
+                    <div class="stop-row-dates">
+                      <mat-form-field appearance="outline">
+                        <mat-label>Arrive</mat-label>
+                        <input matInput [matDatepicker]="arrDp" [value]="stop.arrival_date"
+                               (dateChange)="onStopDateChange(i, 'arrival_date', $event.value)" />
+                        <mat-datepicker-toggle matSuffix [for]="arrDp" />
+                        <mat-datepicker #arrDp />
+                      </mat-form-field>
+                      <mat-form-field appearance="outline">
+                        <mat-label>Depart</mat-label>
+                        <input matInput [matDatepicker]="depDp" [value]="stop.departure_date"
+                               (dateChange)="onStopDateChange(i, 'departure_date', $event.value)" />
+                        <mat-datepicker-toggle matSuffix [for]="depDp" />
+                        <mat-datepicker #depDp />
+                      </mat-form-field>
+                    </div>
+                    <button type="button" mat-icon-button color="warn" matTooltip="Remove this stop"
+                            [disabled]="stopInputs().length <= 1"
+                            (click)="removeStopRow(i)">
+                      <mat-icon>close</mat-icon>
+                    </button>
+                  </div>
                 }
+                <div class="add-stop-row">
+                  <button type="button" class="add-stop-btn" (click)="addStopRow()">
+                    <mat-icon style="font-size:16px;width:16px;height:16px">add</mat-icon>
+                    Add Stop
+                  </button>
+                </div>
               </div>
-
-              <mat-form-field appearance="outline">
-                <mat-label>Start date *</mat-label>
-                <input matInput [matDatepicker]="dp1" formControlName="start_date" />
-                <mat-datepicker-toggle matSuffix [for]="dp1" />
-                <mat-datepicker #dp1 />
-              </mat-form-field>
-
-              <mat-form-field appearance="outline">
-                <mat-label>End date *</mat-label>
-                <input matInput [matDatepicker]="dp2" formControlName="end_date" />
-                <mat-datepicker-toggle matSuffix [for]="dp2" />
-                <mat-datepicker #dp2 />
-              </mat-form-field>
 
               @if (form.value.trip_type === 'based_at_destination') {
                 <mat-form-field appearance="outline">
@@ -455,7 +505,7 @@ function numberedPinEl(order: number): HTMLElement {
             </div>
 
             <button mat-raised-button color="primary" type="submit"
-                    [disabled]="form.invalid" style="margin-top:16px;width:100%;height:48px;font-size:16px">
+                    [disabled]="!canGenerate()" style="margin-top:16px;width:100%;height:48px;font-size:16px">
               <mat-icon>auto_awesome</mat-icon> Build My Trip
             </button>
           </form>
@@ -864,11 +914,17 @@ export class TripWizardComponent implements OnInit, OnDestroy {
   private mapsSvc     = inject(MapsService);
 
   @ViewChild('originAC') originAC?: PlacesAutocompleteComponent;
-  @ViewChild('destAC')   destAC?:   PlacesAutocompleteComponent;
 
   originDisplay = signal('');
-  destDisplay   = signal('');
-  destPlace     = signal<{ name: string; formatted_address: string; lat: number; lng: number; place_id: string } | null>(null);
+
+  // ── Step 1 — Trip stop builder ───────────────────────────────────────
+  private nextStopId = 0;
+  stopInputs = signal<WizardStopInput[]>([this.emptyStopInput()]);
+
+  canGenerate = computed(() =>
+    !this.form.invalid &&
+    this.stopInputs().every(s => s.display.trim().length > 0 && s.arrival_date && s.departure_date),
+  );
 
   // ── Step state ──────────────────────────────────────────────────────
   step        = signal(1);
@@ -939,9 +995,6 @@ export class TripWizardComponent implements OnInit, OnDestroy {
   form = this.fb.group({
     name:                [''],
     origin:              ['', Validators.required],
-    destination:         ['', Validators.required],
-    start_date:          [null as Date | null, Validators.required],
-    end_date:            [null as Date | null, Validators.required],
     budget:              [null as number | null],
     lodging_type:        [''],
     pet_friendly:        [false],
@@ -958,23 +1011,23 @@ export class TripWizardComponent implements OnInit, OnDestroy {
     if (draft) {
       if (draft.place_id && draft.formatted_address && draft.lat != null && draft.lng != null) {
         // Carry the precise place picked on the home page through to the wizard,
-        // matching onDestSelected() so /generate preserves its exact location.
+        // matching onStopPlaceSelected() so /generate preserves its exact location.
         const display = draft.destination && draft.destination !== draft.formatted_address
           ? `${draft.destination} — ${draft.formatted_address}`
           : draft.formatted_address;
-        this.form.patchValue({ destination: draft.formatted_address });
-        this.destDisplay.set(display);
-        this.destPlace.set({
+        const place: PlaceSelectedEvent = {
           name: draft.destination ?? '', formatted_address: draft.formatted_address,
           lat: draft.lat, lng: draft.lng, place_id: draft.place_id,
-        });
-        setTimeout(() => this.destAC?.setValue(display));
+          city: draft.city ?? '', state_province: draft.state_province ?? '', country: 'USA',
+          types: [],
+        };
+        this.stopInputs.update(rows => rows.map((r, i) => i === 0
+          ? { ...r, place, display, place_type: detectPlaceType(place.types) }
+          : r));
       } else {
         const label = [draft.city || draft.destination, draft.state_province].filter(Boolean).join(', ');
         if (label) {
-          this.form.patchValue({ destination: label });
-          this.destDisplay.set(label);
-          setTimeout(() => this.destAC?.setValue(label));
+          this.stopInputs.update(rows => rows.map((r, i) => i === 0 ? { ...r, display: label } : r));
         }
       }
     }
@@ -996,15 +1049,35 @@ export class TripWizardComponent implements OnInit, OnDestroy {
     this.originDisplay.set(e.formatted_address);
   }
 
-  onDestSelected(e: PlaceSelectedEvent) {
-    this.form.patchValue({ destination: e.formatted_address });
-    this.destDisplay.set(
-      e.name && e.name !== e.formatted_address ? `${e.name} — ${e.formatted_address}` : e.formatted_address,
-    );
-    this.destPlace.set({
-      name: e.name, formatted_address: e.formatted_address,
-      lat: e.lat, lng: e.lng, place_id: e.place_id,
-    });
+  // ── Step 1 — Trip stop builder ───────────────────────────────────────
+  private emptyStopInput(): WizardStopInput {
+    return {
+      id: this.nextStopId++,
+      place: null,
+      display: '',
+      place_type: 'city',
+      arrival_date: null,
+      departure_date: null,
+    };
+  }
+
+  onStopPlaceSelected(e: PlaceSelectedEvent, index: number) {
+    const display = e.name && e.name !== e.formatted_address ? `${e.name} — ${e.formatted_address}` : e.formatted_address;
+    this.stopInputs.update(rows => rows.map((r, i) => i === index
+      ? { ...r, place: e, display, place_type: detectPlaceType(e.types) }
+      : r));
+  }
+
+  onStopDateChange(index: number, field: 'arrival_date' | 'departure_date', value: Date | null) {
+    this.stopInputs.update(rows => rows.map((r, i) => i === index ? { ...r, [field]: value } : r));
+  }
+
+  addStopRow() {
+    this.stopInputs.update(rows => [...rows, this.emptyStopInput()]);
+  }
+
+  removeStopRow(index: number) {
+    this.stopInputs.update(rows => rows.length > 1 ? rows.filter((_, i) => i !== index) : rows);
   }
 
   useHome() {
@@ -1049,16 +1122,39 @@ export class TripWizardComponent implements OnInit, OnDestroy {
   }
 
   // ── Generate ─────────────────────────────────────────────────────────
+  /** The stop that represents the trip's "destination" for the /generate contract: the last non-hotel stop (a city or rental), falling back to the final stop if every stop is a hotel. */
+  private destStop(): WizardStopInput {
+    const stops = this.stopInputs();
+    return [...stops].reverse().find(s => s.place_type !== 'hotel') ?? stops[stops.length - 1];
+  }
+
   generate() {
-    if (this.form.invalid) return;
+    if (!this.canGenerate()) return;
     const v = this.form.getRawValue();
+    const stops = this.stopInputs();
+    const dest = this.destStop();
+
+    const destination = dest.place?.city
+      ? `${dest.place.city}, ${dest.place.state_province}`
+      : dest.display;
+
+    const destinationPlace = dest.place ? {
+      name:              dest.place.name,
+      formatted_address: dest.place.formatted_address,
+      lat:               dest.place.lat,
+      lng:               dest.place.lng,
+      place_id:          dest.place.place_id,
+    } : null;
+
+    const startDate = stops[0].arrival_date as Date;
+    const endDate   = stops[stops.length - 1].departure_date as Date;
 
     const payload: WizardGenerateRequest = {
       origin:              v.origin!,
-      destination:         v.destination!,
-      destination_place:   this.destPlace(),
-      start_date:          (v.start_date as Date).toISOString().split('T')[0],
-      end_date:            (v.end_date   as Date).toISOString().split('T')[0],
+      destination,
+      destination_place:   destinationPlace,
+      start_date:          startDate.toISOString().split('T')[0],
+      end_date:            endDate.toISOString().split('T')[0],
       budget:              v.budget ?? 0,
       trip_type:           (v.trip_type as TripType) || 'one_way',
       drive_hours_per_day: v.drive_hours_per_day ?? 6,
@@ -1222,7 +1318,8 @@ export class TripWizardComponent implements OnInit, OnDestroy {
   nextStopCity(afterOrder: number): string {
     const next = (this.plan()?.stops ?? []).find(s => s.stop_order === afterOrder + 1);
     if (next) return `${next.city}, ${next.state_province}`;
-    return this.form.value.destination || 'your destination';
+    const dest = this.destStop();
+    return dest.place?.city ? `${dest.place.city}, ${dest.place.state_province}` : (dest.display || 'your destination');
   }
 
   stopLabel(stop: WizardStop): string {
