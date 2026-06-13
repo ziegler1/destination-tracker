@@ -32,7 +32,7 @@ import {
   WizardPlan, WizardStop, WizardGenerateRequest, TripType, WizardLodgingSuggestion,
   TripStopPlaceType,
 } from '../../../types/schema.types';
-import { detectPlaceType } from '../../../core/utils/stop-location.util';
+import { detectPlaceType, redactStreetNumber } from '../../../core/utils/stop-location.util';
 import { parseApiDate } from '../../../core/utils/date.utils';
 
 const CUISINES   = ['BBQ', 'Italian', 'Seafood', 'American', 'Mexican', 'Asian', 'Southern', 'Steakhouse', 'Other'];
@@ -205,14 +205,30 @@ function numberedPinEl(order: number): HTMLElement {
     }
 
     /* Phase B — Lodging & Dining */
-    .phase-progress { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:18px; }
+    .phase-progress { display:flex; flex-wrap:nowrap; gap:6px; margin-bottom:18px; overflow-x:auto; }
+    .progress-step  { display:flex; flex-direction:column; align-items:center; gap:4px; flex-shrink:0; }
     .progress-pill {
       width:32px; height:32px; border-radius:50%; border:1.5px solid var(--wp-border);
       background:var(--wp-surface); color:var(--wp-text-secondary); font-size:13px; font-weight:700;
       cursor:pointer; transition:all .2s; flex-shrink:0;
     }
-    .progress-pill.current { background:#00695C; border-color:#00695C; color:#fff; }
+    .progress-pill.current   { background:#00695C; border-color:#00695C; color:#fff; }
+    .progress-pill.completed { background:#2e7d32; border-color:#2e7d32; color:#fff; }
+    .progress-city {
+      font-size:11px; color:var(--wp-text-secondary); white-space:nowrap;
+      overflow:hidden; text-overflow:ellipsis; max-width:64px;
+    }
+    @media (max-width:480px) { .progress-city { max-width:48px; font-size:10px; } }
     .stop-b-header { display:flex; align-items:center; gap:12px; margin-bottom:16px; }
+    .confirmed-place-card {
+      display:flex; gap:12px; border-radius:10px; overflow:hidden;
+      border:2px solid #00695C; background:color-mix(in srgb,#00695C 6%,var(--wp-surface));
+    }
+    .confirmed-place-card .card-photo { width:96px; height:96px; flex-shrink:0; }
+    .confirmed-place-card .card-body  { flex:1; min-width:0; padding:10px 12px; }
+    .suggestion-card.excluded { opacity:.45; }
+    .suggestion-card.excluded .card-name { text-decoration:line-through; }
+    .selected-outline { border-color:var(--wp-primary) !important; color:var(--wp-primary) !important; }
     .stop-nav {
       display:flex; align-items:center; justify-content:space-between; gap:12px;
       margin-top:24px; flex-wrap:wrap;
@@ -286,10 +302,18 @@ function numberedPinEl(order: number): HTMLElement {
     }
     .pack-item-chip.included { background:var(--wp-surface-variant); text-decoration:line-through; opacity:.5; }
 
-    .budget-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:10px; margin:12px 0; }
+    .budget-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin:12px 0; }
     .budget-item { padding:10px 12px; border-radius:8px; background:var(--wp-surface-variant); }
     .budget-item label { font-size:11px; text-transform:uppercase; letter-spacing:.7px; color:var(--wp-text-hint); display:block; }
     .budget-item span  { font-size:16px; font-weight:700; color:var(--wp-primary); }
+    .budget-total {
+      display:flex; align-items:center; justify-content:space-between; gap:10px;
+      padding:12px 14px; border-radius:8px; margin-top:10px;
+      background:color-mix(in srgb,var(--wp-primary) 10%,var(--wp-surface-variant));
+      border:1.5px solid var(--wp-primary);
+    }
+    .budget-total label { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.7px; }
+    .budget-total span  { font-size:20px; font-weight:800; color:var(--wp-primary); }
     .budget-vs { font-size:14px; font-weight:600; margin-top:8px; }
     .under { color:#2e7d32; }
     .over  { color:#c62828; }
@@ -328,6 +352,8 @@ function numberedPinEl(order: number): HTMLElement {
       .basics-grid { grid-template-columns:1fr; }
       .trip-type-grid { grid-template-columns:1fr; }
       .suggestion-grid { grid-template-columns:1fr; }
+      .route-recap { flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:4px; }
+      .recap-place { flex-shrink:0; }
     }
   `],
   template: `
@@ -725,38 +751,89 @@ function numberedPinEl(order: number): HTMLElement {
 
       <!-- ── Step 4: Phase B — Pick Your Stops ──────────────────────── -->
       @if (step() === 4 && plan()) {
-        @if (currentStop(); as stop) {
+        @if (currentStopInfo(); as info) {
+        @if (info.stop; as stop) {
           <p class="step-title">Pick Your Stops</p>
           <p class="step-sub">Choose where to stay and eat at each stop.</p>
 
-          <!-- Progress pills -->
+          <!-- Progress steps -->
           <div class="phase-progress">
             @for (s of plan()!.stops; track s.stop_order; let i = $index) {
-              <button type="button" class="progress-pill" [class.current]="i === currentStopIdx()"
-                      (click)="currentStopIdx.set(i)">{{ i + 1 }}</button>
+              <div class="progress-step">
+                <button type="button" class="progress-pill"
+                        [class.current]="i === currentStopIdx()"
+                        [class.completed]="i < currentStopIdx()"
+                        (click)="currentStopIdx.set(i); scrollToTop()">
+                  @if (i < currentStopIdx()) { ✓ } @else { {{ i + 1 }} }
+                </button>
+                <span class="progress-city">{{ s.city }}</span>
+              </div>
             }
           </div>
 
           <!-- Stop header -->
           <div class="stop-b-header">
             <div class="route-stop-num">{{ stop.stop_order }}</div>
-            <div>
-              <p class="route-stop-city">{{ stopLabel(stop) }}</p>
+            <div style="flex:1;min-width:0">
+              <p class="route-stop-city">
+                @if (info.placeType === 'hotel') { 🏨 }
+                @if (info.placeType === 'rental') { 🏖️ }
+                @if (info.placeType === 'city') { 📍 }
+                {{ phaseAStopName(info) }}
+              </p>
               @if (stop.arrive_date) {
                 <p class="route-stop-dates">
                   {{ stop.arrive_date | date:'MMM d' }} → {{ stop.depart_date | date:'MMM d' }}
                   @if (stop.drive_minutes_from_prev > 0) { · {{ driveLbl(stop.drive_minutes_from_prev) }} drive }
                 </p>
               }
+              @if (stop.gas_stop_before) {
+                <p class="gas-flag" style="margin:2px 0 0">
+                  <mat-icon style="font-size:14px;width:14px;height:14px">local_gas_station</mat-icon> Fuel up before this stop
+                </p>
+              }
             </div>
           </div>
 
-          @if (stop.stop_type === 'base') {
+          <!-- Lodging: confirmed hotel / confirmed rental / base stay / lodging suggestions -->
+          @if (info.placeType === 'hotel') {
+            <p class="section-label">🏨 Your Hotel</p>
+            <div class="confirmed-place-card">
+              <div class="card-photo" style="display:flex;align-items:center;justify-content:center;font-size:36px">🏨</div>
+              <div class="card-body">
+                <p class="card-name">{{ confirmedPlaceName(info) }}</p>
+                @if (confirmedPlaceAddress(info); as addr) { <p class="card-meta">{{ addr }}</p> }
+                <p class="confirmed-caption">✓ Your chosen hotel</p>
+              </div>
+            </div>
+            <button mat-stroked-button style="margin-top:8px"
+                    (click)="changingStop.set(changingStop() === stop.stop_order ? null : stop.stop_order)">
+              Change Hotel
+            </button>
+            @if (changingStop() === stop.stop_order) {
+              <div class="insert-stop-form">
+                <p class="insert-stop-label">Search for a different hotel in {{ stop.city }}, {{ stop.state_province }}</p>
+                <app-places-autocomplete placeholder="Search hotels…" [types]="['lodging']"
+                  (placeSelected)="onChangePlace($event, stop)" />
+                <button type="button" mat-stroked-button style="font-size:12px" (click)="changingStop.set(null)">Cancel</button>
+              </div>
+            }
+          } @else if (info.placeType === 'rental') {
+            <p class="section-label">🏖️ Your Rental</p>
+            <div class="confirmed-place-card">
+              <div class="card-photo" style="display:flex;align-items:center;justify-content:center;font-size:36px">🏖️</div>
+              <div class="card-body">
+                <p class="card-name">{{ confirmedPlaceName(info) }}</p>
+                @if (confirmedPlaceAddress(info, true); as addr) { <p class="card-meta">{{ addr }}</p> }
+                <p class="confirmed-caption">✓ Rental property confirmed</p>
+              </div>
+            </div>
+          } @else if (stop.stop_type === 'base') {
             <div class="base-stay-banner">
               🏖️ <strong>Base Stay</strong> — You'll be staying in your own accommodation here. No lodging booking needed.
             </div>
           } @else {
-            <p class="section-label">🏨 Where will you stay?</p>
+            <p class="section-label">🏨 Where will you stay in {{ stop.city }}?</p>
             <div class="suggestion-grid">
               @for (s of stop.lodging_suggestions; track $index) {
                 <div class="suggestion-card"
@@ -777,22 +854,21 @@ function numberedPinEl(order: number): HTMLElement {
                   </div>
                 </div>
               }
-              <div class="suggestion-card" style="display:flex;align-items:center;justify-content:center;min-height:80px"
-                   [class.selected]="selectedLodging().get(stop.stop_order) === -1"
-                   (click)="selectLodging(stop.stop_order, -1)">
-                @if (selectedLodging().get(stop.stop_order) === -1) { <span class="card-check">✓</span> }
-                <p style="font-size:13px;color:var(--wp-text-secondary);text-align:center;padding:12px">I'll add my own later</p>
-              </div>
             </div>
+            <button mat-stroked-button style="margin-top:4px"
+                    [class.selected-outline]="selectedLodging().get(stop.stop_order) === -1"
+                    (click)="selectLodging(stop.stop_order, -1)">
+              @if (selectedLodging().get(stop.stop_order) === -1) { ✓ }
+              I'll add my own later
+            </button>
           }
 
-          <p class="section-label">🍽️ Where might you eat?</p>
+          <p class="section-label">🍽️ Where might you eat in {{ stop.city }}?</p>
           <div class="suggestion-grid">
             @for (s of stop.restaurant_suggestions; track $index) {
               <div class="suggestion-card"
-                   [class.approved]="isRestApproved(stop.stop_order, $index)"
+                   [class.excluded]="!isRestApproved(stop.stop_order, $index)"
                    (click)="toggleRest(stop.stop_order, $index)">
-                @if (isRestApproved(stop.stop_order, $index)) { <span class="card-check">✓</span> }
                 @if (s.photo_url) {
                   <img class="card-photo" [src]="s.photo_url" [alt]="s.name" (error)="onImgError($event)" />
                 } @else {
@@ -806,18 +882,15 @@ function numberedPinEl(order: number): HTMLElement {
                 </div>
               </div>
             }
-            <div class="suggestion-card" style="display:flex;align-items:center;justify-content:center;min-height:80px"
-                 [class.selected]="!hasApprovedRests(stop.stop_order)"
-                 (click)="clearRests(stop.stop_order)">
-              @if (!hasApprovedRests(stop.stop_order)) { <span class="card-check">✓</span> }
-              <p style="font-size:13px;color:var(--wp-text-secondary);text-align:center;padding:12px">I'll add my own later</p>
-            </div>
           </div>
+          <button mat-stroked-button style="margin-top:4px" (click)="clearRests(stop.stop_order)">
+            I'll find my own
+          </button>
 
           @if (extraSuggestionCount(stop) > 0) {
             <button type="button" class="narrative-toggle" (click)="toggleExtras(stop.stop_order)">
               {{ isExtrasExpanded(stop.stop_order) ? '▼' : '▶' }}
-              {{ isExtrasExpanded(stop.stop_order) ? 'Hide' : 'Show' }} {{ extraSuggestionCount(stop) }} more suggestion{{ extraSuggestionCount(stop) === 1 ? '' : 's' }}
+              Things to do nearby ({{ extraSuggestionCount(stop) }} suggestion{{ extraSuggestionCount(stop) === 1 ? '' : 's' }})
             </button>
 
             @if (isExtrasExpanded(stop.stop_order)) {
@@ -870,21 +943,22 @@ function numberedPinEl(order: number): HTMLElement {
 
           <!-- Bottom nav -->
           <div class="stop-nav">
-            <button mat-stroked-button [disabled]="currentStopIdx() === 0" (click)="prevStop()">← Prev Stop</button>
+            <button mat-stroked-button [disabled]="currentStopIdx() === 0" (click)="prevStop()">← Prev</button>
             <span class="stop-nav-label">Stop {{ currentStopIdx() + 1 }} of {{ plan()!.stops.length }}</span>
             @if (currentStopIdx() < plan()!.stops.length - 1) {
-              <button mat-raised-button color="primary" (click)="nextStop()">Next Stop →</button>
+              <button mat-raised-button color="primary" (click)="nextStop()">Next →</button>
             } @else {
               <button mat-raised-button color="primary" (click)="goToPhaseC()">Review & Save →</button>
             }
           </div>
         }
+        }
       }
 
       <!-- ── Step 5: Phase C — Review & Save ────────────────────────── -->
       @if (step() === 5 && plan()) {
-        <p class="step-title">Review & Save</p>
-        <p class="step-sub">Here's your complete trip plan — make sure everything looks right.</p>
+        <p class="step-title">Ready to Go!</p>
+        <p class="step-sub">Here's everything we've planned — give it a final look before saving.</p>
 
         <!-- Route recap -->
         <div class="route-recap">
@@ -896,18 +970,52 @@ function numberedPinEl(order: number): HTMLElement {
 
         <!-- Lodging summary -->
         <p class="section-label">🏨 Lodging</p>
-        @for (stop of plan()!.stops; track stop.stop_order) {
-          @if (stop.stop_type !== 'base') {
+        @for (item of phaseAStops(); track item.stop.stop_order; let i = $index) {
+          @if (item.placeType === 'hotel' || item.placeType === 'rental' || item.stop.stop_type !== 'base') {
             <div class="lodging-summary-row">
-              <span class="lodging-summary-city">{{ stopLabel(stop) }}</span>
-              @if (selectedLodgingFor(stop); as lodging) {
-                <span class="lodging-summary-name">{{ lodging.name }}</span>
-                <span class="lodging-summary-price">{{ lodging.estimated_price_per_night | currency:'USD':'symbol':'1.0-0' }}/night</span>
+              <span class="lodging-summary-city">Stop {{ i + 1 }}: {{ item.stop.city }}</span>
+              @if (item.placeType === 'hotel') {
+                <span class="lodging-summary-name">🏨 {{ confirmedPlaceName(item) }}</span>
+              } @else if (item.placeType === 'rental') {
+                <span class="lodging-summary-name">🏖️ {{ confirmedPlaceName(item) }} (rental)</span>
               } @else {
-                <span class="lodging-summary-none">No lodging selected</span>
+                @if (selectedLodgingFor(item.stop); as lodging) {
+                  <span class="lodging-summary-name">{{ lodging.name }}</span>
+                  <span class="lodging-summary-price">{{ lodging.estimated_price_per_night | currency:'USD':'symbol':'1.0-0' }}/night</span>
+                } @else {
+                  <span class="lodging-summary-none">No lodging selected</span>
+                }
               }
             </div>
           }
+        }
+
+        <!-- Restaurants summary -->
+        <mat-divider style="margin:24px 0" />
+        <p class="section-label">🍽️ Restaurants</p>
+        @if (restaurantSummary().total > 0) {
+          <p>{{ restaurantSummary().total }} restaurant{{ restaurantSummary().total === 1 ? '' : 's' }} saved across {{ restaurantSummary().stopCount }} stop{{ restaurantSummary().stopCount === 1 ? '' : 's' }}</p>
+          <button type="button" class="narrative-toggle" (click)="restaurantsExpanded.set(!restaurantsExpanded())">
+            {{ restaurantsExpanded() ? '▼' : '▶' }} See full list
+          </button>
+          @if (restaurantsExpanded()) {
+            @for (stop of plan()!.stops; track stop.stop_order) {
+              @if (hasApprovedRests(stop.stop_order)) {
+                <div class="pack-section">
+                  <p class="pack-cat-title">{{ stop.city }}</p>
+                  <div class="pack-items">
+                    @for (r of stop.restaurant_suggestions; track $index) {
+                      @if (isRestApproved(stop.stop_order, $index)) {
+                        <span class="pack-item-chip">{{ r.name }}</span>
+                      }
+                    }
+                  </div>
+                </div>
+              }
+            }
+          }
+        } @else {
+          <span class="lodging-summary-none">No restaurants saved</span>
         }
 
         <!-- Packing list -->
@@ -939,8 +1047,8 @@ function numberedPinEl(order: number): HTMLElement {
             <div class="budget-item"><label>Food</label><span>{{ plan()!.trip.estimated_costs.food | currency:'USD':'symbol':'1.0-0' }}</span></div>
             <div class="budget-item"><label>Fuel</label><span>{{ plan()!.trip.estimated_costs.fuel | currency:'USD':'symbol':'1.0-0' }}</span></div>
             <div class="budget-item"><label>Activities</label><span>{{ plan()!.trip.estimated_costs.activities | currency:'USD':'symbol':'1.0-0' }}</span></div>
-            <div class="budget-item"><label>Total</label><span>{{ plan()!.trip.estimated_costs.total | currency:'USD':'symbol':'1.0-0' }}</span></div>
           </div>
+          <div class="budget-total"><label>Total</label><span>{{ plan()!.trip.estimated_costs.total | currency:'USD':'symbol':'1.0-0' }}</span></div>
           @if (plan()!.trip.budget) {
             <p class="budget-vs" [class.under]="plan()!.trip.estimated_costs.total <= plan()!.trip.budget"
                [class.over]="plan()!.trip.estimated_costs.total > plan()!.trip.budget">
@@ -1034,13 +1142,30 @@ export class TripWizardComponent implements OnInit, OnDestroy {
 
   currentStop = computed(() => this.plan()?.stops[this.currentStopIdx()] ?? null);
 
+  currentStopInfo = computed(() => {
+    const stop = this.currentStop();
+    if (!stop) return null;
+    const { placeType, place } = this.placeInfoFor(stop);
+    return { stop, placeType, place };
+  });
+
   // ── Phase C — Review & Save ──────────────────────────────────────────
-  packingExpanded = signal(false);
+  packingExpanded     = signal(false);
+  restaurantsExpanded = signal(false);
 
   routeRecap = computed(() => {
     const p = this.plan();
     if (!p) return [];
-    return [this.shortPlace(p.trip.origin), ...p.stops.map(s => s.place_name || s.city)];
+    const home = this.shortPlace(p.trip.origin);
+    const stopNames = this.phaseAStops().map(item =>
+      item.placeType === 'hotel' || item.placeType === 'rental' ? this.confirmedPlaceName(item) : item.stop.city);
+
+    const places = [home, ...stopNames];
+    const tripType = this.form.value.trip_type;
+    if (tripType === 'round_trip' || (tripType === 'based_at_destination' && this.form.value.include_return)) {
+      places.push(home);
+    }
+    return places;
   });
 
   totalPackItems = computed(() =>
@@ -1048,6 +1173,18 @@ export class TripWizardComponent implements OnInit, OnDestroy {
       (sum, cat) => sum + cat.items.filter(item => !this.isPackExcluded(cat.category, item)).length, 0,
     ),
   );
+
+  restaurantSummary = computed(() => {
+    const p = this.plan();
+    if (!p) return { total: 0, stopCount: 0 };
+    let total = 0, stopCount = 0;
+    for (const stop of p.stops) {
+      const approved = stop.restaurant_suggestions.filter((_, i) => this.isRestApproved(stop.stop_order, i)).length;
+      if (approved > 0) stopCount++;
+      total += approved;
+    }
+    return { total, stopCount };
+  });
 
   // ── Review selection state ──────────────────────────────────────────
   selectedLodging   = signal(new Map<number, number>());
@@ -1429,11 +1566,6 @@ export class TripWizardComponent implements OnInit, OnDestroy {
     return dest.place?.city ? `${dest.place.city}, ${dest.place.state_province}` : (dest.display || 'your destination');
   }
 
-  stopLabel(stop: WizardStop): string {
-    return stop.place_name
-      ? `${stop.place_name} — ${stop.city}, ${stop.state_province}`
-      : `${stop.city}, ${stop.state_province}`;
-  }
 
   // ── Stop place-type info (correlates plan.stops with Step 1 stopInputs) ─
   /** stop_order → user-driven place override applied via "Change" in Phase A/B. */
@@ -1468,6 +1600,22 @@ export class TripWizardComponent implements OnInit, OnDestroy {
     if (item.placeType === 'hotel')  return `${item.place?.name ?? item.stop.place_name ?? 'Hotel'} — ${cityState}`;
     if (item.placeType === 'rental') return `${item.place?.name ?? item.stop.place_name ?? 'Rental Property'} — ${cityState}`;
     return cityState;
+  }
+
+  /** Display name for a confirmed hotel/rental, falling back to a generic label. */
+  confirmedPlaceName(item: { stop: WizardStop; placeType: TripStopPlaceType; place: PlaceSelectedEvent | null }): string {
+    return item.place?.name ?? item.stop.place_name ?? (item.placeType === 'hotel' ? 'Hotel' : 'Rental Property');
+  }
+
+  /** Address for a confirmed hotel/rental, optionally redacting the street number for privacy. */
+  confirmedPlaceAddress(item: { stop: WizardStop; placeType: TripStopPlaceType; place: PlaceSelectedEvent | null }, redact = false): string | null {
+    const addr = item.place?.formatted_address ?? item.stop.place_address ?? null;
+    if (!addr) return null;
+    return redact ? redactStreetNumber(addr) : addr;
+  }
+
+  scrollToTop() {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   // ── Change a stop's place (Phase A "Change" / Phase B "Change Hotel") ───
@@ -1510,11 +1658,13 @@ export class TripWizardComponent implements OnInit, OnDestroy {
 
   prevStop() {
     this.currentStopIdx.update(i => Math.max(0, i - 1));
+    this.scrollToTop();
   }
 
   nextStop() {
     const max = (this.plan()?.stops.length ?? 1) - 1;
     this.currentStopIdx.update(i => Math.min(max, i + 1));
+    this.scrollToTop();
   }
 
   goToPhaseC() {
@@ -1643,21 +1793,30 @@ export class TripWizardComponent implements OnInit, OnDestroy {
 
     const payload: WizardPlan = {
       ...p,
-      stops: p.stops.map(stop => ({
-        ...stop,
-        lodging_suggestions: stop.lodging_suggestions.map((s, i) => ({
-          ...s, approved: this.selectedLodging().get(stop.stop_order) === i,
-        })),
-        restaurant_suggestions: stop.restaurant_suggestions.map((s, i) => ({
-          ...s, approved: this.isRestApproved(stop.stop_order, i),
-        })),
-        poi_suggestions: stop.poi_suggestions.map((s, i) => ({
-          ...s, approved: this.isPoiApproved(stop.stop_order, i),
-        })),
-        special_interest_matches: (stop.special_interest_matches ?? []).map((s, i) => ({
-          ...s, approved: this.isSpecialInterestApproved(stop.stop_order, i),
-        })),
-      })),
+      stops: p.stops.map(stop => {
+        const { placeType, place } = this.placeInfoFor(stop);
+        return {
+          ...stop,
+          place_type:    placeType,
+          place_name:    place?.name ?? stop.place_name ?? null,
+          place_address: place?.formatted_address ?? stop.place_address ?? null,
+          place_lat:     place?.lat ?? stop.place_lat ?? null,
+          place_lng:     place?.lng ?? stop.place_lng ?? null,
+          place_id:      place?.place_id ?? stop.place_id ?? null,
+          lodging_suggestions: stop.lodging_suggestions.map((s, i) => ({
+            ...s, approved: this.selectedLodging().get(stop.stop_order) === i,
+          })),
+          restaurant_suggestions: stop.restaurant_suggestions.map((s, i) => ({
+            ...s, approved: this.isRestApproved(stop.stop_order, i),
+          })),
+          poi_suggestions: stop.poi_suggestions.map((s, i) => ({
+            ...s, approved: this.isPoiApproved(stop.stop_order, i),
+          })),
+          special_interest_matches: (stop.special_interest_matches ?? []).map((s, i) => ({
+            ...s, approved: this.isSpecialInterestApproved(stop.stop_order, i),
+          })),
+        };
+      }),
       trip: {
         ...p.trip,
         packing_suggestions: p.trip.packing_suggestions

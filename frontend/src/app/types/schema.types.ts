@@ -422,6 +422,7 @@ export interface WizardStop {
   place_lat?:              number | null;
   place_lng?:              number | null;
   place_id?:               string | null;
+  place_type?:             TripStopPlaceType;
 }
 
 export interface WizardTripMeta {
