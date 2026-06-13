@@ -450,6 +450,22 @@ export interface WizardPlan {
 
 export type TripType = 'round_trip' | 'one_way' | 'based_at_destination';
 
+/** A single user-defined stop from the Step 1 itinerary builder, sent to /generate so the
+ *  backend can construct the plan directly from it instead of inventing its own route. */
+export interface WizardStopPayload {
+  city:            string;
+  state_province:  string;
+  country:         string;
+  arrive_date:     string;
+  depart_date:     string;
+  place_type:      TripStopPlaceType;
+  place_name?:     string | null;
+  place_address?:  string | null;
+  place_lat?:      number | null;
+  place_lng?:      number | null;
+  place_id?:       string | null;
+}
+
 export interface WizardGenerateRequest {
   origin:             string;
   destination:        string;
@@ -468,6 +484,10 @@ export interface WizardGenerateRequest {
   stop_timing?:       string;
   base_nights?:       number;
   include_return?:    boolean;
+  /** The full Step 1 itinerary, in order. When this has more than one stop, the
+   *  backend builds the plan directly from it (Mode A) instead of letting Claude
+   *  invent the route (Mode B). */
+  stops?:             WizardStopPayload[];
   preferences: {
     lodging_type?:        string;
     cuisine_preferences?: string[];

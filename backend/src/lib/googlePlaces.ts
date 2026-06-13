@@ -204,6 +204,58 @@ export async function enrichPlace(
   }
 }
 
+// ── Directions & fuel estimates ─────────────────────────────────────────────
+
+export const MILES_PER_GALLON       = 25;
+export const FUEL_PRICE_PER_GALLON  = 3.50;
+export const GAS_STOP_THRESHOLD_MILES = 250;
+
+export interface DriveLeg {
+  minutes: number;
+  miles:   number;
+}
+
+interface DirectionsResponse {
+  status: string;
+  routes: Array<{
+    legs: Array<{
+      duration: { value: number };
+      distance: { value: number };
+    }>;
+  }>;
+}
+
+/**
+ * Drive time + distance between two addresses via the Directions API.
+ * Returns null when the API key is unset, the request fails, or no route is found.
+ */
+export async function getDriveLeg(origin: string, destination: string): Promise<DriveLeg | null> {
+  if (!API_KEY) return null;
+
+  try {
+    const url = `https://maps.googleapis.com/maps/api/directions/json`
+      + `?origin=${encodeURIComponent(origin)}`
+      + `&destination=${encodeURIComponent(destination)}`
+      + `&key=${API_KEY}`;
+    const res  = await fetch(url, { headers: { Accept: 'application/json' } });
+    const data = await res.json() as DirectionsResponse;
+
+    if (data.status !== 'OK' || !data.routes.length) return null;
+    const leg = data.routes[0].legs[0];
+    return {
+      minutes: Math.round(leg.duration.value / 60),
+      miles:   Math.round(leg.distance.value / 1609.34),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Rough fuel cost for a leg, given the app-wide MPG/price assumptions. */
+export function estimateFuelCost(miles: number): number {
+  return Math.round((miles / MILES_PER_GALLON) * FUEL_PRICE_PER_GALLON);
+}
+
 /**
  * Enrich multiple suggestions in parallel (capped to avoid quota burst).
  * Each item must have a `name` field; `city` and `state` apply to all.

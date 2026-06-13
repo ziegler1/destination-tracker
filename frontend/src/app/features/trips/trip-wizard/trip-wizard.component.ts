@@ -30,7 +30,7 @@ import {
 } from '../../../shared/components/places-autocomplete/places-autocomplete.component';
 import {
   WizardPlan, WizardStop, WizardGenerateRequest, TripType, WizardLodgingSuggestion,
-  TripStopPlaceType,
+  TripStopPlaceType, WizardStopPayload,
 } from '../../../types/schema.types';
 import { detectPlaceType, redactStreetNumber } from '../../../core/utils/stop-location.util';
 import { parseApiDate } from '../../../core/utils/date.utils';
@@ -1342,6 +1342,36 @@ export class TripWizardComponent implements OnInit, OnDestroy {
     return [...stops].reverse().find(s => s.place_type !== 'hotel') ?? stops[stops.length - 1];
   }
 
+  /** Builds the /generate `stops[]` payload entry for one Step 1 row — city/state/country
+   *  from the selected place, falling back to parsing the free-text display string. */
+  private stopPayload(s: WizardStopInput): WizardStopPayload {
+    let city           = s.place?.city ?? '';
+    let state_province = s.place?.state_province ?? '';
+    const country      = s.place?.country ?? 'USA';
+
+    if (!city) {
+      const parts = s.display.split(',').map(p => p.trim());
+      city = parts[0] ?? s.display;
+      state_province = state_province || (parts[1] ?? '');
+    }
+
+    const isSpecificPlace = s.place_type !== 'city';
+
+    return {
+      city,
+      state_province,
+      country,
+      arrive_date:   (s.arrival_date as Date).toISOString().split('T')[0],
+      depart_date:   (s.departure_date as Date).toISOString().split('T')[0],
+      place_type:    s.place_type,
+      place_name:    isSpecificPlace ? (s.place?.name              ?? null) : null,
+      place_address: isSpecificPlace ? (s.place?.formatted_address ?? null) : null,
+      place_lat:     isSpecificPlace ? (s.place?.lat               ?? null) : null,
+      place_lng:     isSpecificPlace ? (s.place?.lng                ?? null) : null,
+      place_id:      isSpecificPlace ? (s.place?.place_id          ?? null) : null,
+    };
+  }
+
   generate() {
     if (!this.canGenerate()) return;
     const v = this.form.getRawValue();
@@ -1375,6 +1405,7 @@ export class TripWizardComponent implements OnInit, OnDestroy {
       stop_timing:         v.stop_timing || 'flexible',
       base_nights:         v.base_nights ?? 4,
       include_return:      v.include_return ?? true,
+      stops:               stops.map(s => this.stopPayload(s)),
       preferences: {
         lodging_type:        v.lodging_type || undefined,
         cuisine_preferences: this.selectedCuisines().length ? this.selectedCuisines() : undefined,
@@ -1576,13 +1607,30 @@ export class TripWizardComponent implements OnInit, OnDestroy {
 
   /**
    * Best-known place type + place details for a generated stop. An explicit "Change"
-   * override takes priority; otherwise correlate back to the Step 1 stop the user entered
-   * (by place_id, falling back to city/state) so hotel/rental stops the user already chose
-   * show as confirmed instead of as lodging-TBD city stops.
+   * override takes priority. Next, if the backend echoed `place_type` directly (Mode A —
+   * the plan was built straight from the Step 1 itinerary), trust that and the place_*
+   * fields on the stop itself. Otherwise (Mode B), correlate back to the Step 1 stop the
+   * user entered (by place_id, falling back to city/state) so hotel/rental stops the user
+   * already chose show as confirmed instead of as lodging-TBD city stops.
    */
   placeInfoFor(stop: WizardStop): { placeType: TripStopPlaceType; place: PlaceSelectedEvent | null } {
     const override = this.placeOverrides().get(stop.stop_order);
     if (override) return { placeType: override.place_type, place: override.place };
+
+    if (stop.place_type) {
+      const place: PlaceSelectedEvent | null = stop.place_id ? {
+        name:              stop.place_name ?? '',
+        formatted_address: stop.place_address ?? '',
+        lat:               stop.place_lat ?? 0,
+        lng:               stop.place_lng ?? 0,
+        place_id:          stop.place_id,
+        city:              stop.city,
+        state_province:    stop.state_province,
+        country:           stop.country === 'Canada' ? 'Canada' : 'USA',
+        types:             [],
+      } : null;
+      return { placeType: stop.place_type, place };
+    }
 
     const inputs = this.stopInputs();
     const matched = (stop.place_id && inputs.find(i => i.place?.place_id === stop.place_id))

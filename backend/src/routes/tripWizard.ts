@@ -2,7 +2,10 @@ import { Router } from 'express';
 import Anthropic from '@anthropic-ai/sdk';
 import pool from '../db';
 import { asyncHandler } from '../lib/asyncHandler';
-import { enrichBatch, searchPlaces, PlaceSearchResult } from '../lib/googlePlaces';
+import {
+  enrichBatch, searchPlaces, PlaceSearchResult,
+  getDriveLeg, estimateFuelCost, GAS_STOP_THRESHOLD_MILES,
+} from '../lib/googlePlaces';
 
 const router = Router();
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -164,6 +167,27 @@ interface WizardStop {
   place_lat?:     number | null;
   place_lng?:     number | null;
   place_id?:      string | null;
+  place_type?:    string;
+}
+
+// ── User-defined stops (Step 1 itinerary builder) ────────────────────────────
+// When the traveler builds out more than one stop in the wizard, that itinerary
+// is authoritative — the plan is constructed directly from these rather than
+// asking Claude to invent a route.
+type StopPlaceType = 'city' | 'hotel' | 'rental' | 'campsite' | 'residence' | 'other';
+
+interface UserStopInput {
+  city: string;
+  state_province: string;
+  country: string;
+  arrive_date: string;
+  depart_date: string;
+  place_type: StopPlaceType;
+  place_name?:    string | null;
+  place_address?: string | null;
+  place_lat?:     number | null;
+  place_lng?:     number | null;
+  place_id?:      string | null;
 }
 
 interface WizardTrip {
@@ -185,47 +209,60 @@ interface WizardPlan {
   stops: WizardStop[];
 }
 
-// ── POST /api/trips/wizard/generate ─────────────────────────────────────────
+// ── Claude JSON response parsing (shared by Mode A & Mode B) ────────────────
 
-router.post('/generate', asyncHandler(async (req, res) => {
-  const {
-    origin, destination, destination_place, start_date, end_date, budget,
-    trip_type = 'one_way',
-    drive_hours_per_day = 6,
-    stop_timing = 'flexible',
-    base_nights = 4,
-    include_return = true,
-    preferences = {},
-  } = req.body as {
-    origin: string;
-    destination: string;
-    destination_place?: {
-      name: string; formatted_address: string; lat: number; lng: number; place_id: string;
-    } | null;
-    start_date: string;
-    end_date: string;
-    budget: number;
-    trip_type?: 'round_trip' | 'one_way' | 'based_at_destination';
-    drive_hours_per_day?: number;
-    stop_timing?: string;
-    base_nights?: number;
-    include_return?: boolean;
-    preferences?: {
-      lodging_type?: string;
-      cuisine_preferences?: string[];
-      pet_friendly?: boolean;
-      interests?: string[];
-    };
-  };
+class ClaudeParseError extends Error {
+  constructor(public raw: string) {
+    super('Claude returned invalid JSON');
+  }
+}
 
-  if (!origin || !destination || !start_date || !end_date) {
-    res.status(400).json({ error: 'origin, destination, start_date, and end_date are required' });
-    return;
+function parseClaudeJson<T>(rawText: string): T {
+  let jsonText = rawText.trim();
+
+  // Strip markdown code fences that Claude sometimes adds despite instructions
+  const fenceMatch = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fenceMatch) jsonText = fenceMatch[1].trim();
+
+  // If still not starting with { try to find the first { ... } block
+  if (!jsonText.startsWith('{')) {
+    const braceStart = jsonText.indexOf('{');
+    const braceEnd   = jsonText.lastIndexOf('}');
+    if (braceStart !== -1 && braceEnd > braceStart) {
+      jsonText = jsonText.slice(braceStart, braceEnd + 1);
+    }
   }
 
-  const minRating = (preferences as any).min_rating ?? 0;
-  const ratingNote = minRating > 0 ? `Minimum Google rating: ${minRating} stars (only suggest places rated ${minRating}+ on Google)` : 'No minimum rating requirement';
-  const prefStr = `Lodging type: ${preferences.lodging_type ?? 'any'} | Cuisine: ${preferences.cuisine_preferences?.join(', ') ?? 'any'} | Pet friendly: ${preferences.pet_friendly ? 'yes' : 'no'} | Interests: ${preferences.interests?.join(', ') ?? 'general sightseeing'} | ${ratingNote}`;
+  try {
+    return JSON.parse(jsonText) as T;
+  } catch {
+    console.error('Claude JSON parse failed. Raw (first 800 chars):', rawText.slice(0, 800));
+    throw new ClaudeParseError(rawText.slice(0, 800));
+  }
+}
+
+// ── Mode B: single destination — Claude plans the whole route ──────────────
+
+async function buildModeBPlan(params: {
+  origin: string;
+  destination: string;
+  destination_place?: {
+    name: string; formatted_address: string; lat: number; lng: number; place_id: string;
+  } | null;
+  start_date: string;
+  end_date: string;
+  budget: number;
+  trip_type: 'round_trip' | 'one_way' | 'based_at_destination';
+  drive_hours_per_day: number;
+  stop_timing: string;
+  base_nights: number;
+  include_return: boolean;
+  prefStr: string;
+}): Promise<WizardPlan> {
+  const {
+    origin, destination, destination_place, start_date, end_date, budget,
+    trip_type, drive_hours_per_day, stop_timing, base_nights, include_return, prefStr,
+  } = params;
 
   const stopShape = `{
       "stop_order": 1,
@@ -333,29 +370,7 @@ Return JSON:
   });
 
   const rawText = claudeMsg.content[0].type === 'text' ? claudeMsg.content[0].text : '';
-
-  // Strip markdown code fences that Claude sometimes adds despite instructions
-  let jsonText = rawText.trim();
-  const fenceMatch = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (fenceMatch) jsonText = fenceMatch[1].trim();
-
-  // If still not starting with { try to find the first { ... } block
-  if (!jsonText.startsWith('{')) {
-    const braceStart = jsonText.indexOf('{');
-    const braceEnd   = jsonText.lastIndexOf('}');
-    if (braceStart !== -1 && braceEnd > braceStart) {
-      jsonText = jsonText.slice(braceStart, braceEnd + 1);
-    }
-  }
-
-  let plan: WizardPlan;
-  try {
-    plan = JSON.parse(jsonText) as WizardPlan;
-  } catch {
-    console.error('Claude JSON parse failed. Raw (first 800 chars):', rawText.slice(0, 800));
-    res.status(502).json({ error: 'Claude returned invalid JSON', raw: rawText.slice(0, 800) });
-    return;
-  }
+  const plan = parseClaudeJson<WizardPlan>(rawText);
 
   // If the user picked a specific place (restaurant/lodging/special interest/etc.) as their
   // destination, attach its precise name/address/coordinates to the stop that represents it,
@@ -378,6 +393,224 @@ Return JSON:
       destStop.place_lng     = destination_place.lng;
       destStop.place_id      = destination_place.place_id;
     }
+  }
+
+  return plan;
+}
+
+// ── Mode A: direct plan construction from a pre-built itinerary ────────────
+
+/** Best address for Directions API calls: a specific place address, falling back to "City, State". */
+function addressForUserStop(s: UserStopInput): string {
+  return s.place_address || `${s.city}, ${s.state_province}`;
+}
+
+async function buildModeAPlan(params: {
+  origin: string;
+  userStops: UserStopInput[];
+  start_date: string;
+  end_date: string;
+  budget: number;
+  trip_type: 'round_trip' | 'one_way' | 'based_at_destination';
+  prefStr: string;
+}): Promise<WizardPlan> {
+  const { origin, userStops, start_date, end_date, budget, trip_type, prefStr } = params;
+
+  // 1. Drive time/distance for each leg: origin → stop1 → stop2 → ... → stopN
+  const addresses = [origin, ...userStops.map(addressForUserStop)];
+  const legs = await Promise.all(
+    userStops.map((_, i) => getDriveLeg(addresses[i], addresses[i + 1])),
+  );
+
+  // 2. Build the plan's stops directly from the traveler's itinerary —
+  // cities, order, and dates are authoritative and never altered by Claude.
+  const stops: WizardStop[] = userStops.map((s, i) => {
+    const leg   = legs[i];
+    const miles = leg?.miles ?? 0;
+    const isSpecificPlace = s.place_type !== 'city';
+    const isLast = i === userStops.length - 1;
+
+    return {
+      stop_order:              i + 1,
+      stop_type:               trip_type === 'based_at_destination' && isLast ? 'base' : 'transit',
+      city:                    s.city,
+      state_province:          s.state_province,
+      country:                 normalizeCountry(s.country),
+      arrive_date:             s.arrive_date,
+      depart_date:             s.depart_date,
+      drive_minutes_from_prev: leg?.minutes ?? 0,
+      gas_stop_before:         miles > GAS_STOP_THRESHOLD_MILES,
+      estimated_fuel_cost:     estimateFuelCost(miles),
+      lodging_suggestions:     [],
+      restaurant_suggestions:  [],
+      poi_suggestions:         [],
+      place_name:    isSpecificPlace ? (s.place_name    ?? null) : null,
+      place_address: isSpecificPlace ? (s.place_address ?? null) : null,
+      place_lat:     isSpecificPlace ? (s.place_lat     ?? null) : null,
+      place_lng:     isSpecificPlace ? (s.place_lng     ?? null) : null,
+      place_id:      isSpecificPlace ? (s.place_id      ?? null) : null,
+      place_type:    s.place_type,
+    };
+  });
+
+  // 3. Ask Claude only for budget/narrative/packing + per-stop dining/lodging/
+  // activity suggestions — the itinerary itself is fixed.
+  const stopList = stops.map((s) => {
+    const lodgingNote = (s.place_type === 'city' && s.stop_type !== 'base')
+      ? 'needs 2-3 lodging suggestions'
+      : `traveler already has lodging${s.place_name ? ` (${s.place_name})` : ''} — return an empty lodging_suggestions array`;
+    return `${s.stop_order}. ${s.city}, ${s.state_province} — ${s.arrive_date} to ${s.depart_date} (${lodgingNote})`;
+  }).join('\n');
+
+  const stopSuggestionShape = `{
+      "stop_order": 1,
+      "lodging_suggestions": [
+        { "name": "string", "area": "string", "lodging_type": "hotel", "estimated_price_per_night": 0, "why_recommended": "string" }
+      ],
+      "restaurant_suggestions": [
+        { "name": "string", "cuisine_type": "string", "price_range": "$$", "why_recommended": "string" }
+      ],
+      "poi_suggestions": [
+        { "name": "string", "poi_type": "historic_site", "why_recommended": "string" }
+      ]
+    }`;
+
+  const lastStop = stops[stops.length - 1];
+  const tripShape = `{
+    "name": "<catchy trip name>",
+    "origin": "${origin}",
+    "destination": "${lastStop.city}, ${lastStop.state_province}",
+    "start_date": "${start_date}",
+    "end_date": "${end_date}",
+    "budget": ${budget ?? 0},
+    "estimated_costs": { "lodging": 0, "food": 0, "fuel": 0, "activities": 0, "total": 0 },
+    "travel_notes": "<best aspects of this route>",
+    "packing_suggestions": [{ "category": "string", "items": ["string"] }]
+  }`;
+
+  const userPrompt = `This road trip's itinerary is already finalized — do NOT add, remove, reorder, or rename any stops. Plan the budget, travel notes, packing list, and per-stop dining/lodging/activity suggestions for it.
+
+Trip type: ${trip_type}
+Origin: ${origin}
+Preferences: ${prefStr}
+Budget: $${budget ?? 'flexible'}
+
+Stops (in order, fixed):
+${stopList}
+
+For each stop, suggest 3-4 restaurants and 2-3 points of interest. Follow the lodging instruction for each stop exactly.
+
+Return JSON:
+{
+  "trip": ${tripShape},
+  "stops": [ ${stopSuggestionShape} ]
+}`;
+
+  const claudeMsg = await anthropic.messages.create({
+    model: MODEL,
+    max_tokens: 4096,
+    system: [WIZARD_SYSTEM],
+    messages: [{ role: 'user', content: userPrompt }],
+  });
+
+  const rawText = claudeMsg.content[0].type === 'text' ? claudeMsg.content[0].text : '';
+  const enrichment = parseClaudeJson<{
+    trip: WizardTrip;
+    stops: Array<{
+      stop_order: number;
+      lodging_suggestions?:    LodgingSuggestion[];
+      restaurant_suggestions?: RestaurantSuggestion[];
+      poi_suggestions?:        PoiSuggestion[];
+    }>;
+  }>(rawText);
+
+  // 4. Merge Claude's per-stop suggestions into the directly-constructed stops
+  for (const stop of stops) {
+    const match = enrichment.stops?.find((s) => s.stop_order === stop.stop_order);
+    if (match) {
+      stop.lodging_suggestions    = match.lodging_suggestions    ?? [];
+      stop.restaurant_suggestions = match.restaurant_suggestions ?? [];
+      stop.poi_suggestions        = match.poi_suggestions        ?? [];
+    }
+  }
+
+  // 5. Fuel cost comes from real drive distances, not Claude's guess
+  const totalFuel = stops.reduce((sum, s) => sum + (s.estimated_fuel_cost ?? 0), 0);
+  const costs = enrichment.trip.estimated_costs ?? { lodging: 0, food: 0, fuel: 0, activities: 0, total: 0 };
+  costs.fuel  = totalFuel;
+  costs.total = (costs.lodging ?? 0) + (costs.food ?? 0) + costs.fuel + (costs.activities ?? 0);
+
+  return {
+    trip: { ...enrichment.trip, estimated_costs: costs },
+    stops,
+  };
+}
+
+// ── POST /api/trips/wizard/generate ─────────────────────────────────────────
+
+router.post('/generate', asyncHandler(async (req, res) => {
+  const {
+    origin, destination, destination_place, start_date, end_date, budget,
+    trip_type = 'one_way',
+    drive_hours_per_day = 6,
+    stop_timing = 'flexible',
+    base_nights = 4,
+    include_return = true,
+    preferences = {},
+    stops: userStops,
+  } = req.body as {
+    origin: string;
+    destination: string;
+    destination_place?: {
+      name: string; formatted_address: string; lat: number; lng: number; place_id: string;
+    } | null;
+    start_date: string;
+    end_date: string;
+    budget: number;
+    trip_type?: 'round_trip' | 'one_way' | 'based_at_destination';
+    drive_hours_per_day?: number;
+    stop_timing?: string;
+    base_nights?: number;
+    include_return?: boolean;
+    preferences?: {
+      lodging_type?: string;
+      cuisine_preferences?: string[];
+      pet_friendly?: boolean;
+      interests?: string[];
+    };
+    stops?: UserStopInput[];
+  };
+
+  if (!origin || !destination || !start_date || !end_date) {
+    res.status(400).json({ error: 'origin, destination, start_date, and end_date are required' });
+    return;
+  }
+
+  const minRating = (preferences as any).min_rating ?? 0;
+  const ratingNote = minRating > 0 ? `Minimum Google rating: ${minRating} stars (only suggest places rated ${minRating}+ on Google)` : 'No minimum rating requirement';
+  const prefStr = `Lodging type: ${preferences.lodging_type ?? 'any'} | Cuisine: ${preferences.cuisine_preferences?.join(', ') ?? 'any'} | Pet friendly: ${preferences.pet_friendly ? 'yes' : 'no'} | Interests: ${preferences.interests?.join(', ') ?? 'general sightseeing'} | ${ratingNote}`;
+
+  let plan: WizardPlan;
+  try {
+    if (Array.isArray(userStops) && userStops.length > 1) {
+      // ── Mode A: the traveler already built this itinerary stop-by-stop in
+      // Step 1 — construct the plan directly from those stops (preserving
+      // order, dates, and any specific places chosen) and only ask Claude to
+      // fill in budget/narrative/packing/per-stop suggestions. ─────────────
+      plan = await buildModeAPlan({ origin, userStops, start_date, end_date, budget, trip_type, prefStr });
+    } else {
+      // ── Mode B: single destination — let Claude plan the whole route ────
+      plan = await buildModeBPlan({
+        origin, destination, destination_place, start_date, end_date, budget,
+        trip_type, drive_hours_per_day, stop_timing, base_nights, include_return, prefStr,
+      });
+    }
+  } catch (err) {
+    if (err instanceof ClaudeParseError) {
+      res.status(502).json({ error: 'Claude returned invalid JSON', raw: err.raw });
+      return;
+    }
+    throw err;
   }
 
   // ── STEP 2: Google Places enrichment ─────────────────────────────────────
