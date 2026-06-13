@@ -354,6 +354,12 @@ function numberedPinEl(order: number): HTMLElement {
       .suggestion-grid { grid-template-columns:1fr; }
       .route-recap { flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:4px; }
       .recap-place { flex-shrink:0; }
+
+      /* Trip stop builder — location on its own row, dates + remove below */
+      .stop-row { flex-wrap:wrap; }
+      .stop-row-main { flex:1 1 100%; }
+      .stop-row-dates { flex:1 1 auto; }
+      .stop-row-dates mat-form-field { flex:1; width:auto; }
     }
   `],
   template: `
