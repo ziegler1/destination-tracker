@@ -193,9 +193,6 @@ function numberedPinEl(order: number): HTMLElement {
     .stop-city  { font-size:17px; font-weight:700; white-space:nowrap; }
     .stop-dates { font-size:13px; color:var(--wp-text-secondary); }
     .gas-flag   { color:#e65100; font-size:13px; font-weight:600; display:flex; align-items:center; gap:4px; }
-    .stop-type-badge { padding:2px 10px; border-radius:12px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.7px; }
-    .badge-base   { background:#fff8e1; color:#f57f17; border:1px solid #ffe082; }
-    .badge-return { background:#e8f5e9; color:#2e7d32; border:1px solid #a5d6a7; }
 
     .base-stay-banner {
       padding:14px 18px; border-radius:8px; margin-bottom:16px;
