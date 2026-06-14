@@ -1290,7 +1290,8 @@ export class TripDetailComponent implements OnInit {
 
   openAddStop() {
     const trip = this.tripSig(); if (!trip) return;
-    this.bottomSheet.open(AddStopSheetComponent, { data: { tripId: trip.id, nextOrder: (trip.stop_count ?? this.sortedStops().length) + 1 } })
+    const stops = this.sortedStops();
+    this.bottomSheet.open(AddStopSheetComponent, { data: { tripId: trip.id, nextOrder: stops.length + 1, stops } })
       .afterDismissed().subscribe((added) => { if (added) this.reload(); });
   }
 
