@@ -6,6 +6,21 @@ export function stopAddress(stop: TripStop): string | null {
       ?? (stop.destination ? `${stop.destination.city}, ${stop.destination.state_province}` : null);
 }
 
+/**
+ * Best available routing location for a stop, for building Directions API requests:
+ *  1. place_address (specific street address)
+ *  2. place_lat + place_lng (coordinates)
+ *  3. destination's "city, state" (fallback)
+ */
+export function stopRouteLocation(stop: TripStop): string | { lat: number; lng: number } | null {
+  if (stop.place_address) return stop.place_address;
+  if (stop.place_lat != null && stop.place_lng != null) {
+    return { lat: Number(stop.place_lat), lng: Number(stop.place_lng) };
+  }
+  if (stop.destination) return `${stop.destination.city}, ${stop.destination.state_province}`;
+  return null;
+}
+
 /** Best available coordinates for a stop: a specific place's lat/lng, falling back to its destination's. */
 export function stopCoords(stop: TripStop): { lat: number; lng: number } | null {
   if (stop.place_lat != null && stop.place_lng != null) {

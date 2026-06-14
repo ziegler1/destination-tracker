@@ -54,6 +54,31 @@ export class MapsService {
     });
   }
 
+  /**
+   * Load a driving route from an ordered list of locations, each either an address
+   * string (e.g. a stop's place_address or "city, state" fallback) or {lat, lng}
+   * coordinates. Lets a route mix specific addresses with bare coordinates per stop.
+   */
+  loadDirectionsFromLocations(
+    locations: (string | GmapsLatLng)[],
+  ): Observable<google.maps.DirectionsResult | null> {
+    return new Observable(obs => {
+      if (!this.ready() || locations.length < 2) { obs.next(null); obs.complete(); return; }
+      new google.maps.DirectionsService().route(
+        {
+          origin:      locations[0],
+          destination: locations[locations.length - 1],
+          waypoints:   locations.slice(1, -1).map(loc => ({ location: loc, stopover: true })),
+          travelMode:  google.maps.TravelMode.DRIVING,
+        },
+        (result, status) => {
+          obs.next(status === google.maps.DirectionsStatus.OK ? result : null);
+          obs.complete();
+        },
+      );
+    });
+  }
+
   /** Geocode a free-text address using Google Geocoding API. */
   geocode(address: string): Observable<GmapsLatLng | null> {
     return new Observable(obs => {

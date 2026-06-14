@@ -1443,14 +1443,18 @@ export class TripWizardComponent implements OnInit, OnDestroy {
     const origin     = this.form.value.origin || '';
     const tripType   = this.form.value.trip_type;
 
-    // Build address list: origin → each stop city (or precise place) → (origin if round trip)
-    const stopAddresses = sorted.map(s => s.place_address || `${s.city}, ${s.state_province}`);
-    const addresses: string[] = [origin, ...stopAddresses];
+    // Build location list: origin → each stop's address/coords/city → (origin if round trip)
+    const stopLocations: (string | google.maps.LatLngLiteral)[] = sorted.map(s => {
+      if (s.place_address) return s.place_address;
+      if (s.place_lat != null && s.place_lng != null) return { lat: Number(s.place_lat), lng: Number(s.place_lng) };
+      return `${s.city}, ${s.state_province}`;
+    });
+    const locations: (string | google.maps.LatLngLiteral)[] = [origin, ...stopLocations];
     if (tripType === 'round_trip' || (tripType === 'based_at_destination' && this.form.value.include_return)) {
-      addresses.push(origin);
+      locations.push(origin);
     }
 
-    this.mapsSvc.loadDirectionsFromAddresses(addresses).subscribe(result => {
+    this.mapsSvc.loadDirectionsFromLocations(locations).subscribe(result => {
       this.directionsResult.set(result);
     });
   }

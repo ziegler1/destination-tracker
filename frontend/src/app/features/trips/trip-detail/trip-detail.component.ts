@@ -28,7 +28,7 @@ import { ClaudeService } from '../../../core/services/claude.service';
 import { GeocodingService } from '../../../core/services/geocoding.service';
 import { MapsService } from '../../../core/services/maps.service';
 import { parseApiDate } from '../../../core/utils/date.utils';
-import { stopAddress, stopCoords as resolveStopCoords, redactStreetNumber } from '../../../core/utils/stop-location.util';
+import { stopAddress, stopCoords as resolveStopCoords, stopRouteLocation, redactStreetNumber } from '../../../core/utils/stop-location.util';
 import {
   Trip, TripStatus, TripStop, TripExpense, TripJournalEntry, Lodging, Restaurant, SpecialInterestPlace,
 } from '../../../types/schema.types';
@@ -1216,19 +1216,19 @@ export class TripDetailComponent implements OnInit {
     const sorted = this.sortedStops();
     if (!sorted.length) return;
 
-    // Build direction addresses: origin (home) → each stop's specific place/city → (end at origin if round trip)
-    const stopAddresses = sorted
-      .map(s => stopAddress(s))
-      .filter(Boolean) as string[];
+    // Build route locations: origin (home) → each stop's address/coords/city → (end at origin if round trip)
+    const stopLocations = sorted
+      .map(s => stopRouteLocation(s))
+      .filter((loc): loc is string | google.maps.LatLngLiteral => loc !== null);
 
-    if (stopAddresses.length === 0) return;
+    if (stopLocations.length === 0) return;
 
-    const addresses: string[] = t.origin_address
-      ? [t.origin_address, ...stopAddresses]
-      : stopAddresses;
+    const locations: (string | google.maps.LatLngLiteral)[] = t.origin_address
+      ? [t.origin_address, ...stopLocations]
+      : stopLocations;
 
-    if (addresses.length >= 2) {
-      this.mapsSvc.loadDirectionsFromAddresses(addresses).subscribe(result => {
+    if (locations.length >= 2) {
+      this.mapsSvc.loadDirectionsFromLocations(locations).subscribe(result => {
         this.directionsResult.set(result);
         if (result?.routes?.[0]?.legs) {
           const totalDistM = result.routes[0].legs.reduce((s, l) => s + l.distance!.value, 0);
