@@ -273,6 +273,7 @@ function restaurantMarkerEl(): HTMLElement {
     .gas-flag  { color:#e65100; font-weight:600; }
     .stop-actions { display:flex; gap:6px; padding:8px 14px;
                     border-top:1px solid var(--wp-divider); flex-wrap:wrap; }
+    .stop-directions-btn { margin:6px 14px 4px; width:calc(100% - 28px); }
     .edit-form { padding:12px 14px; background:var(--wp-surface-variant); }
     .edit-grid { display:grid; grid-template-columns:1fr 1fr; gap:0 10px; }
     .edit-full { grid-column:1/-1; }
@@ -653,6 +654,9 @@ function restaurantMarkerEl(): HTMLElement {
                     <div class="stop-num">{{ stop.stop_order }}</div>
                     <span class="stop-city">{{ stopDisplayName(stop) }}</span>
                     <span class="status-pill" [style.color]="STOP_STATUS_COLOR[stop.status]">{{ stop.status }}</span>
+                    <button mat-icon-button style="width:30px;height:30px;flex-shrink:0;line-height:30px" (click)="onStopFocused(stop)" title="View on map">
+                      <mat-icon style="font-size:18px">map</mat-icon>
+                    </button>
                   </div>
                   @if (stopLocationText(stop); as loc) {
                     <p class="stop-row" style="color:var(--wp-text-hint)">
@@ -695,9 +699,19 @@ function restaurantMarkerEl(): HTMLElement {
                           }
                         </span>
                       </p>
+                      @if (stopDirectionsUrl(stop); as dirUrl) {
+                        <a mat-stroked-button color="primary" class="stop-directions-btn" [href]="dirUrl" target="_blank" rel="noopener">
+                          <mat-icon>directions</mat-icon> Get Directions
+                        </a>
+                      }
                     }
                     @case ('rental') {
                       <p class="stop-row" style="color:var(--wp-text-hint)"><mat-icon>cottage</mat-icon> Vacation rental — this is your lodging</p>
+                      @if (stopDirectionsUrl(stop); as dirUrl) {
+                        <a mat-stroked-button color="primary" class="stop-directions-btn" [href]="dirUrl" target="_blank" rel="noopener">
+                          <mat-icon>directions</mat-icon> Get Directions
+                        </a>
+                      }
                     }
                     @case ('residence') {
                       <p class="stop-row" style="color:var(--wp-text-hint)"><mat-icon>home</mat-icon> Staying at a residence — this is your lodging</p>
@@ -718,10 +732,16 @@ function restaurantMarkerEl(): HTMLElement {
                             }
                           </span>
                         </p>
-                      } @else {
+                      } @else if (!stop.lodging_id) {
                         <p class="stop-row" style="color:var(--wp-text-hint)"><mat-icon>hotel</mat-icon> No lodging set</p>
                       }
                     }
+                  }
+
+                  @if (stop.status === 'current' && nextStopDirectionsUrl(stop); as dirUrl) {
+                    <a mat-stroked-button color="primary" class="stop-directions-btn" [href]="dirUrl" target="_blank" rel="noopener">
+                      <mat-icon>directions</mat-icon> Get Directions to Next Stop
+                    </a>
                   }
 
                   @if (stop.restaurants?.length) {
@@ -1455,5 +1475,26 @@ export class TripDetailComponent implements OnInit {
     const addr = stopAddress(stop);
     if (!addr) return null;
     return (stop.place_type === 'rental' || stop.place_type === 'residence') ? redactStreetNumber(addr) : addr;
+  }
+
+  /** Google Maps directions URL to this stop's own location (hotel/rental "Get Directions"). */
+  stopDirectionsUrl(stop: TripStop): string | null {
+    const coords = this.stopCoords(stop);
+    if (coords) {
+      return `https://www.google.com/maps/dir/?api=1&destination=${coords.lat},${coords.lng}&travelmode=driving`;
+    }
+    const addr = stopAddress(stop);
+    return addr ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(addr)}&travelmode=driving` : null;
+  }
+
+  /** Google Maps directions URL from this (current) stop to the next stop in the itinerary. */
+  nextStopDirectionsUrl(stop: TripStop): string | null {
+    const cur = this.stopCoords(stop);
+    if (!cur) return null;
+    const list = this.sortedStops();
+    const idx = list.findIndex(s => s.id === stop.id);
+    const next = list[idx + 1] ? this.stopCoords(list[idx + 1]) : null;
+    if (!next) return null;
+    return `https://www.google.com/maps/dir/?api=1&origin=${cur.lat},${cur.lng}&destination=${next.lat},${next.lng}&travelmode=driving`;
   }
 }
