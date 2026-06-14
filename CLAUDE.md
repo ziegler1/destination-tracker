@@ -36,20 +36,30 @@ trip_expenses, trip_journal_entries, points_of_interest,
 fuel_stops, app_settings
 
 ## Recent Major Changes Completed
-- Google Places photo pipeline fixed (resolvePhotoUrl)
-- All wizard confirm INSERTs now save image_url
+- Trip stops support specific places (hotels, rentals, residences, campsites)
+  via place_address/place_type/place_lat/place_lng (db/017_stop_address.sql)
+- Trip Wizard Step 1 itinerary builder is now authoritative when >1 stop is
+  given — backend builds the plan directly (Mode A) instead of Claude
+  inventing the route (Mode B); Mode B unchanged for single-destination trips
+- Google Directions API drive time/distance + fuel cost estimates
+  (getDriveLeg/estimateFuelCost in backend/src/lib/googlePlaces.ts)
+- Trip Companion map routes through each stop's specific address/coords
+  (stopRouteLocation + MapsService.loadDirectionsFromLocations), with
+  "Get Directions" buttons per stop and to the next stop
 - State normalization (full names, no abbreviations)
-- Back buttons via PageHeaderComponent
 - Miles/hours conversion throughout
-- Mobile bottom nav, FAB positioning fixed
 - Production Angular build configured
 
 ## What Is Currently Being Built
-Fixing trip stops to support specific place addresses
-(hotels, beach houses, rentals) not just city names.
-See backend/db/017_stop_address.sql migration.
+Nothing in progress. The trip-stop specific-places feature above (db/017,
+Mode A/B wizard split, Directions integration) completed 2026-06-13 — see
+docs/Plan.md for details and the Backlog section for next candidates.
 
 ## Environment Variables Required
 DATABASE_URL, ANTHROPIC_API_KEY, GOOGLE_PLACES_API_KEY,
 R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY,
-R2_BUCKET_NAME, R2_PUBLIC_URL
+R2_BUCKET, R2_PUBLIC_URL
+
+Note: GOOGLE_PLACES_API_KEY must also have the Directions API enabled in the
+Google Cloud project (used server-side by getDriveLeg for Mode A drive-time
+estimates).

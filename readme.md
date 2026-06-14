@@ -138,7 +138,7 @@ waypoint/
 | `special_interest_photos` | R2-hosted photos per special-interest place |
 | `trip_special_interests` | Special-interest places attached to a trip/stop |
 | `trips` | Named road trips with budget, origin, and status |
-| `trip_stops` | Ordered stops within a trip (links destination + lodging) |
+| `trip_stops` | Ordered stops within a trip — links destination + lodging, or a specific place (hotel/rental/residence/campsite) via `place_address`/`place_type`/`place_lat`/`place_lng` |
 | `trip_restaurants` | Restaurants visited at a stop |
 | `trip_expenses` | Categorized expenses per trip/stop |
 | `packing_lists` | Named packing lists per trip |
@@ -156,7 +156,7 @@ The app has grown well past its original Phase 0/1 scope — it's now a full tra
 
 - **Destinations, Restaurants, Lodging, Special Interests** — full CRUD with photo galleries (R2), maps, ratings, filters/search, and an AI "suggest" flow for destinations
 - **AI Trip Wizard** — describe a trip, Claude plans the route and Google Places enriches every stop (lodging, restaurants, POIs) into a reviewable preview before anything is saved
-- **Trip Companion view** — two-panel layout with stop timeline + Google Maps route, plus tabs for Expenses (with charts), Packing Lists (AI-suggested), Journal, and Fuel Log
+- **Trip Companion view** — two-panel layout with stop timeline + Google Maps route, plus tabs for Expenses (with charts), Packing Lists (AI-suggested), Journal, and Fuel Log. Stops can be a specific hotel, rental, or residence (not just a city) — the route and "Get Directions" links follow that exact address
 - **Quick Add bottom sheets** — fast, places-search-powered add forms for every entity type, available from the global "+" nav button *and* every entity list page (unified mobile UX)
 - **Google Maps integration** — full-screen map with status-coded pins, POI markers, trip route polylines, and mini-maps on detail pages
 - **Stats dashboard** — ng2-charts donuts/bars for destinations, trips, spending, and road stats (miles, fuel cost, cost-per-mile)

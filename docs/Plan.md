@@ -215,6 +215,45 @@
 
 ---
 
+## Trip Stops — Specific Places & Directions ✅
+
+> Lets travelers pin a trip stop to an exact hotel, vacation rental, residence, or
+> campsite — not just a city — and have routes/directions follow those exact
+> locations. See `backend/db/017_stop_address.sql`.
+
+**Database**
+- [x] `017_stop_address.sql` — `trip_stops` gains `place_name`, `place_address`,
+  `place_type` (city/hotel/rental/campsite/residence/other), `place_lat`/`place_lng`,
+  `place_google_id`, `is_home_base`; `destination_id` now nullable
+
+**Backend**
+- [x] `googlePlaces.ts` — `getDriveLeg()` (Directions API drive time/distance) and
+  `estimateFuelCost()` (MPG/price-based estimate), `GAS_STOP_THRESHOLD_MILES`
+- [x] `tripWizard.ts` split into **Mode A** (the traveler's Step 1 itinerary is
+  authoritative — plan built directly from it, Claude only fills in
+  suggestions/budget/narrative) and **Mode B** (single destination — Claude plans
+  the whole route, unchanged from before)
+- [x] Shared `parseClaudeJson()` helper with markdown-fence stripping for both modes
+
+**Frontend — Trip Wizard**
+- [x] Step 1 itinerary builder: insert stops with arrival/departure dates, search
+  hotels/addresses via Places Autocomplete, auto-detect place type
+- [x] Step 3 (Review Route): confirmed hotel/rental stops shown with a "✓ Confirmed"
+  badge and "Change" flow; progress steps show city names + completed checkmarks
+- [x] `WizardStopPayload` sent to `/generate` when the itinerary has >1 stop
+
+**Frontend — Trip Companion**
+- [x] `add-stop-sheet` — place-type selector, auto-creates a `lodging` record for
+  hotel stops, "Insert after" ordering via stop reorder
+- [x] "Get Directions" button per stop (to its own address/coords) and
+  "Get Directions to Next Stop" on the current stop
+- [x] `redactStreetNumber()` hides exact street numbers for rental/residence stops
+- [x] `stopRouteLocation()` + `MapsService.loadDirectionsFromLocations()` — route
+  polyline now follows each stop's specific address/coordinates, falling back to
+  city center
+
+---
+
 ## Phase 7 — App Redesign, Special Interests & Mobile Experience ✅
 
 > Covers the app-shell redesign, the Google Maps migration, the new Special Interests feature, and the mobile-polish/UX-unification passes (commits from `d6b7e12` "App shell redesign" through `0df0bb8` "Add flow unification").
