@@ -10,6 +10,7 @@ out-tsc/
 .env
 backend/.env
 *.env.local
+.mcp.json
 
 # ─── Angular ──────────────────────────────────────────────────────────────────
 .angular/

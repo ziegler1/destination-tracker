@@ -4,6 +4,9 @@
 A full-stack personal travel encyclopedia and trip planner.
 Production app at: https://frontend-production-9322.up.railway.app
 
+## Memory
+This project uses Memory Vault (Postgres-backed, via MCP) for persistent memory instead of native Claude Code memory files. Always use the `memory-vault` MCP tools (`remember`, `recall`/search) to save and retrieve context across sessions — do not write to `.claude/projects/.../memory/*.md`.
+
 ## Tech Stack
 - Frontend: Angular 17 standalone components, 
   Angular Material M3, @angular/google-maps
